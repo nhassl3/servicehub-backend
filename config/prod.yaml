@@ -1,0 +1,17 @@
+environment: prod
+
+server:
+  grpc_port: ":9090"
+  http_port: ":8080"
+
+db:
+  host: localhost
+  port: 5432
+  ssl_mode: disable
+
+auth:
+  access_token_ttl: 15m
+  refresh_token_ttl: 168h
+
+log:
+  level: info

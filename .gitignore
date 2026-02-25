@@ -1,0 +1,7 @@
+.env
+servicehub_backend_sshkey
+servicehub_backend_sshkey.pub
+proto/
+.idea
+.git
+bin
