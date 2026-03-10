@@ -1,0 +1,285 @@
+Project servicehub {
+  database_type: 'PostgreSQL'
+  Note: '''
+  # ServiceHub Database
+  ****
+
+    Схема базы данных маркетплейса цифровых услуг ServiceHub.
+
+    ## Основные модули
+
+    | Модуль | Таблицы | Описание |
+    |--------|---------|----------|
+    | Пользователи | `users`, `sessions` | Регистрация, аутентификация,
+профили |
+    | Продавцы | `sellers` | Профили продавцов, рейтинги |
+    | Каталог | `products`, `categories` | Товары, категории, полнотекстовый поиск |
+    | Заказы | `orders`, `order_items` | Оформление и отслеживание заказ
+ов |
+    | Отзывы | `reviews` | Оценки и комментарии к товарам |
+    | Корзина | `carts`, `cart_items` | Корзина покупателя |
+    | Избранное | `wishlists` | Список желаний |
+    | Финансы | `balances`, `balance_transactions` | Балансы и история транзакций |
+    | Админ | `admins`, `moderation` | Администрирование и модерация тов
+аров |
+    ****
+  '''
+}
+
+Table "users" {
+  "username" VARCHAR(50) [pk]
+  "uid" UUID [unique, not null, default: `gen_random_uuid()`]
+  "email" VARCHAR(255) [unique, not null]
+  "password_hash" VARCHAR(255) [not null]
+  "full_name" VARCHAR(255) [not null, default: '']
+  "avatar_url" TEXT [not null, default: '']
+  "role" VARCHAR(20) [not null, check: `role IN ('buyer', 'seller', 'admin')`, default: 'buyer']
+  "is_active" BOOLEAN [not null, default: true]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    uid [name: "idx_users_uid"]
+    email [name: "idx_users_email"]
+    role [name: "idx_users_role"]
+  }
+}
+
+Table "categories" {
+  "id" SERIAL [pk, increment]
+  "slug" VARCHAR(100) [unique, not null]
+  "name" VARCHAR(255) [not null]
+  "description" TEXT [not null, default: '']
+  "icon_url" TEXT [not null, default: '']
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+}
+
+Table "sellers" {
+  "id" UUID [pk, default: `gen_random_uuid()`]
+  "username" VARCHAR(50) [unique, not null]
+  "display_name" VARCHAR(255) [not null]
+  "description" TEXT [not null, default: '']
+  "avatar_url" TEXT [not null, default: '']
+  "rating" NUMERIC(3,2) [not null, default: 0.00]
+  "total_sales" INTEGER [not null, default: 0]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    username [name: "idx_sellers_username"]
+  }
+}
+
+Table "products" {
+  "id" UUID [pk, default: `gen_random_uuid()`]
+  "seller_id" UUID [not null]
+  "category_id" INTEGER [not null]
+  "title" VARCHAR(255) [not null]
+  "description" TEXT [not null, default: '']
+  "price" NUMERIC(12,2) [not null, check: `price >= 0`]
+  "tags" "TEXT[]" [not null, default: '{}']
+  "status" VARCHAR(20) [not null, check: `status IN ('active', 'inactive', 'draft')`, default: 'draft']
+  "sales_count" INTEGER [not null, default: 0]
+  "rating" NUMERIC(3,2) [not null, default: 0.00]
+  "reviews_count" INTEGER [not null, default: 0]
+  "fts" TSVECTOR
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    seller_id [name: "idx_products_seller_id"]
+    category_id [name: "idx_products_category_id"]
+    status [name: "idx_products_status"]
+    fts [type: gin, name: "idx_products_fts"]
+    tags [type: gin, name: "idx_products_tags"]
+  }
+}
+
+Table "orders" {
+  "id" UUID [pk, default: `gen_random_uuid()`]
+  "uid" UUID [unique, not null, default: `gen_random_uuid()`]
+  "username" VARCHAR(50) [not null]
+  "status" VARCHAR(20) [not null, check: `status IN ('pending', 'paid', 'delivered', 'cancelled')`, default: 'pending']
+  "total_amount" NUMERIC(12,2) [not null, default: 0.00]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    username [name: "idx_orders_username"]
+    status [name: "idx_orders_status"]
+    uid [name: "idx_orders_uid"]
+  }
+}
+
+Table "order_items" {
+  "id" BIGSERIAL [pk, increment]
+  "order_id" UUID [not null]
+  "product_id" UUID [not null]
+  "quantity" INTEGER [not null, check: `quantity > 0`]
+  "unit_price" NUMERIC(12,2) [not null]
+  "total_price" NUMERIC(12,2)
+
+  Indexes {
+    order_id [name: "idx_order_items_order_id"]
+    product_id [name: "idx_order_items_product_id"]
+  }
+}
+
+Table "reviews" {
+  "id" BIGSERIAL [pk, increment]
+  "product_id" UUID [not null]
+  "username" VARCHAR(50) [not null]
+  "rating" SMALLINT [not null, check: `rating BETWEEN 1 AND 5`]
+  "comment" TEXT [not null, default: '']
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    (product_id, username) [unique]
+    product_id [name: "idx_reviews_product_id"]
+    rating [name: "idx_reviews_rating"]
+  }
+}
+
+Table "carts" {
+  "id" BIGSERIAL [pk, increment]
+  "username" VARCHAR(50) [unique, not null]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    username [unique, name: "idx_carts_username"]
+  }
+}
+
+Table "cart_items" {
+  "id" BIGSERIAL [pk, increment]
+  "cart_id" BIGINT [not null]
+  "product_id" UUID [not null]
+  "quantity" INTEGER [not null, check: `quantity > 0`, default: 1]
+  "unit_price" NUMERIC(12,2) [not null]
+
+  Indexes {
+    (cart_id, product_id) [unique]
+    cart_id [name: "idx_cart_items_cart_id"]
+  }
+}
+
+Table "wishlists" {
+  "id" BIGSERIAL [pk, increment]
+  "username" VARCHAR(50) [not null]
+  "product_id" UUID [not null]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    (username, product_id) [unique]
+    username [name: "idx_wishlists_username"]
+  }
+}
+
+Table "balances" {
+  "username" VARCHAR(50) [unique, not null]
+  "amount" NUMERIC(14,2) [not null, check: `amount >= 0`, default: 0.00]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    username [unique, name: "idx_balances_username"]
+  }
+}
+
+Table "balance_transactions" {
+  "id" BIGSERIAL [pk, increment]
+  "username" VARCHAR(50) [not null]
+  "type" VARCHAR(20) [not null, check: `type IN ('deposit', 'withdraw', 'commission', 'profit')`]
+  "amount" NUMERIC(14,2) [not null, check: `amount > 0`]
+  "comment" TEXT [not null, default: '']
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    (username, created_at) [name: "idx_balance_tx_username_created"]
+  }
+}
+
+Table "admins" {
+  "id" UUID [pk, default: `gen_random_uuid()`]
+  "username" VARCHAR(50) [unique, not null]
+  "display_name" VARCHAR(255) [not null]
+  "level_rights" INTEGER [not null, check: `level_rights in (1, 2, 3)`, default: 1]
+  "total_moderation" INTEGER [not null, default: 0]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    username [name: "idx_admins_username"]
+  }
+}
+
+Table "moderation" {
+  "id" UUID [pk, default: `gen_random_uuid()`]
+  "admin_id" UUID [not null]
+  "product_id" UUID [unique, not null]
+  "active" BOOLEAN [not null, default: false]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+  "updated_at" TIMESTAMPTZ [not null, default: `NOW()`]
+
+  Indexes {
+    admin_id [name: "idx_admin_uid"]
+    product_id [name: "idx_admin_product_id"]
+  }
+}
+
+Table "sessions" {
+  "id" UUID [pk]
+  "username" VARCHAR [not null]
+  "refresh_token" VARCHAR [not null]
+  "user_agent" VARCHAR [not null]
+  "client_ip" VARCHAR [not null]
+  "is_blocked" BOOLEAN [not null, default: false]
+  "expires_at" TIMESTAMPTZ [not null]
+  "created_at" TIMESTAMPTZ [not null, default: `NOW()`]
+}
+
+Ref:"users"."username" < "sellers"."username" [delete: cascade]
+
+Ref:"sellers"."id" < "products"."seller_id" [delete: cascade]
+
+Ref:"categories"."id" < "products"."category_id"
+
+Ref:"users"."username" < "orders"."username" [delete: restrict]
+
+Ref:"orders"."id" < "order_items"."order_id" [delete: cascade]
+
+Ref:"products"."id" < "order_items"."product_id" [delete: restrict]
+
+Ref:"products"."id" < "reviews"."product_id" [delete: cascade]
+
+Ref:"users"."username" < "reviews"."username" [delete: cascade]
+
+Ref:"users"."username" < "carts"."username" [delete: cascade]
+
+Ref:"carts"."id" < "cart_items"."cart_id" [delete: cascade]
+
+Ref:"products"."id" < "cart_items"."product_id" [delete: cascade]
+
+Ref:"users"."username" < "wishlists"."username" [delete: cascade]
+
+Ref:"products"."id" < "wishlists"."product_id" [delete: cascade]
+
+Ref:"users"."username" < "balances"."username" [delete: cascade]
+
+Ref:"users"."username" < "balance_transactions"."username" [delete: cascade]
+
+Ref:"users"."username" < "admins"."username" [delete: cascade]
+
+Ref:"admins"."id" < "moderation"."admin_id" [delete: cascade]
+
+Ref:"products"."id" < "moderation"."product_id" [delete: cascade]
+
+Ref:"users"."username" < "sessions"."username"
+
+Records categories(slug, name, description) {
+  'api-services', 'API Services', 'REST and GraphQL API integrations'
+  'osint', 'OSINT', 'Open-source intelligence tools and data'
+  'parsers', 'Parsers', 'Web scrapers and data extractors'
+  'software', 'Software', 'Desktop and server software'
+  'general', 'General Services', 'General digital services'
+  'scripts', 'Scripts', 'Automation and utility scripts'
+}
