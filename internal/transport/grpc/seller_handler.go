@@ -40,7 +40,18 @@ func (h *SellerHandler) CreateSeller(ctx context.Context, req *sellerv1.CreateSe
 }
 
 func (h *SellerHandler) GetSellerProfile(ctx context.Context, req *sellerv1.GetSellerProfileRequest) (*sellerv1.GetSellerProfileResponse, error) {
-	seller, err := h.svc.GetSellerProfile(ctx, req.Username)
+	var params domain.GetSellerProfileParams
+
+	if req.Username != nil {
+		v := *req.Username
+		params.Username = &v
+	}
+	if req.SellerId != nil {
+		v := *req.SellerId
+		params.SellerId = &v
+	}
+
+	seller, err := h.svc.GetSellerProfile(ctx, params)
 	if err != nil {
 		return nil, domainErr(err)
 	}
