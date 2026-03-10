@@ -39,6 +39,11 @@ type ListOrdersParams struct {
 	Offset   int32
 }
 
+type SellerTotalAmount struct {
+	ProductId   string
+	TotalAmount float64
+}
+
 //go:generate mockgen -source=order.go -destination=../repository/mock/order_repo_mock.go -package=mockrepo
 type OrderRepository interface {
 	Create(ctx context.Context, username string) (*Order, error)
