@@ -2,9 +2,9 @@ name: go
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "bugfix" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "bugfix" ]
 
 jobs:
   test:
@@ -37,6 +37,8 @@ jobs:
       - name: Create .env file
         run: |
           touch .env
+          echo DB_NAME=servicehub >> .env
+          echo DB_USER=servicehub >> .env
           echo DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }} >> .env
           cat .env
 
