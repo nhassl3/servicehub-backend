@@ -7,6 +7,9 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createSeller = `-- name: CreateSeller :one
@@ -38,14 +41,21 @@ func (q *Queries) CreateSeller(ctx context.Context, arg CreateSellerParams) (Sel
 	return i, err
 }
 
-const getSellerByUsername = `-- name: GetSellerByUsername :one
+const getSeller = `-- name: GetSeller :one
 SELECT id, username, display_name, description, avatar_url, rating, total_sales, created_at, updated_at
 FROM sellers
-WHERE username = $1
+WHERE ($1::varchar IS NULL OR username = $1::varchar)
+  AND ($2::uuid IS NULL OR id = $2::uuid)
+  AND ($1::varchar IS NOT NULL OR $2::uuid IS NOT NULL)
 `
 
-func (q *Queries) GetSellerByUsername(ctx context.Context, username string) (Seller, error) {
-	row := q.db.QueryRow(ctx, getSellerByUsername, username)
+type GetSellerParams struct {
+	Username pgtype.Text `json:"username"`
+	SellerID pgtype.UUID `json:"seller_id"`
+}
+
+func (q *Queries) GetSeller(ctx context.Context, arg GetSellerParams) (Seller, error) {
+	row := q.db.QueryRow(ctx, getSeller, arg.Username, arg.SellerID)
 	var i Seller
 	err := row.Scan(
 		&i.ID,
@@ -59,6 +69,35 @@ func (q *Queries) GetSellerByUsername(ctx context.Context, username string) (Sel
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getSellerByProductId = `-- name: GetSellerByProductId :one
+SELECT username
+FROM sellers
+WHERE id=(SELECT p.seller_id FROM products p WHERE p.id=$1)
+`
+
+func (q *Queries) GetSellerByProductId(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getSellerByProductId, id)
+	var username string
+	err := row.Scan(&username)
+	return username, err
+}
+
+const increaseTotalSalesByProductId = `-- name: IncreaseTotalSalesByProductId :exec
+UPDATE sellers
+SET total_sales = total_sales + $2
+WHERE id = (SELECT p.seller_id FROM products p WHERE p.id = $1)
+`
+
+type IncreaseTotalSalesByProductIdParams struct {
+	ID         uuid.UUID `json:"id"`
+	TotalSales int32     `json:"total_sales"`
+}
+
+func (q *Queries) IncreaseTotalSalesByProductId(ctx context.Context, arg IncreaseTotalSalesByProductIdParams) error {
+	_, err := q.db.Exec(ctx, increaseTotalSalesByProductId, arg.ID, arg.TotalSales)
+	return err
 }
 
 const sellerExistsByUsername = `-- name: SellerExistsByUsername :one
@@ -109,4 +148,20 @@ func (q *Queries) UpdateSeller(ctx context.Context, arg UpdateSellerParams) (Sel
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateSellerRating = `-- name: UpdateSellerRating :exec
+UPDATE sellers
+SET rating     = (
+    SELECT COALESCE(AVG(p.rating), 0)
+    FROM products p
+    WHERE p.seller_id = $1
+),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) UpdateSellerRating(ctx context.Context, sellerID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, updateSellerRating, sellerID)
+	return err
 }

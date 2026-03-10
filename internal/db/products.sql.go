@@ -179,6 +179,17 @@ func (q *Queries) GetProductSellerID(ctx context.Context, id uuid.UUID) (uuid.UU
 	return seller_id, err
 }
 
+const increaseReviewsCount = `-- name: IncreaseReviewsCount :exec
+UPDATE products
+SET reviews_count = reviews_count+1
+WHERE id = $1
+`
+
+func (q *Queries) IncreaseReviewsCount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, increaseReviewsCount, id)
+	return err
+}
+
 const incrementProductSales = `-- name: IncrementProductSales :exec
 UPDATE products
 SET sales_count = sales_count + $2
