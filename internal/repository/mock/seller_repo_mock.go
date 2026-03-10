@@ -65,19 +65,19 @@ func (mr *MockSellerRepositoryMockRecorder) ExistsByUsername(ctx, username inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsByUsername", reflect.TypeOf((*MockSellerRepository)(nil).ExistsByUsername), ctx, username)
 }
 
-// GetByUsername mocks base method.
-func (m *MockSellerRepository) GetByUsername(ctx context.Context, username string) (*domain.Seller, error) {
+// GetSeller mocks base method.
+func (m *MockSellerRepository) GetSeller(ctx context.Context, params domain.GetSellerProfileParams) (*domain.Seller, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByUsername", ctx, username)
+	ret := m.ctrl.Call(m, "GetSeller", ctx, params)
 	ret0, _ := ret[0].(*domain.Seller)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetByUsername indicates an expected call of GetByUsername.
-func (mr *MockSellerRepositoryMockRecorder) GetByUsername(ctx, username interface{}) *gomock.Call {
+// GetSeller indicates an expected call of GetSeller.
+func (mr *MockSellerRepositoryMockRecorder) GetSeller(ctx, params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUsername", reflect.TypeOf((*MockSellerRepository)(nil).GetByUsername), ctx, username)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSeller", reflect.TypeOf((*MockSellerRepository)(nil).GetSeller), ctx, params)
 }
 
 // Update mocks base method.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/nhassl3/servicehub/internal/db"
 	"github.com/nhassl3/servicehub/internal/domain"
 )
@@ -41,6 +42,32 @@ func (r *UserRepo) Create(ctx context.Context, params domain.CreateUserParams) (
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
 	}), nil
+}
+
+func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
+	err := r.store.CreateSession(ctx, db.CreateSessionParams{
+		Username:     params.Username,
+		RefreshToken: params.RefreshToken,
+		UserAgent:    params.UserAgent,
+		ClientIp:     params.ClientIp,
+		ExpiresAt:    pgtype.Timestamptz{Time: params.ExpiresAt, Valid: true},
+		IsBlocked:    params.IsBlocked,
+	})
+	if err != nil {
+		return fmt.Errorf("user_repo.CreateSession: %w", err)
+	}
+	return nil
+}
+
+func (r *UserRepo) GetSession(ctx context.Context, username string) (*domain.Session, error) {
+	row, err := r.store.GetSession(ctx, username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("user_repo.GetSession: %w", err)
+	}
+	return mapSession(row), nil
 }
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
@@ -161,5 +188,18 @@ func mapUser(u db.User) *domain.User {
 		IsActive:     u.IsActive,
 		CreatedAt:    pgTimeTZ(u.CreatedAt, time.UTC),
 		UpdatedAt:    pgTimeTZ(u.UpdatedAt, time.UTC),
+	}
+}
+
+func mapSession(s db.Session) *domain.Session {
+	return &domain.Session{
+		ID:           s.ID.String(),
+		Username:     s.Username,
+		RefreshToken: s.RefreshToken,
+		UserAgent:    s.UserAgent,
+		ClientIP:     s.ClientIp,
+		ExpiresAt:    pgTimeTZ(s.ExpiresAt, time.UTC),
+		IsBlocked:    s.IsBlocked,
+		CreatedAt:    pgTimeTZ(s.CreatedAt, time.UTC),
 	}
 }

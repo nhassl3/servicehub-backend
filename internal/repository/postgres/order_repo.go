@@ -61,28 +61,43 @@ func (r *OrderRepo) GetByUID(ctx context.Context, uid string) (*domain.Order, er
 }
 
 func (r *OrderRepo) List(ctx context.Context, params domain.ListOrdersParams) ([]domain.Order, int64, error) {
-	total, err := r.store.CountOrdersByUsername(ctx, db.CountOrdersByUsernameParams{
-		Username:     params.Username,
-		FilterStatus: params.Status,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("order_repo.List count: %w", err)
+	orders := make([]domain.Order, 0, params.Limit)
+	var total int64
+
+	if err := r.store.ExecTx(ctx, func(q *db.Queries) error {
+		var err error
+
+		total, err = r.store.CountOrdersByUsername(ctx, db.CountOrdersByUsernameParams{
+			Username:     params.Username,
+			FilterStatus: params.Status,
+		})
+		if err != nil {
+			return fmt.Errorf("order_repo.List count: %w", err)
+		}
+
+		rows, err := r.store.ListOrdersByUsername(ctx, db.ListOrdersByUsernameParams{
+			Username:     params.Username,
+			FilterStatus: params.Status,
+			Limit:        params.Limit,
+			Offset:       params.Offset,
+		})
+		if err != nil {
+			return fmt.Errorf("order_repo.List: %w", err)
+		}
+
+		// TODO: may be very critical place
+		for _, row := range rows {
+			items, _ := r.getItems(ctx, row.ID) // an error may appear here
+			order := *mapOrder(row)
+			order.Items = items
+			orders = append(orders, order)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, 0, err
 	}
 
-	rows, err := r.store.ListOrdersByUsername(ctx, db.ListOrdersByUsernameParams{
-		Username:     params.Username,
-		FilterStatus: params.Status,
-		Limit:        params.Limit,
-		Offset:       params.Offset,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("order_repo.List: %w", err)
-	}
-
-	orders := make([]domain.Order, len(rows))
-	for i, row := range rows {
-		orders[i] = *mapOrder(row)
-	}
 	return orders, total, nil
 }
 
@@ -108,7 +123,11 @@ func (r *OrderRepo) UpdateStatus(ctx context.Context, id, status string) (*domai
 //  1. Get cart + items
 //  2. Check balance (FOR UPDATE lock)
 //  3. Create order
-//  4. Insert order items + increment product sales_count
+//  4. Insert items +
+//     // 		increment product sales +
+//     //		increase total sales on count from given parameters +
+//     //		transfer money to sellers account
+//     //		commission from totalAmount on admin balance
 //  5. Deduct balance + record transaction
 //  6. Clear cart
 //  7. Mark order as paid
@@ -131,8 +150,11 @@ func (r *OrderRepo) Checkout(ctx context.Context, username string) (*domain.Orde
 		}
 
 		var totalAmount float64
+		sellers := make(map[uuid.UUID]float64, len(cartItems))
 		for _, ci := range cartItems {
-			totalAmount += float64(ci.Quantity) * ci.UnitPrice
+			amount := float64(ci.Quantity) * ci.UnitPrice
+			totalAmount += amount
+			sellers[ci.ProductID] = amount - (amount * 0.1) // 10% percents commission
 		}
 
 		// 2. Check balance
@@ -153,8 +175,13 @@ func (r *OrderRepo) Checkout(ctx context.Context, username string) (*domain.Orde
 			return fmt.Errorf("create order: %w", err)
 		}
 
-		// 4. Insert items + increment product sales
+		// 4. Insert items +
+		// 		increment product sales +
+		//		increase total sales on count from given parameters +
+		//		transfer money to sellers account
+		//		commission from totalAmount on admin balance
 		for _, ci := range cartItems {
+			// Create order items
 			if _, err = q.CreateOrderItem(ctx, db.CreateOrderItemParams{
 				OrderID:   order.ID,
 				ProductID: ci.ProductID,
@@ -163,11 +190,36 @@ func (r *OrderRepo) Checkout(ctx context.Context, username string) (*domain.Orde
 			}); err != nil {
 				return fmt.Errorf("create order item: %w", err)
 			}
-			if err = q.IncrementProductSales(ctx, db.IncrementProductSalesParams{
-				ID:         ci.ProductID,
-				SalesCount: ci.Quantity,
-			}); err != nil {
-				return fmt.Errorf("increment sales: %w", err)
+			// Increment seller parameters
+			if err := incrementSellerParameters(ctx, q, ci.ProductID, ci.Quantity); err != nil {
+				return err
+			}
+			// AddToBalance for seller
+			sellerUsername, err := q.GetSellerByProductId(ctx, ci.ProductID)
+			if err != nil {
+				return fmt.Errorf("get seller by product id: %w", err)
+			}
+			if err := addToBalance(
+				ctx,
+				q,
+				sellerUsername,
+				sellers[ci.ProductID],
+				fmt.Sprintf("Profit from order %s", order.ID), domain.TxTypeProfit,
+			); err != nil {
+				return err
+			}
+			// AddToBalance for admin who checked this product (10%)
+			adminUsername, err := q.GetAdminUsernameByProductId(ctx, ci.ProductID)
+			if err != nil {
+				return fmt.Errorf("get admin username: %w", err)
+			}
+			if err := addToBalance(
+				ctx,
+				q,
+				adminUsername,
+				totalAmount*0.1,
+				fmt.Sprintf("Commission from order %s", order.ID), domain.TxTypeCommission); err != nil {
+				return err
 			}
 		}
 
@@ -218,9 +270,54 @@ func (r *OrderRepo) Checkout(ctx context.Context, username string) (*domain.Orde
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrInsufficientFunds) {
+			return nil, domain.ErrInsufficientFunds
+		} else if errors.Is(err, domain.ErrEmptyCart) {
+			return nil, domain.ErrEmptyCart
+		}
 		return nil, fmt.Errorf("order_repo.Checkout: %w", err)
 	}
 	return finalOrder, nil
+}
+
+func incrementSellerParameters(ctx context.Context, q *db.Queries, productID uuid.UUID, quantity int32) error {
+	if err := q.IncrementProductSales(ctx, db.IncrementProductSalesParams{
+		ID:         productID,
+		SalesCount: quantity,
+	}); err != nil {
+		return fmt.Errorf("increment sales: %w", err)
+	}
+	if err := q.IncreaseTotalSalesByProductId(ctx, db.IncreaseTotalSalesByProductIdParams{
+		ID:         productID,
+		TotalSales: quantity,
+	}); err != nil {
+		return fmt.Errorf("increase total sales for seller: %w", err)
+	}
+	return nil
+}
+
+func addToBalance(
+	ctx context.Context,
+	q *db.Queries,
+	username string,
+	amount float64,
+	comment, typeOfDeposit string,
+) error {
+	if _, err := q.AddToBalance(ctx, db.AddToBalanceParams{
+		Username: username,
+		Amount:   amount,
+	}); err != nil {
+		return fmt.Errorf("add to balance: %w", err)
+	}
+	if _, err := q.CreateBalanceTx(ctx, db.CreateBalanceTxParams{
+		Username: username,
+		Type:     typeOfDeposit,
+		Amount:   amount,
+		Comment:  comment,
+	}); err != nil {
+		return fmt.Errorf("create balance for seller tx: %w", err)
+	}
+	return nil
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
