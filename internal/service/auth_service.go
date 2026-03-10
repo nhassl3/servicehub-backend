@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/nhassl3/servicehub/internal/domain"
 	"github.com/nhassl3/servicehub/pkg/auth"
 	"github.com/nhassl3/servicehub/pkg/hash"
+	"google.golang.org/grpc/metadata"
 )
 
 type AuthService struct {
@@ -32,8 +35,9 @@ type RegisterInput struct {
 }
 
 type TokenPair struct {
-	AccessToken  string
-	RefreshToken string
+	AccessToken         string
+	RefreshToken        string
+	RefreshTokenPayload *auth.Payload
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, *TokenPair, error) {
@@ -73,6 +77,10 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 		return nil, nil, err
 	}
 
+	if err := s.createSession(ctx, input.Username, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
+		return nil, nil, err
+	}
+
 	return user, tokens, nil
 }
 
@@ -98,16 +106,41 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 		return nil, nil, err
 	}
 
+	if err := s.createSession(ctx, username, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
+		return nil, nil, err
+	}
+
 	return user, tokens, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
-	payload, err := s.refreshManager.VerifyToken(refreshToken)
+func (s *AuthService) RefreshToken(ctx context.Context, username string) (*TokenPair, error) {
+	session, err := s.userRepo.GetSession(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("auth_service.RefreshToken get session: %w", err)
+	}
+
+	if session.RefreshToken == "" {
+		return nil, domain.ErrInvalidToken
+	} else if time.Now().After(session.ExpiresAt) {
+		return nil, domain.ErrExpiredToken
+	} else if session.IsBlocked {
+		return nil, domain.ErrSessionIsBlocked
+	}
+
+	payload, err := s.refreshManager.VerifyToken(session.RefreshToken)
 	if err != nil {
 		return nil, domain.ErrInvalidCredentials
 	}
 
-	return s.createTokenPair(payload.Username, payload.UID, payload.Role)
+	accessToken, err := s.tokenManager.CreateToken(username, payload.UID, payload.Role)
+	if err != nil {
+		return nil, fmt.Errorf("auth_service: create access token: %w", err)
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: session.RefreshToken,
+	}, nil
 }
 
 func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User, error) {
@@ -120,10 +153,41 @@ func (s *AuthService) createTokenPair(username, uid, role string) (*TokenPair, e
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
 
-	refreshToken, err := s.refreshManager.CreateToken(username, uid, role)
+	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create refresh token: %w", err)
 	}
 
-	return &TokenPair{AccessToken: accessToken, RefreshToken: refreshToken}, nil
+	return &TokenPair{AccessToken: accessToken, RefreshToken: refreshToken, RefreshTokenPayload: payload}, nil
+}
+
+func (s *AuthService) createSession(ctx context.Context, username, refreshToken string, expiredAt time.Time) error {
+	var clientIp, userAgent string
+	if headers, ok := metadata.FromIncomingContext(ctx); ok {
+		xForwardFor := headers.Get("x-forwarded-for")
+		if len(xForwardFor) > 0 && xForwardFor[0] != "" {
+			ips := strings.Split(xForwardFor[0], ",")
+			if len(ips) > 0 {
+				clientIp = ips[0]
+			}
+		}
+		usrAgent := headers.Get("user-agent")
+		if len(usrAgent) >= 1 && usrAgent[0] != "" {
+			userAgent = usrAgent[0]
+		}
+	}
+
+	// Creating session record about user session
+	if err := s.userRepo.CreateSession(ctx, domain.CreateSessionParams{
+		Username:     username,
+		RefreshToken: refreshToken,
+		UserAgent:    userAgent,
+		ClientIp:     clientIp,
+		IsBlocked:    false,
+		ExpiresAt:    expiredAt,
+	}); err != nil {
+		return fmt.Errorf("auth_service.Register create session: %w", err)
+	}
+
+	return nil
 }

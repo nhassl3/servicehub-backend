@@ -35,7 +35,9 @@ func (s *ProductService) SearchProducts(ctx context.Context, params domain.Searc
 }
 
 func (s *ProductService) CreateProduct(ctx context.Context, username string, params domain.CreateProductParams) (*domain.Product, error) {
-	seller, err := s.sellerRepo.GetByUsername(ctx, username)
+	seller, err := s.sellerRepo.GetSeller(ctx, domain.GetSellerProfileParams{
+		Username: &username,
+	})
 	if err != nil {
 		return nil, domain.ErrForbidden
 	}
@@ -53,7 +55,9 @@ func (s *ProductService) UpdateProduct(ctx context.Context, username string, par
 		return nil, err
 	}
 
-	seller, err := s.sellerRepo.GetByUsername(ctx, username)
+	seller, err := s.sellerRepo.GetSeller(ctx, domain.GetSellerProfileParams{
+		Username: &username,
+	})
 	if err != nil || seller.ID != existing.SellerID {
 		return nil, domain.ErrForbidden
 	}
@@ -67,7 +71,9 @@ func (s *ProductService) DeleteProduct(ctx context.Context, username, id string)
 		return err
 	}
 
-	seller, err := s.sellerRepo.GetByUsername(ctx, username)
+	seller, err := s.sellerRepo.GetSeller(ctx, domain.GetSellerProfileParams{
+		Username: &username,
+	})
 	if err != nil || seller.ID != existing.SellerID {
 		return domain.ErrForbidden
 	}
