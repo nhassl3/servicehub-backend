@@ -5,3 +5,4 @@ proto/
 .idea
 .git
 bin
+coverage.out
