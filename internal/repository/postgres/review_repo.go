@@ -43,10 +43,24 @@ func (r *ReviewRepo) Create(ctx context.Context, params domain.CreateReviewParam
 		if err != nil {
 			return err
 		}
-		return q.UpdateProductRating(ctx, db.UpdateProductRatingParams{
+		if err := q.UpdateProductRating(ctx, db.UpdateProductRatingParams{
 			ID:     productUID,
 			Rating: avg,
-		})
+		}); err != nil {
+			return err
+		}
+
+		// Update seller rating: recalculate average across all their products.
+		sellerID, err := q.GetProductSellerID(ctx, productUID)
+		if err != nil {
+			return err
+		}
+		if err := q.UpdateSellerRating(ctx, sellerID); err != nil {
+			return err
+		}
+
+		// Increase review count for the product.
+		return q.IncreaseReviewsCount(ctx, productUID)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("review_repo.Create: %w", err)

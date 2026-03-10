@@ -77,15 +77,8 @@ sqlc:
 ## ─── DATABSE CONTROLL ────────────────────────────────────────────────────────
 
 generate-data:
-	@docker exec -i servicehub-postgres psql -U servicehub -d servicehub < /home/nhassl3/Projects/servicehub/scripts/seed.sql
+	@docker exec -i $(CONTAINER_NAME) psql -U servicehub -d servicehub < /home/nhassl3/Projects/servicehub/scripts/seed.sql
 	@echo "Successfully created data"
-
-_regenerateData:
-	@docker exec -i servicehub-postgres psql -U servicehub -d servicehub \
- 	-c "TRUNCATE balance_transactions, balances, wishlists, cart_items, carts, reviews, order_items, orders, products, sellers RESTART IDENTITY CASCADE; DELETE FROM users WHERE username != 'admin';"
-
-regenerate-data: _regenerateData generate-data
-	@echo "Data regenerated successfully"
 
 createdb:
 	@docker exec -it postgres18 createdb --username=$(DB_USER) --owner=$(DB_USER) $(DB_NAME)

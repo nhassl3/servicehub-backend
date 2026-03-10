@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,16 +26,28 @@ func NewStore(pool *pgxpool.Pool) *Store {
 // ExecTx executes fn inside a database transaction.
 // The transaction is committed if fn returns nil, rolled back otherwise.
 func (s *Store) ExecTx(ctx context.Context, fn func(*Queries) error) error {
-	tx, err := s.pool.Begin(ctx)
+	// Create new connection from pool
+	conn, err := s.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("failed when acquire db connection: %w", err)
+	}
+	defer conn.Release()
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
+		AccessMode: pgx.ReadWrite,
+	})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	qtx := s.WithTx(tx)
-	if err := fn(qtx); err != nil {
+	if err = fn(s.WithTx(tx)); err != nil {
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			return fmt.Errorf("tx err : %v, rb err: %v", err, rbErr)
+		}
 		return err
 	}
+
 	return tx.Commit(ctx)
 }
 

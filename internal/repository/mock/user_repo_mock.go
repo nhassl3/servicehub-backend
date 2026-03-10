@@ -50,6 +50,21 @@ func (mr *MockUserRepositoryMockRecorder) Create(ctx, params interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserRepository)(nil).Create), ctx, params)
 }
 
+// CreateSession mocks base method.
+func (m *MockUserRepository) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSession", ctx, params)
+	ret0, _ := ret[0].(*domain.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSession indicates an expected call of CreateSession.
+func (mr *MockUserRepositoryMockRecorder) CreateSession(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockUserRepository)(nil).CreateSession), ctx, params)
+}
+
 // ExistsByEmail mocks base method.
 func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -125,6 +140,21 @@ func (mr *MockUserRepositoryMockRecorder) GetByUsername(ctx, username interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUsername", reflect.TypeOf((*MockUserRepository)(nil).GetByUsername), ctx, username)
 }
 
+// GetSession mocks base method.
+func (m *MockUserRepository) GetSession(ctx context.Context, username string) (*domain.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSession", ctx, username)
+	ret0, _ := ret[0].(*domain.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSession indicates an expected call of GetSession.
+func (mr *MockUserRepositoryMockRecorder) GetSession(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSession", reflect.TypeOf((*MockUserRepository)(nil).GetSession), ctx, username)
+}
+
 // Update mocks base method.
 func (m *MockUserRepository) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
@@ -138,4 +168,19 @@ func (m *MockUserRepository) Update(ctx context.Context, params domain.UpdateUse
 func (mr *MockUserRepositoryMockRecorder) Update(ctx, params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserRepository)(nil).Update), ctx, params)
+}
+
+// UpdatePassword mocks base method.
+func (m *MockUserRepository) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdatePassword", ctx, params)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdatePassword indicates an expected call of UpdatePassword.
+func (mr *MockUserRepositoryMockRecorder) UpdatePassword(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockUserRepository)(nil).UpdatePassword), ctx, params)
 }

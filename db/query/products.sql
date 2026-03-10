@@ -66,5 +66,10 @@ UPDATE products
 SET rating = $2
 WHERE id = $1;
 
+-- name: IncreaseReviewsCount :exec
+UPDATE products
+SET reviews_count = reviews_count+1
+WHERE id = $1;
+
 -- name: GetProductSellerID :one
 SELECT seller_id FROM products WHERE id = $1;

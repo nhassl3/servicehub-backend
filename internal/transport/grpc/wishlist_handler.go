@@ -39,6 +39,18 @@ func (h *WishlistHandler) GetWishlist(ctx context.Context, _ *wishlistv1.GetWish
 	return &wishlistv1.GetWishlistResponse{Items: proto}, nil
 }
 
+func (h *WishlistHandler) InWishlist(ctx context.Context, req *wishlistv1.InWishlistRequest) (*wishlistv1.InWishlistResponse, error) {
+	username, err := mustUsername(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ok, err := h.svc.Exists(ctx, username, req.GetProductId())
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &wishlistv1.InWishlistResponse{InWishlist: ok}, nil
+}
+
 func (h *WishlistHandler) AddItem(ctx context.Context, req *wishlistv1.AddItemRequest) (*wishlistv1.AddItemResponse, error) {
 	username, err := mustUsername(ctx)
 	if err != nil {

@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS products (
     description   TEXT         NOT NULL DEFAULT '',
     price         NUMERIC(12,2) NOT NULL CHECK (price >= 0),
     tags          TEXT[]       NOT NULL DEFAULT '{}',
-    status        VARCHAR(20)  NOT NULL DEFAULT 'active'
+    status        VARCHAR(20)  NOT NULL DEFAULT 'draft'
                   CHECK (status IN ('active', 'inactive', 'draft')),
     sales_count   INTEGER      NOT NULL DEFAULT 0,
     rating        NUMERIC(3,2) NOT NULL DEFAULT 0.00,

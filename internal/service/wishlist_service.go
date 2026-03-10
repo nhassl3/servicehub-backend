@@ -25,3 +25,7 @@ func (s *WishlistService) AddItem(ctx context.Context, username, productID strin
 func (s *WishlistService) RemoveItem(ctx context.Context, username, productID string) error {
 	return s.repo.RemoveItem(ctx, username, productID)
 }
+
+func (s *WishlistService) Exists(ctx context.Context, username, productID string) (bool, error) {
+	return s.repo.Exists(ctx, username, productID)
+}

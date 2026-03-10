@@ -9,6 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Admin struct {
+	ID              uuid.UUID          `json:"id"`
+	Username        string             `json:"username"`
+	DisplayName     string             `json:"display_name"`
+	LevelRights     int32              `json:"level_rights"`
+	TotalModeration int32              `json:"total_moderation"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Balance struct {
 	Username  string             `json:"username"`
 	Amount    float64            `json:"amount"`
@@ -45,6 +55,15 @@ type Category struct {
 	Description string             `json:"description"`
 	IconUrl     string             `json:"icon_url"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type Moderation struct {
+	ID        uuid.UUID          `json:"id"`
+	AdminID   uuid.UUID          `json:"admin_id"`
+	ProductID uuid.UUID          `json:"product_id"`
+	Active    bool               `json:"active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Order struct {
@@ -102,6 +121,17 @@ type Seller struct {
 	TotalSales  int32              `json:"total_sales"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Session struct {
+	ID           uuid.UUID          `json:"id"`
+	Username     string             `json:"username"`
+	RefreshToken string             `json:"refresh_token"`
+	UserAgent    string             `json:"user_agent"`
+	ClientIp     string             `json:"client_ip"`
+	IsBlocked    bool               `json:"is_blocked"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type User struct {

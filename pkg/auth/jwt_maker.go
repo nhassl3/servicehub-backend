@@ -29,11 +29,33 @@ func NewJWTMaker(secret string, ttl time.Duration) (*JWTMaker, error) {
 }
 
 func (m *JWTMaker) CreateToken(username, uid, role string) (string, error) {
-	now := time.Now()
+	return m.createToken(username, uid, role, time.Now())
+}
+
+func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payload, error) {
+	begin := time.Now()
+	token, err := m.createToken(username, uid, role, begin)
+	if err != nil {
+		return "", nil, err
+	}
+	return token, &Payload{
+		Username:  username,
+		UID:       uid,
+		Role:      role,
+		IssuedAt:  begin,
+		ExpiredAt: begin.Add(m.ttl),
+	}, nil
+}
+
+func (m *JWTMaker) createToken(username, uid, role string, start time.Time) (string, error) {
+	if start == (time.Time{}) {
+		start = time.Now()
+	}
+
 	claims := &jwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
+			IssuedAt:  jwt.NewNumericDate(start),
+			ExpiresAt: jwt.NewNumericDate(start.Add(m.ttl)),
 		},
 		Username: username,
 		UID:      uid,
@@ -41,7 +63,11 @@ func (m *JWTMaker) CreateToken(username, uid, role string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(m.secret)
+	tokenString, err := token.SignedString(m.secret)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
 }
 
 func (m *JWTMaker) VerifyToken(tokenStr string) (*Payload, error) {

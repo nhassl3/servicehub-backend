@@ -23,6 +23,11 @@ type CreateSellerParams struct {
 	Description string
 }
 
+type GetSellerProfileParams struct {
+	Username *string
+	SellerId *string
+}
+
 type UpdateSellerParams struct {
 	Username    string
 	DisplayName string
@@ -33,7 +38,7 @@ type UpdateSellerParams struct {
 //go:generate mockgen -source=seller.go -destination=../repository/mock/seller_repo_mock.go -package=mockrepo
 type SellerRepository interface {
 	Create(ctx context.Context, params CreateSellerParams) (*Seller, error)
-	GetByUsername(ctx context.Context, username string) (*Seller, error)
+	GetSeller(ctx context.Context, params GetSellerProfileParams) (*Seller, error)
 	Update(ctx context.Context, params UpdateSellerParams) (*Seller, error)
 	ExistsByUsername(ctx context.Context, username string) (bool, error)
 }

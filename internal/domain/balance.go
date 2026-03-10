@@ -6,8 +6,10 @@ import (
 )
 
 const (
-	TxTypeDeposit  = "deposit"
-	TxTypeWithdraw = "withdraw"
+	TxTypeDeposit    = "deposit"
+	TxTypeWithdraw   = "withdraw"
+	TxTypeProfit     = "profit"
+	TxTypeCommission = "commission"
 )
 
 type Balance struct {

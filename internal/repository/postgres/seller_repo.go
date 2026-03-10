@@ -45,13 +45,20 @@ func (r *SellerRepo) Create(ctx context.Context, params domain.CreateSellerParam
 	return seller, nil
 }
 
-func (r *SellerRepo) GetByUsername(ctx context.Context, username string) (*domain.Seller, error) {
-	row, err := r.store.GetSellerByUsername(ctx, username)
+func (r *SellerRepo) GetSeller(ctx context.Context, params domain.GetSellerProfileParams) (*domain.Seller, error) {
+	sellerID := uuidPtrToNullable(params.SellerId)
+	if params.SellerId != nil && !sellerID.Valid {
+		return nil, domain.ErrInvalidInput
+	}
+	row, err := r.store.GetSeller(ctx, db.GetSellerParams{
+		Username: usernamePtrToNullable(params.Username),
+		SellerID: sellerID,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("seller_repo.GetByUsername: %w", err)
+		return nil, fmt.Errorf("seller_repo.GetSeller: %w", err)
 	}
 	return mapSeller(row), nil
 }

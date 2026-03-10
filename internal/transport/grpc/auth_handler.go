@@ -35,6 +35,10 @@ func NewAuthHandler(svc *service.AuthService, _ auth.TokenManager) *AuthHandler 
 }
 
 func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	user, tokens, err := h.svc.Register(ctx, service.RegisterInput{
 		Username: req.Username,
 		Email:    req.Email,
@@ -52,6 +56,10 @@ func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest)
 }
 
 func (h *AuthHandler) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.LoginResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	user, tokens, err := h.svc.Login(ctx, req.Username, req.Password)
 	if err != nil {
 		return nil, domainErr(err)
@@ -70,9 +78,9 @@ func (h *AuthHandler) Logout(_ context.Context, _ *authv1.LogoutRequest) (*authv
 }
 
 func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequest) (*authv1.RefreshTokenResponse, error) {
-	tokens, err := h.svc.RefreshToken(ctx, req.RefreshToken)
+	tokens, err := h.svc.RefreshToken(ctx, req.Username)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid or expired refresh token")
+		return nil, domainErr(err)
 	}
 	return &authv1.RefreshTokenResponse{
 		AccessToken:  tokens.AccessToken,
@@ -105,6 +113,7 @@ func protoUserInfo(u *domain.User) *authv1.UserInfo {
 		AvatarUrl: u.AvatarURL,
 		Role:      u.Role,
 		CreatedAt: safeTimestamp(u.CreatedAt),
+		IsActive:  u.IsActive,
 	}
 }
 

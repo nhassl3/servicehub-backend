@@ -34,10 +34,33 @@ func NewPasetoMaker(keyHex string, ttl time.Duration) (*PasetoMaker, error) {
 }
 
 func (m *PasetoMaker) CreateToken(username, uid, role string) (string, error) {
+	return m.createToken(username, uid, role, time.Now())
+}
+
+func (m *PasetoMaker) CreateRefreshToken(username, uid, role string) (string, *Payload, error) {
+	begin := time.Now()
+	token, err := m.createToken(username, uid, role, begin)
+	if err != nil {
+		return "", nil, err
+	}
+	return token, &Payload{
+		Username:  username,
+		UID:       uid,
+		Role:      role,
+		IssuedAt:  begin,
+		ExpiredAt: begin.Add(m.ttl),
+	}, nil
+}
+
+func (m *PasetoMaker) createToken(username, uid, role string, startTime time.Time) (string, error) {
+	if startTime == (time.Time{}) {
+		startTime = time.Now()
+	}
+
 	token := paseto.NewToken()
 	token.SetJti(uuid.New().String())
-	token.SetIssuedAt(time.Now())
-	token.SetExpiration(time.Now().Add(m.ttl))
+	token.SetIssuedAt(startTime)
+	token.SetExpiration(startTime.Add(m.ttl))
 	token.SetString("username", username)
 	token.SetString("uid", uid)
 	token.SetString("role", role)

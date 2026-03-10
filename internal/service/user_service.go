@@ -36,12 +36,12 @@ func (s *UserService) UpdatePassword(ctx context.Context, params domain.UpdateUs
 		return nil, fmt.Errorf("user_service.UpdatePassword verify password: %w", err)
 	}
 	if !ok {
-		return nil, domain.ErrorPasswordDontMatch
+		return nil, domain.ErrPasswordDontMatch
 	}
 
 	// similarity by default is 0.7 - DO NOT CHANGE THIS THRESHOLD
 	passwordValidator := validator.New(
-		validator.Similarity([]string{params.OldPassword}, nil, domain.ErrorTooSimilarPasswords),
+		validator.Similarity([]string{params.OldPassword}, nil, domain.ErrTooSimilarPasswords),
 	)
 	if err := passwordValidator.Validate(params.NewPassword); err != nil {
 		return nil, err

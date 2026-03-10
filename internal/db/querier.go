@@ -25,16 +25,22 @@ type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (CreateProductRow, error)
 	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
 	CreateSeller(ctx context.Context, arg CreateSellerParams) (Seller, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeductFromBalance(ctx context.Context, arg DeductFromBalanceParams) (Balance, error)
 	DeleteCartItem(ctx context.Context, arg DeleteCartItemParams) (int64, error)
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
 	DeleteReview(ctx context.Context, id int64) (int64, error)
+	GetAdminById(ctx context.Context, id uuid.UUID) (Admin, error)
+	GetAdminByUsername(ctx context.Context, username string) (Admin, error)
+	GetAdminUsernameByProductId(ctx context.Context, productID uuid.UUID) (string, error)
 	GetAvgRatingByProduct(ctx context.Context, productID uuid.UUID) (float64, error)
 	GetBalance(ctx context.Context, username string) (Balance, error)
 	GetBalanceForUpdate(ctx context.Context, username string) (GetBalanceForUpdateRow, error)
 	GetCartItems(ctx context.Context, cartID int64) ([]CartItem, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (GetCategoryBySlugRow, error)
+	GetModerationByAdminId(ctx context.Context, adminID uuid.UUID) (Moderation, error)
+	GetModerationByProductId(ctx context.Context, productID uuid.UUID) (Moderation, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByUID(ctx context.Context, uid uuid.UUID) (Order, error)
 	GetOrderItems(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
@@ -43,12 +49,17 @@ type Querier interface {
 	GetProductSellerID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetReviewByID(ctx context.Context, id int64) (Review, error)
 	GetReviewsByProduct(ctx context.Context, arg GetReviewsByProductParams) ([]Review, error)
-	GetSellerByUsername(ctx context.Context, username string) (Seller, error)
+	GetSeller(ctx context.Context, arg GetSellerParams) (Seller, error)
+	GetSellerByProductId(ctx context.Context, id uuid.UUID) (string, error)
+	GetSession(ctx context.Context, username string) (Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetWishlistItems(ctx context.Context, username string) ([]Wishlist, error)
+	IncreaseReviewsCount(ctx context.Context, id uuid.UUID) error
+	IncreaseTotalSalesByProductId(ctx context.Context, arg IncreaseTotalSalesByProductIdParams) error
 	IncrementProductSales(ctx context.Context, arg IncrementProductSalesParams) error
+	ListActiveProducts(ctx context.Context, arg ListActiveProductsParams) ([]Moderation, error)
 	ListBalanceTxByUsername(ctx context.Context, arg ListBalanceTxByUsernameParams) ([]BalanceTransaction, error)
 	ListCategories(ctx context.Context) ([]ListCategoriesRow, error)
 	ListOrdersByUsername(ctx context.Context, arg ListOrdersByUsernameParams) ([]Order, error)
@@ -65,6 +76,7 @@ type Querier interface {
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (UpdateProductRow, error)
 	UpdateProductRating(ctx context.Context, arg UpdateProductRatingParams) error
 	UpdateSeller(ctx context.Context, arg UpdateSellerParams) (Seller, error)
+	UpdateSellerRating(ctx context.Context, sellerID uuid.UUID) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpsertBalance(ctx context.Context, username string) (Balance, error)
 	UpsertCart(ctx context.Context, username string) (UpsertCartRow, error)

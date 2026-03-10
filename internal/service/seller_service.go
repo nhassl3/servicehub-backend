@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub/internal/domain"
 )
 
@@ -25,8 +26,16 @@ func (s *SellerService) CreateSeller(ctx context.Context, params domain.CreateSe
 	return s.sellerRepo.Create(ctx, params)
 }
 
-func (s *SellerService) GetSellerProfile(ctx context.Context, username string) (*domain.Seller, error) {
-	return s.sellerRepo.GetByUsername(ctx, username)
+func (s *SellerService) GetSellerProfile(ctx context.Context, params domain.GetSellerProfileParams) (*domain.Seller, error) {
+	if params.SellerId == nil && params.Username == nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if params.SellerId != nil {
+		if _, err := uuid.Parse(*params.SellerId); err != nil {
+			return nil, domain.ErrInvalidInput
+		}
+	}
+	return s.sellerRepo.GetSeller(ctx, params)
 }
 
 func (s *SellerService) UpdateSeller(ctx context.Context, params domain.UpdateSellerParams) (*domain.Seller, error) {

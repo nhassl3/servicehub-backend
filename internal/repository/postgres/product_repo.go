@@ -99,6 +99,7 @@ func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams
 	return products, total, nil
 }
 
+// Search TODO: change the method
 func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
 	total, err := r.store.CountSearchProducts(ctx, params.Query)
 	if err != nil {
