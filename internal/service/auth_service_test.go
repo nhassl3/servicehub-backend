@@ -19,6 +19,19 @@ type mockTokenManager struct {
 	verifyErr error
 }
 
+func (m *mockTokenManager) CreateRefreshToken(_, _, _ string) (string, *auth.Payload, error) {
+	if m.createErr != nil {
+		return "", nil, m.createErr
+	}
+	return "test-token", &auth.Payload{
+		Username:  "alice",
+		UID:       "uid-123",
+		Role:      "buyer",
+		IssuedAt:  time.Now(),
+		ExpiredAt: time.Now().Add(15 * time.Minute),
+	}, nil
+}
+
 func (m *mockTokenManager) CreateToken(_, _, _ string) (string, error) {
 	if m.createErr != nil {
 		return "", m.createErr
@@ -49,6 +62,30 @@ type mockUserRepo struct {
 	getByEmailFunc       func(ctx context.Context, email string) (*domain.User, error)
 	getByUIDFunc         func(ctx context.Context, uid string) (*domain.User, error)
 	updateFunc           func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
+	updatePasswordFunc   func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
+	getSessionFunc       func(ctx context.Context, username string) (*domain.Session, error)
+	createSessionFunc    func(ctx context.Context, params domain.CreateSessionParams) error
+}
+
+func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
+	if m.createSessionFunc != nil {
+		return m.createSessionFunc(ctx, params)
+	}
+	return nil
+}
+
+func (m *mockUserRepo) GetSession(ctx context.Context, username string) (*domain.Session, error) {
+	if m.getSessionFunc != nil {
+		return m.getSessionFunc(ctx, username)
+	}
+	return &domain.Session{}, nil
+}
+
+func (m *mockUserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
+	if m.updatePasswordFunc != nil {
+		return m.updatePasswordFunc(ctx, params)
+	}
+	return &domain.User{}, nil
 }
 
 func (m *mockUserRepo) ExistsByUsername(ctx context.Context, username string) (bool, error) {
@@ -225,5 +262,5 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	svc := service.NewAuthService(repo, tm, tm)
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
-	require.ErrorIs(t, err, domain.ErrInvalidCredentials)
+	require.ErrorIs(t, err, domain.ErrInvalidToken)
 }
