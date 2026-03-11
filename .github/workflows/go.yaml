@@ -17,7 +17,7 @@ jobs:
         env:
           POSTGRES_USER: servicehub
           POSTGRES_DB: servicehub
-          POSTGRES_PASSWORD: ${{secrets.DATABASE_PASSWORD}}
+          POSTGRES_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -39,8 +39,7 @@ jobs:
           touch .env
           echo DB_NAME=servicehub >> .env
           echo DB_USER=servicehub >> .env
-          echo DATABASE_PASSWORD=${{ secrets.DATABASE_PASSWORD }} >> .env
-          cat .env
+          echo DB_PASSWORD=${{ secrets.DATABASE_PASSWORD }} >> .env
 
       - name: Install migrate package CLI v4.19.1
         run: |
