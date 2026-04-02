@@ -42,7 +42,7 @@ func (m *mockTokenManager) CreateRefreshToken(_, _, _ string) (string, *auth.Pay
 	if m.createErr != nil {
 		return "", nil, m.createErr
 	}
-	return "test-token", &auth.Payload{
+	return "test-refresh-token", &auth.Payload{
 		Username:  "alice",
 		UID:       "uid-123",
 		Role:      "buyer",
@@ -55,7 +55,7 @@ func (m *mockTokenManager) CreateToken(_, _, _ string) (string, error) {
 	if m.createErr != nil {
 		return "", m.createErr
 	}
-	return "test-token", nil
+	return "test-access-token", nil
 }
 
 func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
@@ -71,28 +71,71 @@ func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
 	}, nil
 }
 
+// ─── Mock UserRedis ──────────────────────────────────────────────────────────
+
+type mockUserRedis struct{}
+
+func (m *mockUserRedis) Profile(_ context.Context, _ string) (*domain.User, error) {
+	return nil, domain.ErrRedisNotFound
+}
+
+func (m *mockUserRedis) Session(_ context.Context, _ string) (*domain.Session, error) {
+	return nil, domain.ErrRedisNotFound
+}
+
+func (m *mockUserRedis) AuthBlock(_ context.Context, _ string) (bool, float64, error) {
+	return false, 0, nil
+}
+
+func (m *mockUserRedis) SetProfile(_ context.Context, _ *domain.User) error {
+	return nil
+}
+
+func (m *mockUserRedis) SetSession(_ context.Context, _ *domain.Session) error {
+	return nil
+}
+
+func (m *mockUserRedis) SetAuthBlock(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockUserRedis) DelProfile(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockUserRedis) DelSession(_ context.Context, _ string) error {
+	return nil
+}
+
 // ─── Mock UserRepository ──────────────────────────────────────────────────────
 
 type mockUserRepo struct {
-	existsByUsernameFunc   func(ctx context.Context, username string) (bool, error)
-	existsByEmailFunc      func(ctx context.Context, email string) (bool, error)
-	createFunc             func(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
-	getByUsernameFunc      func(ctx context.Context, username string) (*domain.User, error)
-	getByEmailFunc         func(ctx context.Context, email string) (*domain.User, error)
-	getByUIDFunc           func(ctx context.Context, uid string) (*domain.User, error)
-	updateFunc             func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
-	updatePasswordFunc     func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
-	getSessionFunc         func(ctx context.Context, refreshToken string) (*domain.Session, error)
+	existsByUsernameFunc     func(ctx context.Context, username string) (bool, error)
+	existsByEmailFunc        func(ctx context.Context, email string) (bool, error)
+	createFunc               func(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
+	getByUsernameFunc        func(ctx context.Context, username string) (*domain.User, error)
+	getByEmailFunc           func(ctx context.Context, email string) (*domain.User, error)
+	getByUIDFunc             func(ctx context.Context, uid string) (*domain.User, error)
+	updateFunc               func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
+	updatePasswordFunc       func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
+	getSessionFunc           func(ctx context.Context, refreshToken string) (*domain.Session, error)
 	getSessionByUsernameFunc func(ctx context.Context, username string) (*domain.Session, error)
-	deleteSessionFunc      func(ctx context.Context, refreshToken string) error
-	createSessionFunc      func(ctx context.Context, params domain.CreateSessionParams) error
+	deleteSessionFunc        func(ctx context.Context, username string) error
+	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
 }
 
-func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
+func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
 	if m.createSessionFunc != nil {
 		return m.createSessionFunc(ctx, params)
 	}
-	return nil
+	return &domain.Session{
+		Username:     params.Username,
+		RefreshToken: params.RefreshToken,
+		UserAgent:    params.UserAgent,
+		ClientIP:     params.ClientIp,
+		IsBlocked:    params.IsBlocked,
+		ExpiresAt:    params.ExpiresAt,
+	}, nil
 }
 
 func (m *mockUserRepo) GetSession(ctx context.Context, refreshToken string) (*domain.Session, error) {
@@ -109,9 +152,9 @@ func (m *mockUserRepo) GetSessionByUsername(ctx context.Context, username string
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockUserRepo) DeleteSession(ctx context.Context, refreshToken string) error {
+func (m *mockUserRepo) DeleteSession(ctx context.Context, username string) error {
 	if m.deleteSessionFunc != nil {
-		return m.deleteSessionFunc(ctx, refreshToken)
+		return m.deleteSessionFunc(ctx, username)
 	}
 	return nil
 }
@@ -182,7 +225,8 @@ func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParam
 func newAuthService(repo domain.UserRepository) *service.AuthService {
 	tm := &mockTokenManager{}
 	bl := newMockBlacklist()
-	return service.NewAuthService(repo, tm, tm, bl)
+	redis := &mockUserRedis{}
+	return service.NewAuthService(repo, redis, tm, tm, bl)
 }
 
 func TestAuthService_Register_OK(t *testing.T) {
@@ -273,8 +317,6 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 }
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
-	// Use a valid ARGON2ID hash for "correctpassword"
-	// We'll just verify the wrong-password path via the service
 	repo := &mockUserRepo{
 		getByUsernameFunc: func(_ context.Context, _ string) (*domain.User, error) {
 			return &domain.User{
@@ -296,7 +338,8 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	repo := &mockUserRepo{}
 	tm := &mockTokenManager{verifyErr: auth.ErrInvalidToken}
 	bl := newMockBlacklist()
-	svc := service.NewAuthService(repo, tm, tm, bl)
+	redis := &mockUserRedis{}
+	svc := service.NewAuthService(repo, redis, tm, tm, bl)
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)
