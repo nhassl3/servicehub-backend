@@ -6,6 +6,7 @@ import (
 
 // Payload holds the claims embedded in a token.
 type Payload struct {
+	JTI       string    `json:"jti"`
 	Username  string    `json:"username"`
 	UID       string    `json:"uid"`
 	Role      string    `json:"role"`

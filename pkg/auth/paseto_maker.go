@@ -34,16 +34,18 @@ func NewPasetoMaker(keyHex string, ttl time.Duration) (*PasetoMaker, error) {
 }
 
 func (m *PasetoMaker) CreateToken(username, uid, role string) (string, error) {
-	return m.createToken(username, uid, role, time.Now())
+	return m.createTokenWithJTI(username, uid, role, uuid.New().String(), time.Now())
 }
 
 func (m *PasetoMaker) CreateRefreshToken(username, uid, role string) (string, *Payload, error) {
 	begin := time.Now()
-	token, err := m.createToken(username, uid, role, begin)
+	jti := uuid.New().String()
+	token, err := m.createTokenWithJTI(username, uid, role, jti, begin)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, &Payload{
+		JTI:       jti,
 		Username:  username,
 		UID:       uid,
 		Role:      role,
@@ -52,13 +54,13 @@ func (m *PasetoMaker) CreateRefreshToken(username, uid, role string) (string, *P
 	}, nil
 }
 
-func (m *PasetoMaker) createToken(username, uid, role string, startTime time.Time) (string, error) {
+func (m *PasetoMaker) createTokenWithJTI(username, uid, role, jti string, startTime time.Time) (string, error) {
 	if startTime == (time.Time{}) {
 		startTime = time.Now()
 	}
 
 	token := paseto.NewToken()
-	token.SetJti(uuid.New().String())
+	token.SetJti(jti)
 	token.SetIssuedAt(startTime)
 	token.SetExpiration(startTime.Add(m.ttl))
 	token.SetString("username", username)
@@ -74,6 +76,11 @@ func (m *PasetoMaker) VerifyToken(tokenStr string) (*Payload, error) {
 	parser.AddRule(paseto.NotExpired())
 
 	token, err := parser.ParseV4Local(m.key, tokenStr, nil)
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
+	jti, err := token.GetJti()
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
@@ -104,6 +111,7 @@ func (m *PasetoMaker) VerifyToken(tokenStr string) (*Payload, error) {
 	}
 
 	return &Payload{
+		JTI:       jti,
 		Username:  username,
 		UID:       uid,
 		Role:      role,

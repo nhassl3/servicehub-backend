@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // JWTMaker implements TokenManager using HMAC-SHA256 JWT tokens.
@@ -29,16 +30,18 @@ func NewJWTMaker(secret string, ttl time.Duration) (*JWTMaker, error) {
 }
 
 func (m *JWTMaker) CreateToken(username, uid, role string) (string, error) {
-	return m.createToken(username, uid, role, time.Now())
+	return m.createToken(username, uid, role, uuid.New().String(), time.Now())
 }
 
 func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payload, error) {
 	begin := time.Now()
-	token, err := m.createToken(username, uid, role, begin)
+	jti := uuid.New().String()
+	token, err := m.createToken(username, uid, role, jti, begin)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, &Payload{
+		JTI:       jti,
 		Username:  username,
 		UID:       uid,
 		Role:      role,
@@ -47,13 +50,14 @@ func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payl
 	}, nil
 }
 
-func (m *JWTMaker) createToken(username, uid, role string, start time.Time) (string, error) {
+func (m *JWTMaker) createToken(username, uid, role, jti string, start time.Time) (string, error) {
 	if start == (time.Time{}) {
 		start = time.Now()
 	}
 
 	claims := &jwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			IssuedAt:  jwt.NewNumericDate(start),
 			ExpiresAt: jwt.NewNumericDate(start.Add(m.ttl)),
 		},
@@ -92,6 +96,7 @@ func (m *JWTMaker) VerifyToken(tokenStr string) (*Payload, error) {
 	}
 
 	return &Payload{
+		JTI:       claims.ID,
 		Username:  claims.Username,
 		UID:       claims.UID,
 		Role:      claims.Role,
