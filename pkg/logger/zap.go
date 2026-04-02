@@ -16,5 +16,13 @@ func NewZapLogger(level string) (*zap.Logger, error) {
 	cfg.EncoderConfig.TimeKey = "ts"
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	return cfg.Build()
+	logger, err := cfg.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	// Set default logger
+	zap.ReplaceGlobals(logger)
+
+	return logger, nil
 }
