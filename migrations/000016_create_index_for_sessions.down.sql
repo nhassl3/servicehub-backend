@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS refresh_token_idx;

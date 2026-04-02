@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS admins DROP COLUMN IF EXISTS avatar_url;

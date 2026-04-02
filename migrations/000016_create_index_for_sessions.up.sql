@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS refresh_token_idx ON sessions(refresh_token);

@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS admins ADD COLUMN avatar_url    TEXT         NOT NULL DEFAULT '';
