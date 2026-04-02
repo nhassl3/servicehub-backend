@@ -1,7 +1,7 @@
 environment: local
 
 server:
-  grpc_port: ":9090"
+  grpc_port: ":50051"
   http_port: ":8080"
 
 db:
@@ -9,9 +9,23 @@ db:
   port: 5432
   ssl_mode: disable
 
+redis:
+  addr: localhost:6380
+  db: 0
+  ttl:
+    user: 15m
+    categories: 1h
+    auth_block: 5m
+    product: 5m
+
 auth:
   access_token_ttl: 15m
   refresh_token_ttl: 168h
+
+minio:
+  endpoint: "localhost:9000"
+  bucket: "servicehub-avatars"
+  use_ssl: false
 
 log:
   level: debug
