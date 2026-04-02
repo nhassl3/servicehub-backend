@@ -9,47 +9,16 @@ on:
 jobs:
   test:
     name: Test ServiceHub services
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: servicehub
-          POSTGRES_DB: servicehub
-          POSTGRES_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     steps:
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Go 1.25.6
-        uses: actions/setup-go@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.25.6'
+          go-version-file: 'go.mod'
 
-      - name: Create .env file
-        run: |
-          touch .env
-          echo DB_NAME=servicehub >> .env
-          echo DB_USER=servicehub >> .env
-          echo DB_PASSWORD=${{ secrets.DATABASE_PASSWORD }} >> .env
-
-      - name: Install migrate package CLI v4.19.1
-        run: |
-          sudo curl -L https://github.com/golang-migrate/migrate/releases/download/v4.19.1/migrate.linux-amd64.tar.gz | tar xvz
-          sudo mv migrate /usr/bin/migrate
-          which migrate
-
-      - name: Make migrations
-        run: |
-          make migrate-up
-
-      - name: Test
-        run: CGO_ENABLED=1 make test
+      - name: Run tests
+        run: make test
