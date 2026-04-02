@@ -1,4 +1,4 @@
-.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data
+.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop
 
 .DEFAULT_GOAL := build
 
@@ -51,7 +51,7 @@ runb:
 ## ─── Test ────────────────────────────────────────────────────────────────────
 
 test:
-	go test -race -coverprofile=coverage.out ./...
+	@CGO_ENABLED=1 go test -race -coverprofile=coverage.out ./...
 
 test-verbose:
 	go test -race -v ./...
@@ -72,7 +72,8 @@ mock:
 ## ─── SQLC ────────────────────────────────────────────────────────────────────
 
 sqlc:
-	$(SQLC_BIN) generate
+	@$(SQLC_BIN) generate
+	@echo "Successfully built SQL code"
 
 ## ─── DATABSE CONTROLL ────────────────────────────────────────────────────────
 
@@ -126,3 +127,24 @@ tidy:
 
 vet:
 	@go vet ./...
+
+##  ─── Redis ───────────────────────────────────────────────────────────────────
+redis:
+	@docker run -d -p 127.0.0.1:6380:6380 -v ./redis-config:/usr/local/etc/redis --name servicehub-redis redis:7-alpine redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
+
+cli-redis:
+	@redis-cli -h localhost -p 6380 --user $(REDIS_USER) -a $(REDIS_USER_PASSWORD)
+
+##  ─── MinIO ───────────────────────────────────────────────────────────────────
+minio:
+	@docker run -d --name servicehub-minio \
+		-p 9000:9000 -p 9001:9001 \
+		-e MINIO_ROOT_USER=$(MINIO_ACCESS_KEY) \
+		-e MINIO_ROOT_PASSWORD=$(MINIO_SECRET_KEY) \
+		-v servicehub-minio-data:/data \
+		minio/minio:latest server /data --console-address ":9001"
+	@echo "MinIO started: API http://localhost:9000 | Console http://localhost:9001"
+
+minio-stop:
+	@docker stop servicehub-minio && docker rm servicehub-minio
+	@echo "MinIO stopped"
