@@ -68,6 +68,22 @@ func (h *UserHandler) UpdatePassword(ctx context.Context, req *userv1.UpdatePass
 	return &userv1.UpdatePasswordResponse{User: protoUserProfile(user)}, nil
 }
 
+func (h *UserHandler) UploadAvatar(ctx context.Context, req *userv1.UploadAvatarRequest) (*userv1.UploadAvatarResponse, error) {
+	username, err := mustUsername(ctx)
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	user, err := h.svc.UploadAvatar(ctx, domain.UploadAvatarParams{
+		Username:    username,
+		FileData:    req.GetFileData(),
+		ContentType: req.GetContentType(),
+	})
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &userv1.UploadAvatarResponse{User: protoUserProfile(user)}, nil
+}
+
 // ── Proto mapper ─────────────────────────────────────────────────────────────
 
 func protoUserProfile(u *domain.User) *userv1.UserProfile {

@@ -2,9 +2,11 @@ package interceptors
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/nhassl3/servicehub/pkg/auth"
+	tknErrors "github.com/nhassl3/servicehub/pkg/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -16,22 +18,22 @@ type contextKey string
 const PayloadKey contextKey = "auth_payload"
 
 // publicMethods lists gRPC methods that do not require authentication.
-var publicMethods = map[string]struct{}{
-	"/auth.v1.AuthService/Register":               {},
-	"/auth.v1.AuthService/Login":                  {},
-	"/auth.v1.AuthService/RefreshToken":            {},
-	"/category.v1.CategoryService/ListCategories": {},
-	"/product.v1.ProductService/ListProducts":      {},
-	"/product.v1.ProductService/GetProduct":        {},
-	"/product.v1.ProductService/SearchProducts":    {},
-	"/seller.v1.SellerService/GetSellerProfile":    {},
-	"/review.v1.ReviewService/ListReviews":         {},
+var publicMethods = []string{
+	"/auth.v1.AuthService/Register",
+	"/auth.v1.AuthService/Login",
+	"/auth.v1.AuthService/RefreshToken",
+	"/category.v1.CategoryService/ListCategories",
+	"/product.v1.ProductService/ListProducts",
+	"/product.v1.ProductService/GetProduct",
+	"/product.v1.ProductService/SearchProducts",
+	"/seller.v1.SellerService/GetSellerProfile",
+	"/review.v1.ReviewService/ListReviews",
 }
 
 // AuthInterceptor returns a gRPC unary interceptor for PASETO token verification.
 func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if _, ok := publicMethods[info.FullMethod]; ok {
+		if slices.Contains(publicMethods, info.FullMethod) {
 			return handler(ctx, req)
 		}
 
@@ -53,6 +55,9 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 
 		payload, err := tokenManager.VerifyToken(token)
 		if err != nil {
+			if tknErrors.IsAny(err) {
+				return nil, status.Error(codes.Unauthenticated, err.Error())
+			}
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
@@ -65,9 +70,4 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 func PayloadFromContext(ctx context.Context) (*auth.Payload, bool) {
 	payload, ok := ctx.Value(PayloadKey).(*auth.Payload)
 	return payload, ok
-}
-
-// WithPayload stores the auth payload in context (for HTTP middleware use).
-func WithPayload(ctx context.Context, payload *auth.Payload) context.Context {
-	return context.WithValue(ctx, PayloadKey, payload)
 }

@@ -15,15 +15,23 @@ import (
 
 type AuthService struct {
 	userRepo       domain.UserRepository
+	userRedis      domain.UserRedis
 	tokenManager   auth.TokenManager
 	refreshManager auth.TokenManager
+	blacklist      auth.TokenBlacklist
 }
 
-func NewAuthService(userRepo domain.UserRepository, tokenManager, refreshManager auth.TokenManager) *AuthService {
+func NewAuthService(
+	userRepo domain.UserRepository, userRedis domain.UserRedis,
+	tokenManager, refreshManager auth.TokenManager,
+	blacklist auth.TokenBlacklist,
+) *AuthService {
 	return &AuthService{
 		userRepo:       userRepo,
+		userRedis:      userRedis,
 		tokenManager:   tokenManager,
 		refreshManager: refreshManager,
+		blacklist:      blacklist,
 	}
 }
 
@@ -41,6 +49,12 @@ type TokenPair struct {
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, *TokenPair, error) {
+	clientIP, _ := getMetadataFromContext(ctx)
+
+	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
+		return nil, nil, fmt.Errorf("%w: %f", domain.ErrAuthBlock, ttl)
+	}
+
 	existsUsername, err := s.userRepo.ExistsByUsername(ctx, input.Username)
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth_service.Register check username: %w", err)
@@ -81,10 +95,20 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 		return nil, nil, err
 	}
 
+	_ = s.userRedis.SetProfile(ctx, user)
+
+	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+
 	return user, tokens, nil
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password string) (*domain.User, *TokenPair, error) {
+	clientIP, _ := getMetadataFromContext(ctx)
+
+	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
+		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	}
+
 	user, err := s.userRepo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -110,29 +134,57 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 		return nil, nil, err
 	}
 
+	_ = s.userRedis.SetProfile(ctx, user)
+
+	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+
 	return user, tokens, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, username string) (*TokenPair, error) {
-	session, err := s.userRepo.GetSession(ctx, username)
+func (s *AuthService) Logout(ctx context.Context, accessPayload *auth.Payload) error {
+	if accessPayload != nil && accessPayload.JTI != "" {
+		if err := s.blacklist.Blacklist(ctx, accessPayload.JTI, accessPayload.ExpiredAt); err != nil {
+			return fmt.Errorf("auth_service.Logout blacklist access token: %w", err)
+		}
+		if err := s.userRedis.DelProfile(ctx, accessPayload.Username); err != nil {
+			return fmt.Errorf("auth_service.Logout delete redis user profile: %w", err)
+		}
+		if err := s.userRedis.DelSession(ctx, accessPayload.Username); err != nil {
+			return fmt.Errorf("auth_service.Logout delete redis user session: %w", err)
+		}
+		return s.userRepo.DeleteSession(ctx, accessPayload.Username)
+	}
+	return domain.ErrInvalidToken
+}
+
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
+	payload, err := s.refreshManager.VerifyToken(refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("auth_service.RefreshToken get session: %w", err)
+		return nil, domain.ErrInvalidToken
 	}
 
-	if session.RefreshToken == "" {
-		return nil, domain.ErrInvalidToken
-	} else if time.Now().After(session.ExpiresAt) {
+	session, err := s.userRedis.Session(ctx, payload.Username)
+	if err != nil {
+		if errors.Is(err, domain.ErrRedisNotFound) {
+			session, err = s.userRepo.GetSession(ctx, refreshToken)
+			if err != nil {
+				return nil, fmt.Errorf("auth_service.RefreshToken get session: %w", err)
+			}
+			if err := s.userRedis.SetSession(ctx, session); err != nil {
+				return nil, fmt.Errorf("auth_service.RefreshToken set session (redis): %w", err)
+			}
+		} else {
+			return nil, fmt.Errorf("auth_service.RefreshToken get session (redis): %w", err)
+		}
+	}
+
+	if time.Now().After(session.ExpiresAt) {
 		return nil, domain.ErrExpiredToken
 	} else if session.IsBlocked {
 		return nil, domain.ErrSessionIsBlocked
 	}
 
-	payload, err := s.refreshManager.VerifyToken(session.RefreshToken)
-	if err != nil {
-		return nil, domain.ErrInvalidCredentials
-	}
-
-	accessToken, err := s.tokenManager.CreateToken(username, payload.UID, payload.Role)
+	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
@@ -144,7 +196,21 @@ func (s *AuthService) RefreshToken(ctx context.Context, username string) (*Token
 }
 
 func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User, error) {
-	return s.userRepo.GetByUsername(ctx, username)
+	user, err := s.userRedis.Profile(ctx, username)
+	if err != nil {
+		if errors.Is(err, domain.ErrRedisNotFound) {
+			user, err = s.userRepo.GetByUsername(ctx, username)
+			if err != nil {
+				return nil, fmt.Errorf("auth_service.GetMe get from database: %w", err)
+			}
+			if err := s.userRedis.SetProfile(ctx, user); err != nil {
+				return nil, fmt.Errorf("auth_service.GetMe set profile (for redis): %w", err)
+			}
+			return user, nil
+		}
+		return nil, fmt.Errorf("auth_service:GetMe get from redis: %w", err)
+	}
+	return user, nil
 }
 
 func (s *AuthService) createTokenPair(username, uid, role string) (*TokenPair, error) {
@@ -162,7 +228,51 @@ func (s *AuthService) createTokenPair(username, uid, role string) (*TokenPair, e
 }
 
 func (s *AuthService) createSession(ctx context.Context, username, refreshToken string, expiredAt time.Time) error {
-	var clientIp, userAgent string
+	clientIp, userAgent := getMetadataFromContext(ctx)
+
+	// Select session by username because only username store old data for old refreshToken
+	// new refresh token while not store in database
+	// it's only will be created after check old session
+	session, err := s.userRedis.Session(ctx, username)
+	if err != nil {
+		if errors.Is(err, domain.ErrRedisNotFound) {
+			session, err = s.userRepo.GetSessionByUsername(ctx, username)
+			if err != nil && !errors.Is(err, domain.ErrNotFound) {
+				return fmt.Errorf("auth_service.createSession get old session: %w", err)
+			}
+		} else {
+			return fmt.Errorf("auth_service.createSession get old session (redis): %w", err)
+		}
+	}
+
+	// TODO: implement IPs and useragent checker
+	if session != nil && session.ClientIP != clientIp && session.UserAgent != userAgent {
+		return domain.ErrDeviceMistake
+	}
+
+	// Creating session record about user session in main database
+	newSession, err := s.userRepo.CreateSession(ctx, domain.CreateSessionParams{
+		Username:     username,
+		RefreshToken: refreshToken,
+		UserAgent:    userAgent,
+		ClientIp:     clientIp,
+		IsBlocked:    false,
+		ExpiresAt:    expiredAt,
+	})
+	if err != nil {
+		return fmt.Errorf("auth_service.createSession create session: %w", err)
+	}
+
+	// Creating session record about user session in Redis
+	if err := s.userRedis.SetSession(ctx, newSession); err != nil {
+		return fmt.Errorf("auth_service.createSession create session (redis): %w", err)
+	}
+
+	return nil
+}
+
+// getMetadataFromContext TODO: update function (wrong ip and user-agent on response)
+func getMetadataFromContext(ctx context.Context) (clientIp string, userAgent string) {
 	if headers, ok := metadata.FromIncomingContext(ctx); ok {
 		xForwardFor := headers.Get("x-forwarded-for")
 		if len(xForwardFor) > 0 && xForwardFor[0] != "" {
@@ -176,18 +286,5 @@ func (s *AuthService) createSession(ctx context.Context, username, refreshToken 
 			userAgent = usrAgent[0]
 		}
 	}
-
-	// Creating session record about user session
-	if err := s.userRepo.CreateSession(ctx, domain.CreateSessionParams{
-		Username:     username,
-		RefreshToken: refreshToken,
-		UserAgent:    userAgent,
-		ClientIp:     clientIp,
-		IsBlocked:    false,
-		ExpiresAt:    expiredAt,
-	}); err != nil {
-		return fmt.Errorf("auth_service.Register create session: %w", err)
-	}
-
-	return nil
+	return
 }

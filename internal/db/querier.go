@@ -13,26 +13,29 @@ import (
 type Querier interface {
 	AddToBalance(ctx context.Context, arg AddToBalanceParams) (Balance, error)
 	AddWishlistItem(ctx context.Context, arg AddWishlistItemParams) (Wishlist, error)
+	AdminExistsByUsername(ctx context.Context, username string) (bool, error)
 	ClearCart(ctx context.Context, cartID int64) error
 	CountBalanceTxByUsername(ctx context.Context, username string) (int64, error)
 	CountListProducts(ctx context.Context, arg CountListProductsParams) (int64, error)
 	CountOrdersByUsername(ctx context.Context, arg CountOrdersByUsernameParams) (int64, error)
 	CountReviewsByProduct(ctx context.Context, productID uuid.UUID) (int64, error)
 	CountSearchProducts(ctx context.Context, plaintoTsquery string) (int64, error)
+	CreateAdmin(ctx context.Context, arg CreateAdminParams) (Admin, error)
 	CreateBalanceTx(ctx context.Context, arg CreateBalanceTxParams) (BalanceTransaction, error)
 	CreateOrder(ctx context.Context, username string) (Order, error)
 	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (CreateProductRow, error)
 	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
 	CreateSeller(ctx context.Context, arg CreateSellerParams) (Seller, error)
-	CreateSession(ctx context.Context, arg CreateSessionParams) error
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeductFromBalance(ctx context.Context, arg DeductFromBalanceParams) (Balance, error)
 	DeleteCartItem(ctx context.Context, arg DeleteCartItemParams) (int64, error)
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
 	DeleteReview(ctx context.Context, id int64) (int64, error)
-	GetAdminById(ctx context.Context, id uuid.UUID) (Admin, error)
-	GetAdminByUsername(ctx context.Context, username string) (Admin, error)
+	DeleteSession(ctx context.Context, username string) error
+	GetAdmin(ctx context.Context, arg GetAdminParams) (Admin, error)
+	GetAdminForUpdate(ctx context.Context, arg GetAdminForUpdateParams) (Admin, error)
 	GetAdminUsernameByProductId(ctx context.Context, productID uuid.UUID) (string, error)
 	GetAvgRatingByProduct(ctx context.Context, productID uuid.UUID) (float64, error)
 	GetBalance(ctx context.Context, username string) (Balance, error)
@@ -51,12 +54,14 @@ type Querier interface {
 	GetReviewsByProduct(ctx context.Context, arg GetReviewsByProductParams) ([]Review, error)
 	GetSeller(ctx context.Context, arg GetSellerParams) (Seller, error)
 	GetSellerByProductId(ctx context.Context, id uuid.UUID) (string, error)
-	GetSession(ctx context.Context, username string) (Session, error)
+	GetSession(ctx context.Context, refreshToken string) (Session, error)
+	GetSessionByUsername(ctx context.Context, username string) (Session, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetWishlistItems(ctx context.Context, username string) ([]Wishlist, error)
 	IncreaseReviewsCount(ctx context.Context, id uuid.UUID) error
+	IncreaseTotalModerates(ctx context.Context, arg IncreaseTotalModeratesParams) error
 	IncreaseTotalSalesByProductId(ctx context.Context, arg IncreaseTotalSalesByProductIdParams) error
 	IncrementProductSales(ctx context.Context, arg IncrementProductSalesParams) error
 	ListActiveProducts(ctx context.Context, arg ListActiveProductsParams) ([]Moderation, error)
@@ -69,7 +74,9 @@ type Querier interface {
 	SearchProducts(ctx context.Context, arg SearchProductsParams) ([]SearchProductsRow, error)
 	SellerExistsByUsername(ctx context.Context, username string) (bool, error)
 	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	UpdateAdmin(ctx context.Context, arg UpdateAdminParams) (Admin, error)
 	UpdateCartItemQty(ctx context.Context, arg UpdateCartItemQtyParams) (CartItem, error)
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (UpdateCategoryRow, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdateOrderTotal(ctx context.Context, arg UpdateOrderTotalParams) (Order, error)
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (User, error)

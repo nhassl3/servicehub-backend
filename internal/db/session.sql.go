@@ -11,9 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createSession = `-- name: CreateSession :exec
+const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (username, refresh_token, user_agent, client_ip, is_blocked, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (username) DO UPDATE
+    SET refresh_token=excluded.refresh_token,
+        user_agent=excluded.user_agent,
+        client_ip=excluded.client_ip,
+        expires_at=excluded.expires_at,
+        created_at=NOW()
+RETURNING id, username, refresh_token, user_agent, client_ip, is_blocked, expires_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -25,8 +32,8 @@ type CreateSessionParams struct {
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
-	_, err := q.db.Exec(ctx, createSession,
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, createSession,
 		arg.Username,
 		arg.RefreshToken,
 		arg.UserAgent,
@@ -34,17 +41,59 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.IsBlocked,
 		arg.ExpiresAt,
 	)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.RefreshToken,
+		&i.UserAgent,
+		&i.ClientIp,
+		&i.IsBlocked,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions WHERE username=$1
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, username string) error {
+	_, err := q.db.Exec(ctx, deleteSession, username)
 	return err
 }
 
 const getSession = `-- name: GetSession :one
 SELECT id, username, refresh_token, user_agent, client_ip, is_blocked, expires_at, created_at
 FROM sessions
+WHERE refresh_token=$1 LIMIT 1
+`
+
+func (q *Queries) GetSession(ctx context.Context, refreshToken string) (Session, error) {
+	row := q.db.QueryRow(ctx, getSession, refreshToken)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.RefreshToken,
+		&i.UserAgent,
+		&i.ClientIp,
+		&i.IsBlocked,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getSessionByUsername = `-- name: GetSessionByUsername :one
+SELECT id, username, refresh_token, user_agent, client_ip, is_blocked, expires_at, created_at
+FROM sessions
 WHERE username=$1 LIMIT 1
 `
 
-func (q *Queries) GetSession(ctx context.Context, username string) (Session, error) {
-	row := q.db.QueryRow(ctx, getSession, username)
+func (q *Queries) GetSessionByUsername(ctx context.Context, username string) (Session, error) {
+	row := q.db.QueryRow(ctx, getSessionByUsername, username)
 	var i Session
 	err := row.Scan(
 		&i.ID,

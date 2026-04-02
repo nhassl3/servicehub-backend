@@ -61,7 +61,7 @@ func (h *SellerHandler) GetSellerProfile(ctx context.Context, req *sellerv1.GetS
 func (h *SellerHandler) UpdateSeller(ctx context.Context, req *sellerv1.UpdateSellerRequest) (*sellerv1.UpdateSellerResponse, error) {
 	username, err := mustUsername(ctx)
 	if err != nil {
-		return nil, err
+		return nil, domainErr(err)
 	}
 	seller, err := h.svc.UpdateSeller(ctx, domain.UpdateSellerParams{
 		Username:    username,
@@ -73,6 +73,24 @@ func (h *SellerHandler) UpdateSeller(ctx context.Context, req *sellerv1.UpdateSe
 		return nil, domainErr(err)
 	}
 	return &sellerv1.UpdateSellerResponse{Seller: protoSeller(seller)}, nil
+}
+
+func (h *SellerHandler) UploadAvatar(ctx context.Context, req *sellerv1.UploadAvatarRequest) (*sellerv1.UploadAvatarResponse, error) {
+	username, err := mustUsername(ctx)
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	seller, err := h.svc.UploadAvatar(ctx, domain.UploadSellerAvatarParams{
+		Username:    username,
+		FileData:    req.FileData,
+		ContentType: req.ContentType,
+	})
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &sellerv1.UploadAvatarResponse{
+		Seller: protoSeller(seller),
+	}, nil
 }
 
 // ── Proto mapper ─────────────────────────────────────────────────────────────

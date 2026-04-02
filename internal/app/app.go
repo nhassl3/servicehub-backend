@@ -14,11 +14,14 @@ import (
 	"github.com/nhassl3/servicehub/internal/config"
 	"github.com/nhassl3/servicehub/internal/db"
 	repoPostgres "github.com/nhassl3/servicehub/internal/repository/postgres"
+	repoRedis "github.com/nhassl3/servicehub/internal/repository/redis"
 	"github.com/nhassl3/servicehub/internal/service"
 	transportGRPC "github.com/nhassl3/servicehub/internal/transport/grpc"
 	"github.com/nhassl3/servicehub/pkg/auth"
 	"github.com/nhassl3/servicehub/pkg/logger"
 	"github.com/nhassl3/servicehub/pkg/postgres"
+	pkgRedis "github.com/nhassl3/servicehub/pkg/redis"
+	minio "github.com/nhassl3/servicehub/pkg/storage"
 	"go.uber.org/zap"
 )
 
@@ -54,11 +57,44 @@ func Run(cfg *config.Config) error {
 	// ─── SQLC Store ─────────────────────────────────────────────────────────
 	store := db.NewStore(pool)
 
+	// ─── Redis ────────────────────────────────────────────────────────────────
+	redisClient, err := pkgRedis.New(ctx, cfg.Redis.Addr, cfg.Redis.Username, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		return fmt.Errorf("app: connect redis: %w", err)
+	}
+	defer func() { _ = redisClient.Close() }()
+	log.Info("connected to Redis")
+
+	redisProductsClient, err := pkgRedis.New(ctx, cfg.Redis.Addr, cfg.Redis.Username, cfg.Redis.Password, cfg.Redis.DB+1)
+	if err != nil {
+		return fmt.Errorf("app: connect redis products: %w", err)
+	}
+	defer func() { _ = redisProductsClient.Close() }()
+	log.Info("connected to RedisProducts")
+
+	// RedisClient store tokens, sessions, profiles
+	tokenBlacklist := repoRedis.NewTokenBlacklist(redisClient)
+	userRedis := repoRedis.NewUserRedis(redisClient, cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock)
+
+	// RedisProducts store categories and products closed on a page a few moments later
+	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
+	productsRedis := repoRedis.NewAdminRedis(redisProductsClient, cfg.Redis.TTL.Product)
+	_ = productsRedis
+
+	// ─── MinIO ────────────────────────────────────────────────────────────────
+	minIOClient, err := minio.NewMinIO(ctx, &cfg.MinIO)
+	if err != nil {
+		return fmt.Errorf("minio.NewMinIO: failed to initialize minio client: %w", err)
+	}
+	log.Info("connected to MinIO")
+
 	// ─── Token managers ───────────────────────────────────────────────────────
-	accessManager, err := auth.NewPasetoMaker(cfg.Auth.PasetoKey, cfg.Auth.AccessTokenTTL)
+	accessMaker, err := auth.NewPasetoMaker(cfg.Auth.PasetoKey, cfg.Auth.AccessTokenTTL)
 	if err != nil {
 		return fmt.Errorf("app: create paseto access maker: %w", err)
 	}
+	accessManager := auth.NewBlacklistedTokenManager(accessMaker, tokenBlacklist)
+
 	refreshManager, err := auth.NewPasetoMaker(cfg.Auth.PasetoKey, cfg.Auth.RefreshTokenTTL)
 	if err != nil {
 		return fmt.Errorf("app: create paseto refresh maker: %w", err)
@@ -74,18 +110,20 @@ func Run(cfg *config.Config) error {
 	reviewRepo := repoPostgres.NewReviewRepo(store)
 	wishlistRepo := repoPostgres.NewWishlistRepo(store)
 	balanceRepo := repoPostgres.NewBalanceRepo(store)
+	adminRepo := repoPostgres.NewAdminRepo(store)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
 	svcs := &transportGRPC.Services{
-		Auth:     service.NewAuthService(userRepo, accessManager, refreshManager),
-		User:     service.NewUserService(userRepo),
-		Category: service.NewCategoryService(categoryRepo),
+		Admin:    service.NewAdminService(adminRepo, minIOClient),
+		Auth:     service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist),
+		User:     service.NewUserService(userRepo, minIOClient, userRedis),
+		Category: service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:  service.NewProductService(productRepo, sellerRepo),
 		Cart:     service.NewCartService(cartRepo),
 		Order:    service.NewOrderService(orderRepo),
 		Review:   service.NewReviewService(reviewRepo),
 		Wishlist: service.NewWishlistService(wishlistRepo),
-		Seller:   service.NewSellerService(sellerRepo),
+		Seller:   service.NewSellerService(sellerRepo, minIOClient),
 		Balance:  service.NewBalanceService(balanceRepo),
 	}
 

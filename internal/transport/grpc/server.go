@@ -36,6 +36,7 @@ import (
 
 // Services aggregates all application services passed down to handlers.
 type Services struct {
+	Admin    *service.AdminService
 	Auth     *service.AuthService
 	User     *service.UserService
 	Category *service.CategoryService

@@ -64,6 +64,20 @@ func (mr *MockUserRepositoryMockRecorder) CreateSession(ctx, params interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockUserRepository)(nil).CreateSession), ctx, params)
 }
 
+// DeleteSession mocks base method.
+func (m *MockUserRepository) DeleteSession(ctx context.Context, refreshToken string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSession", ctx, refreshToken)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSession indicates an expected call of DeleteSession.
+func (mr *MockUserRepositoryMockRecorder) DeleteSession(ctx, refreshToken interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSession", reflect.TypeOf((*MockUserRepository)(nil).DeleteSession), ctx, refreshToken)
+}
+
 // ExistsByEmail mocks base method.
 func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -140,18 +154,33 @@ func (mr *MockUserRepositoryMockRecorder) GetByUsername(ctx, username interface{
 }
 
 // GetSession mocks base method.
-func (m *MockUserRepository) GetSession(ctx context.Context, username string) (*domain.Session, error) {
+func (m *MockUserRepository) GetSession(ctx context.Context, refreshToken string) (*domain.Session, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSession", ctx, username)
+	ret := m.ctrl.Call(m, "GetSession", ctx, refreshToken)
 	ret0, _ := ret[0].(*domain.Session)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSession indicates an expected call of GetSession.
-func (mr *MockUserRepositoryMockRecorder) GetSession(ctx, username interface{}) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) GetSession(ctx, refreshToken interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSession", reflect.TypeOf((*MockUserRepository)(nil).GetSession), ctx, username)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSession", reflect.TypeOf((*MockUserRepository)(nil).GetSession), ctx, refreshToken)
+}
+
+// GetSessionByUsername mocks base method.
+func (m *MockUserRepository) GetSessionByUsername(ctx context.Context, username string) (*domain.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSessionByUsername", ctx, username)
+	ret0, _ := ret[0].(*domain.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSessionByUsername indicates an expected call of GetSessionByUsername.
+func (mr *MockUserRepositoryMockRecorder) GetSessionByUsername(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSessionByUsername", reflect.TypeOf((*MockUserRepository)(nil).GetSessionByUsername), ctx, username)
 }
 
 // Update mocks base method.

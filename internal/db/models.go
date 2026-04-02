@@ -17,6 +17,7 @@ type Admin struct {
 	TotalModeration int32              `json:"total_moderation"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	AvatarUrl       string             `json:"avatar_url"`
 }
 
 type Balance struct {

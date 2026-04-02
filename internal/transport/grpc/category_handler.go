@@ -4,6 +4,7 @@ import (
 	"context"
 
 	categoryv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/category/v1"
+	"github.com/nhassl3/servicehub/internal/domain"
 	"github.com/nhassl3/servicehub/internal/service"
 )
 
@@ -25,15 +26,39 @@ func (h *CategoryHandler) ListCategories(ctx context.Context, _ *categoryv1.List
 	if err != nil {
 		return nil, domainErr(err)
 	}
+	return &categoryv1.ListCategoriesResponse{Categories: protoCategoriesInfo(*cats)}, nil
+}
+
+func (h *CategoryHandler) UploadAvatar(ctx context.Context, req *categoryv1.UploadAvatarRequest) (*categoryv1.UploadAvatarResponse, error) {
+	category, err := h.svc.UploadCategoryIcon(ctx, domain.UploadCategoryIconParams{
+		Slug:        req.GetSlug(),
+		FileData:    req.GetFileData(),
+		ContentType: req.GetContentType(),
+	})
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &categoryv1.UploadAvatarResponse{
+		Category: protoCategoryInfo(category),
+	}, nil
+}
+
+// ── Shared proto mapper ───────────────────────────────────────────────────────
+
+func protoCategoriesInfo(cats domain.ListCategories) []*categoryv1.Category {
 	proto := make([]*categoryv1.Category, len(cats))
 	for i, c := range cats {
-		proto[i] = &categoryv1.Category{
-			Id:          int32(c.ID),
-			Slug:        c.Slug,
-			Name:        c.Name,
-			Description: c.Description,
-			IconUrl:     c.IconURL,
-		}
+		proto[i] = protoCategoryInfo(&c)
 	}
-	return &categoryv1.ListCategoriesResponse{Categories: proto}, nil
+	return proto
+}
+
+func protoCategoryInfo(cat *domain.Category) *categoryv1.Category {
+	return &categoryv1.Category{
+		Id:          int32(cat.ID),
+		Slug:        cat.Slug,
+		Name:        cat.Name,
+		Description: cat.Description,
+		IconUrl:     cat.IconURL,
+	}
 }

@@ -44,8 +44,8 @@ func (r *UserRepo) Create(ctx context.Context, params domain.CreateUserParams) (
 	}), nil
 }
 
-func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
-	err := r.store.CreateSession(ctx, db.CreateSessionParams{
+func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
+	session, err := r.store.CreateSession(ctx, db.CreateSessionParams{
 		Username:     params.Username,
 		RefreshToken: params.RefreshToken,
 		UserAgent:    params.UserAgent,
@@ -54,13 +54,13 @@ func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessio
 		IsBlocked:    params.IsBlocked,
 	})
 	if err != nil {
-		return fmt.Errorf("user_repo.CreateSession: %w", err)
+		return nil, fmt.Errorf("user_repo.CreateSession: %w", err)
 	}
-	return nil
+	return mapSession(session), nil
 }
 
-func (r *UserRepo) GetSession(ctx context.Context, username string) (*domain.Session, error) {
-	row, err := r.store.GetSession(ctx, username)
+func (r *UserRepo) GetSession(ctx context.Context, refreshToken string) (*domain.Session, error) {
+	row, err := r.store.GetSession(ctx, refreshToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
@@ -68,6 +68,24 @@ func (r *UserRepo) GetSession(ctx context.Context, username string) (*domain.Ses
 		return nil, fmt.Errorf("user_repo.GetSession: %w", err)
 	}
 	return mapSession(row), nil
+}
+
+func (r *UserRepo) GetSessionByUsername(ctx context.Context, username string) (*domain.Session, error) {
+	row, err := r.store.GetSessionByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("user_repo.GetSessionByUsername: %w", err)
+	}
+	return mapSession(row), nil
+}
+
+func (r *UserRepo) DeleteSession(ctx context.Context, username string) error {
+	if err := r.store.DeleteSession(ctx, username); err != nil {
+		return fmt.Errorf("user_repo.DeleteSession: %w", err)
+	}
+	return nil
 }
 
 func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {

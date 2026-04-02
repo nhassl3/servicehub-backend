@@ -9,14 +9,34 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getAdminById = `-- name: GetAdminById :one
-SELECT id, username, display_name, level_rights, total_moderation, created_at, updated_at FROM admins WHERE id=$1
+const adminExistsByUsername = `-- name: AdminExistsByUsername :one
+SELECT EXISTS(SELECT 1 FROM admins WHERE username = $1)
 `
 
-func (q *Queries) GetAdminById(ctx context.Context, id uuid.UUID) (Admin, error) {
-	row := q.db.QueryRow(ctx, getAdminById, id)
+func (q *Queries) AdminExistsByUsername(ctx context.Context, username string) (bool, error) {
+	row := q.db.QueryRow(ctx, adminExistsByUsername, username)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const createAdmin = `-- name: CreateAdmin :one
+INSERT INTO admins (username, display_name, level_rights)
+VALUES ($1, $2, $3)
+RETURNING id, username, display_name, level_rights, total_moderation, created_at, updated_at, avatar_url
+`
+
+type CreateAdminParams struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	LevelRights int32  `json:"level_rights"`
+}
+
+func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) (Admin, error) {
+	row := q.db.QueryRow(ctx, createAdmin, arg.Username, arg.DisplayName, arg.LevelRights)
 	var i Admin
 	err := row.Scan(
 		&i.ID,
@@ -26,16 +46,26 @@ func (q *Queries) GetAdminById(ctx context.Context, id uuid.UUID) (Admin, error)
 		&i.TotalModeration,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
-const getAdminByUsername = `-- name: GetAdminByUsername :one
-SELECT id, username, display_name, level_rights, total_moderation, created_at, updated_at FROM admins WHERE username=$1
+const getAdmin = `-- name: GetAdmin :one
+SELECT id, username, display_name, level_rights, total_moderation, created_at, updated_at, avatar_url
+FROM admins
+WHERE ($1::varchar IS NULL OR username = $1::varchar)
+  AND ($2::uuid IS NULL OR id = $2::uuid)
+  AND ($1::varchar IS NOT NULL OR $2::uuid IS NOT NULL) LIMIT 1
 `
 
-func (q *Queries) GetAdminByUsername(ctx context.Context, username string) (Admin, error) {
-	row := q.db.QueryRow(ctx, getAdminByUsername, username)
+type GetAdminParams struct {
+	Username pgtype.Text    `json:"username"`
+	AdminID  pgtype.UUID `json:"admin_id"`
+}
+
+func (q *Queries) GetAdmin(ctx context.Context, arg GetAdminParams) (Admin, error) {
+	row := q.db.QueryRow(ctx, getAdmin, arg.Username, arg.AdminID)
 	var i Admin
 	err := row.Scan(
 		&i.ID,
@@ -45,6 +75,36 @@ func (q *Queries) GetAdminByUsername(ctx context.Context, username string) (Admi
 		&i.TotalModeration,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+	)
+	return i, err
+}
+
+const getAdminForUpdate = `-- name: GetAdminForUpdate :one
+SELECT id, username, display_name, level_rights, total_moderation, created_at, updated_at, avatar_url
+FROM admins
+WHERE ($1::varchar IS NULL OR username = $1::varchar)
+  AND ($2::uuid IS NULL OR id = $2::uuid)
+  AND ($1::varchar IS NOT NULL OR $2::uuid IS NOT NULL) FOR UPDATE
+`
+
+type GetAdminForUpdateParams struct {
+	Username string    `json:"username"`
+	AdminID  uuid.UUID `json:"admin_id"`
+}
+
+func (q *Queries) GetAdminForUpdate(ctx context.Context, arg GetAdminForUpdateParams) (Admin, error) {
+	row := q.db.QueryRow(ctx, getAdminForUpdate, arg.Username, arg.AdminID)
+	var i Admin
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.LevelRights,
+		&i.TotalModeration,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
@@ -59,4 +119,57 @@ func (q *Queries) GetAdminUsernameByProductId(ctx context.Context, productID uui
 	var username string
 	err := row.Scan(&username)
 	return username, err
+}
+
+const increaseTotalModerates = `-- name: IncreaseTotalModerates :exec
+UPDATE admins SET total_moderation = total_moderation+$2 WHERE username = $1
+`
+
+type IncreaseTotalModeratesParams struct {
+	Username       string `json:"username"`
+	TotalModerates int32  `json:"total_moderates"`
+}
+
+func (q *Queries) IncreaseTotalModerates(ctx context.Context, arg IncreaseTotalModeratesParams) error {
+	_, err := q.db.Exec(ctx, increaseTotalModerates, arg.Username, arg.TotalModerates)
+	return err
+}
+
+const updateAdmin = `-- name: UpdateAdmin :one
+UPDATE admins
+    SET display_name = $1,
+        level_rights = $2,
+        total_moderation = $3,
+        avatar_url = $4,
+        updated_at = NOW()
+WHERE username = $1
+RETURNING id, username, display_name, level_rights, total_moderation, created_at, updated_at, avatar_url
+`
+
+type UpdateAdminParams struct {
+	DisplayName     string `json:"display_name"`
+	LevelRights     int32  `json:"level_rights"`
+	TotalModeration int32  `json:"total_moderation"`
+	AvatarUrl       string `json:"avatar_url"`
+}
+
+func (q *Queries) UpdateAdmin(ctx context.Context, arg UpdateAdminParams) (Admin, error) {
+	row := q.db.QueryRow(ctx, updateAdmin,
+		arg.DisplayName,
+		arg.LevelRights,
+		arg.TotalModeration,
+		arg.AvatarUrl,
+	)
+	var i Admin
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.LevelRights,
+		&i.TotalModeration,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AvatarUrl,
+	)
+	return i, err
 }

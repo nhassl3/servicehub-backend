@@ -71,14 +71,21 @@ func (h *AuthHandler) Login(ctx context.Context, req *authv1.LoginRequest) (*aut
 	}, nil
 }
 
-func (h *AuthHandler) Logout(_ context.Context, _ *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
-	// PASETO tokens are stateless; logout is client-side (discard the token).
-	// Future: add a revocation store (Redis) for true server-side logout.
+func (h *AuthHandler) Logout(ctx context.Context, _ *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
+	payload, ok := interceptors.PayloadFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.FailedPrecondition, "missing token")
+	}
+
+	if err := h.svc.Logout(ctx, payload); err != nil {
+		return nil, domainErr(err)
+	}
+
 	return &authv1.LogoutResponse{Success: true}, nil
 }
 
 func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequest) (*authv1.RefreshTokenResponse, error) {
-	tokens, err := h.svc.RefreshToken(ctx, req.Username)
+	tokens, err := h.svc.RefreshToken(ctx, req.GetRefreshToken())
 	if err != nil {
 		return nil, domainErr(err)
 	}

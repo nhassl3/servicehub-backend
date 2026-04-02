@@ -35,6 +35,12 @@ type UpdateSellerParams struct {
 	AvatarURL   string
 }
 
+type UploadSellerAvatarParams struct {
+	Username    string
+	FileData    []byte
+	ContentType string
+}
+
 //go:generate mockgen -source=seller.go -destination=../repository/mock/seller_repo_mock.go -package=mockrepo
 type SellerRepository interface {
 	Create(ctx context.Context, params CreateSellerParams) (*Seller, error)

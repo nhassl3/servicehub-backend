@@ -41,6 +41,16 @@ func domainErr(err error) error {
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrSessionIsBlocked):
 		return status.Error(codes.Unauthenticated, err.Error())
+	case errors.Is(err, domain.ErrDeviceMistake):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, domain.ErrAuthBlock):
+		return status.Error(codes.Unavailable, err.Error())
+	case errors.Is(err, domain.ErrFileTooLarge):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrInvalidFileType):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrCategoryNotFound):
+		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, fmt.Sprintf("internal server error: %s", err.Error()))
 	}

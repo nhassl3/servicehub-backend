@@ -12,6 +12,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// ─── Mock TokenBlacklist ──────────────────────────────────────────────────────
+
+type mockBlacklist struct {
+	blacklisted map[string]bool
+}
+
+func newMockBlacklist() *mockBlacklist {
+	return &mockBlacklist{blacklisted: make(map[string]bool)}
+}
+
+func (m *mockBlacklist) Blacklist(_ context.Context, jti string, _ time.Time) error {
+	m.blacklisted[jti] = true
+	return nil
+}
+
+func (m *mockBlacklist) IsBlacklisted(_ context.Context, jti string) (bool, error) {
+	return m.blacklisted[jti], nil
+}
+
 // ─── Mock TokenManager ────────────────────────────────────────────────────────
 
 type mockTokenManager struct {
@@ -55,16 +74,18 @@ func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
 // ─── Mock UserRepository ──────────────────────────────────────────────────────
 
 type mockUserRepo struct {
-	existsByUsernameFunc func(ctx context.Context, username string) (bool, error)
-	existsByEmailFunc    func(ctx context.Context, email string) (bool, error)
-	createFunc           func(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
-	getByUsernameFunc    func(ctx context.Context, username string) (*domain.User, error)
-	getByEmailFunc       func(ctx context.Context, email string) (*domain.User, error)
-	getByUIDFunc         func(ctx context.Context, uid string) (*domain.User, error)
-	updateFunc           func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
-	updatePasswordFunc   func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
-	getSessionFunc       func(ctx context.Context, username string) (*domain.Session, error)
-	createSessionFunc    func(ctx context.Context, params domain.CreateSessionParams) error
+	existsByUsernameFunc   func(ctx context.Context, username string) (bool, error)
+	existsByEmailFunc      func(ctx context.Context, email string) (bool, error)
+	createFunc             func(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
+	getByUsernameFunc      func(ctx context.Context, username string) (*domain.User, error)
+	getByEmailFunc         func(ctx context.Context, email string) (*domain.User, error)
+	getByUIDFunc           func(ctx context.Context, uid string) (*domain.User, error)
+	updateFunc             func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
+	updatePasswordFunc     func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
+	getSessionFunc         func(ctx context.Context, refreshToken string) (*domain.Session, error)
+	getSessionByUsernameFunc func(ctx context.Context, username string) (*domain.Session, error)
+	deleteSessionFunc      func(ctx context.Context, refreshToken string) error
+	createSessionFunc      func(ctx context.Context, params domain.CreateSessionParams) error
 }
 
 func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
@@ -74,11 +95,25 @@ func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSe
 	return nil
 }
 
-func (m *mockUserRepo) GetSession(ctx context.Context, username string) (*domain.Session, error) {
+func (m *mockUserRepo) GetSession(ctx context.Context, refreshToken string) (*domain.Session, error) {
 	if m.getSessionFunc != nil {
-		return m.getSessionFunc(ctx, username)
+		return m.getSessionFunc(ctx, refreshToken)
 	}
 	return &domain.Session{}, nil
+}
+
+func (m *mockUserRepo) GetSessionByUsername(ctx context.Context, username string) (*domain.Session, error) {
+	if m.getSessionByUsernameFunc != nil {
+		return m.getSessionByUsernameFunc(ctx, username)
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockUserRepo) DeleteSession(ctx context.Context, refreshToken string) error {
+	if m.deleteSessionFunc != nil {
+		return m.deleteSessionFunc(ctx, refreshToken)
+	}
+	return nil
 }
 
 func (m *mockUserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
@@ -146,7 +181,8 @@ func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParam
 
 func newAuthService(repo domain.UserRepository) *service.AuthService {
 	tm := &mockTokenManager{}
-	return service.NewAuthService(repo, tm, tm)
+	bl := newMockBlacklist()
+	return service.NewAuthService(repo, tm, tm, bl)
 }
 
 func TestAuthService_Register_OK(t *testing.T) {
@@ -259,7 +295,8 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	repo := &mockUserRepo{}
 	tm := &mockTokenManager{verifyErr: auth.ErrInvalidToken}
-	svc := service.NewAuthService(repo, tm, tm)
+	bl := newMockBlacklist()
+	svc := service.NewAuthService(repo, tm, tm, bl)
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)
