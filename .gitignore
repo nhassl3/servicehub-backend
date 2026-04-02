@@ -6,3 +6,6 @@ proto/
 .git
 bin
 coverage.out
+TT.txt
+redis-config/redis.conf
+redis-config/users.acl
