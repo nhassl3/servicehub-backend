@@ -45,14 +45,17 @@ func (r *AdminRepo) CreateAdmin(ctx context.Context, params domain.CreateAdminPa
 }
 
 func (r *AdminRepo) GetAdmin(ctx context.Context, params domain.GetAdminProfileParams) (*domain.Admin, error) {
-	adminID := uuidPtrToNullable(params.AdminId)
-	if params.AdminId != nil && !adminID.Valid {
-		return nil, domain.ErrInvalidInput
+	var getAdminParams db.GetAdminParams
+	if params.AdminId != "" {
+		getAdminParams = db.GetAdminParams{
+			AdminID: uuidPtrToNullable(&params.AdminId),
+		}
+	} else if params.Username != "" {
+		getAdminParams = db.GetAdminParams{
+			Username: usernamePtrToNullable(&params.Username),
+		}
 	}
-	row, err := r.store.GetAdmin(ctx, db.GetAdminParams{
-		Username: usernamePtrToNullable(params.Username),
-		AdminID:  adminID,
-	})
+	row, err := r.store.GetAdmin(ctx, getAdminParams)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound

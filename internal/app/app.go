@@ -75,11 +75,10 @@ func Run(cfg *config.Config) error {
 	// RedisClient store tokens, sessions, profiles
 	tokenBlacklist := repoRedis.NewTokenBlacklist(redisClient)
 	userRedis := repoRedis.NewUserRedis(redisClient, cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock)
+	adminRedis := repoRedis.NewAdminRedis(redisClient, cfg.Redis.TTL.Product, cfg.Redis.TTL.Claim)
 
 	// RedisProducts store categories and products closed on a page a few moments later
 	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
-	productsRedis := repoRedis.NewAdminRedis(redisProductsClient, cfg.Redis.TTL.Product)
-	_ = productsRedis
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(ctx, &cfg.MinIO)
@@ -111,20 +110,22 @@ func Run(cfg *config.Config) error {
 	wishlistRepo := repoPostgres.NewWishlistRepo(store)
 	balanceRepo := repoPostgres.NewBalanceRepo(store)
 	adminRepo := repoPostgres.NewAdminRepo(store)
+	moderationRepo := repoPostgres.NewModerationRepo(store)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
 	svcs := &transportGRPC.Services{
-		Admin:    service.NewAdminService(adminRepo, minIOClient),
-		Auth:     service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist),
-		User:     service.NewUserService(userRepo, minIOClient, userRedis),
-		Category: service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
-		Product:  service.NewProductService(productRepo, sellerRepo),
-		Cart:     service.NewCartService(cartRepo),
-		Order:    service.NewOrderService(orderRepo),
-		Review:   service.NewReviewService(reviewRepo),
-		Wishlist: service.NewWishlistService(wishlistRepo),
-		Seller:   service.NewSellerService(sellerRepo, minIOClient),
-		Balance:  service.NewBalanceService(balanceRepo),
+		Admin:      service.NewAdminService(adminRepo, minIOClient, adminRedis),
+		Auth:       service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist),
+		User:       service.NewUserService(userRepo, minIOClient, userRedis),
+		Category:   service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
+		Product:    service.NewProductService(productRepo, sellerRepo),
+		Cart:       service.NewCartService(cartRepo),
+		Order:      service.NewOrderService(orderRepo),
+		Review:     service.NewReviewService(reviewRepo),
+		Wishlist:   service.NewWishlistService(wishlistRepo),
+		Seller:     service.NewSellerService(sellerRepo, minIOClient),
+		Balance:    service.NewBalanceService(balanceRepo),
+		Moderation: service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
 	}
 
 	// ─── gRPC Server ──────────────────────────────────────────────────────────

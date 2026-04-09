@@ -9,14 +9,35 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getModerationByAdminId = `-- name: GetModerationByAdminId :one
-SELECT id, admin_id, product_id, active, created_at, updated_at FROM moderation WHERE admin_id=$1
+const approve = `-- name: Approve :exec
+
+UPDATE products SET status='active' WHERE id=$1
 `
 
-func (q *Queries) GetModerationByAdminId(ctx context.Context, adminID uuid.UUID) (Moderation, error) {
-	row := q.db.QueryRow(ctx, getModerationByAdminId, adminID)
+// clean up redis lock storage for next methods (Approve, Reject)
+func (q *Queries) Approve(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, approve, id)
+	return err
+}
+
+const createModeration = `-- name: CreateModeration :one
+INSERT INTO moderation (product_id, admin_id, active)
+VALUES ($1, $2, true)
+ON CONFLICT (product_id)
+DO UPDATE SET active = true, admin_id = excluded.admin_id, updated_at = NOW()
+RETURNING id, admin_id, product_id, active, created_at, updated_at, reason, status
+`
+
+type CreateModerationParams struct {
+	ProductID uuid.UUID `json:"product_id"`
+	AdminID   uuid.UUID `json:"admin_id"`
+}
+
+func (q *Queries) CreateModeration(ctx context.Context, arg CreateModerationParams) (Moderation, error) {
+	row := q.db.QueryRow(ctx, createModeration, arg.ProductID, arg.AdminID)
 	var i Moderation
 	err := row.Scan(
 		&i.ID,
@@ -25,16 +46,18 @@ func (q *Queries) GetModerationByAdminId(ctx context.Context, adminID uuid.UUID)
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Reason,
+		&i.Status,
 	)
 	return i, err
 }
 
-const getModerationByProductId = `-- name: GetModerationByProductId :one
-SELECT id, admin_id, product_id, active, created_at, updated_at FROM moderation WHERE product_id=$1
+const getModeration = `-- name: GetModeration :one
+SELECT id, admin_id, product_id, active, created_at, updated_at, reason, status FROM moderation WHERE id=$1 LIMIT 1
 `
 
-func (q *Queries) GetModerationByProductId(ctx context.Context, productID uuid.UUID) (Moderation, error) {
-	row := q.db.QueryRow(ctx, getModerationByProductId, productID)
+func (q *Queries) GetModeration(ctx context.Context, id uuid.UUID) (Moderation, error) {
+	row := q.db.QueryRow(ctx, getModeration, id)
 	var i Moderation
 	err := row.Scan(
 		&i.ID,
@@ -43,38 +66,101 @@ func (q *Queries) GetModerationByProductId(ctx context.Context, productID uuid.U
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Reason,
+		&i.Status,
 	)
 	return i, err
 }
 
-const listActiveProducts = `-- name: ListActiveProducts :many
-SELECT id, admin_id, product_id, active, created_at, updated_at FROM moderation
-WHERE active=true
-ORDER BY product_id
-LIMIT $1 OFFSET $2
+const listModerationItems = `-- name: ListModerationItems :many
+SELECT
+    p.id as product_id,
+    p.seller_id,
+    p.category_id,
+    p.title,
+    p.description,
+    p.price,
+    p.tags,
+    p.status,
+    p.sales_count,
+    p.rating,
+    p.reviews_count,
+    p.created_at as product_created_at,
+    p.updated_at as product_updated_at,
+    m.id as moderation_id,
+    m.admin_id as moderation_admin_id,
+    a.username as admin_username,
+    m.active as moderation_active,
+    m.created_at as moderation_created_at,
+    m.updated_at as moderation_updated_at
+FROM products p
+         LEFT JOIN moderation m ON p.id = m.product_id
+         LEFT JOIN admins   a ON a.id = m.admin_id
+WHERE
+    ($1::uuid IS NULL AND p.status = 'draft')
+   OR
+    (m.admin_id = $1::uuid AND m.active = true)
+ORDER BY m.created_at DESC
+LIMIT $3 OFFSET $2
 `
 
-type ListActiveProductsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+type ListModerationItemsParams struct {
+	AdminID pgtype.UUID `json:"admin_id"`
+	Offset  int32       `json:"offset"`
+	Limit   int32       `json:"limit"`
 }
 
-func (q *Queries) ListActiveProducts(ctx context.Context, arg ListActiveProductsParams) ([]Moderation, error) {
-	rows, err := q.db.Query(ctx, listActiveProducts, arg.Limit, arg.Offset)
+type ListModerationItemsRow struct {
+	ProductID           uuid.UUID          `json:"product_id"`
+	SellerID            uuid.UUID          `json:"seller_id"`
+	CategoryID          int32              `json:"category_id"`
+	Title               string             `json:"title"`
+	Description         string             `json:"description"`
+	Price               float64            `json:"price"`
+	Tags                []string           `json:"tags"`
+	Status              string             `json:"status"`
+	SalesCount          int32              `json:"sales_count"`
+	Rating              float64            `json:"rating"`
+	ReviewsCount        int32              `json:"reviews_count"`
+	ProductCreatedAt    pgtype.Timestamptz `json:"product_created_at"`
+	ProductUpdatedAt    pgtype.Timestamptz `json:"product_updated_at"`
+	ModerationID        pgtype.UUID        `json:"moderation_id"`
+	ModerationAdminID   pgtype.UUID        `json:"moderation_admin_id"`
+	AdminUsername       pgtype.Text        `json:"admin_username"`
+	ModerationActive    pgtype.Bool        `json:"moderation_active"`
+	ModerationCreatedAt pgtype.Timestamptz `json:"moderation_created_at"`
+	ModerationUpdatedAt pgtype.Timestamptz `json:"moderation_updated_at"`
+}
+
+func (q *Queries) ListModerationItems(ctx context.Context, arg ListModerationItemsParams) ([]ListModerationItemsRow, error) {
+	rows, err := q.db.Query(ctx, listModerationItems, arg.AdminID, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Moderation{}
+	items := []ListModerationItemsRow{}
 	for rows.Next() {
-		var i Moderation
+		var i ListModerationItemsRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.AdminID,
 			&i.ProductID,
-			&i.Active,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.SellerID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Description,
+			&i.Price,
+			&i.Tags,
+			&i.Status,
+			&i.SalesCount,
+			&i.Rating,
+			&i.ReviewsCount,
+			&i.ProductCreatedAt,
+			&i.ProductUpdatedAt,
+			&i.ModerationID,
+			&i.ModerationAdminID,
+			&i.AdminUsername,
+			&i.ModerationActive,
+			&i.ModerationCreatedAt,
+			&i.ModerationUpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -84,4 +170,52 @@ func (q *Queries) ListActiveProducts(ctx context.Context, arg ListActiveProducts
 		return nil, err
 	}
 	return items, nil
+}
+
+const reject = `-- name: Reject :exec
+UPDATE products SET status='inactive' WHERE id=$1
+`
+
+func (q *Queries) Reject(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, reject, id)
+	return err
+}
+
+const release = `-- name: Release :exec
+WITH updated AS (
+    UPDATE moderation m SET active = false, status = $1, updated_at = NOW()
+    WHERE m.product_id = $2
+    RETURNING m.product_id, m.status
+)
+DELETE FROM moderation a
+WHERE a.product_id = (SELECT u.product_id FROM updated u WHERE u.status = 'draft')
+`
+
+type ReleaseParams struct {
+	Status    string    `json:"status"`
+	ProductID uuid.UUID `json:"product_id"`
+}
+
+func (q *Queries) Release(ctx context.Context, arg ReleaseParams) error {
+	_, err := q.db.Exec(ctx, release, arg.Status, arg.ProductID)
+	return err
+}
+
+const total = `-- name: Total :one
+SELECT COUNT(*)
+FROM moderation
+WHERE ($2::uuid IS NULL OR admin_id = $2::uuid)
+    AND active = $1
+`
+
+type TotalParams struct {
+	Active  bool        `json:"active"`
+	AdminID pgtype.UUID `json:"admin_id"`
+}
+
+func (q *Queries) Total(ctx context.Context, arg TotalParams) (int64, error) {
+	row := q.db.QueryRow(ctx, total, arg.Active, arg.AdminID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }

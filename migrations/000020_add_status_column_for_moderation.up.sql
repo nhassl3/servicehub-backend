@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS moderation ADD COLUMN IF NOT EXISTS status VARCHAR(20)  NOT NULL DEFAULT 'draft' CHECK (status IN ('active', 'inactive', 'draft'));

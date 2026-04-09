@@ -41,8 +41,8 @@ type CreateAdminParams struct {
 }
 
 type GetAdminProfileParams struct {
-	Username *string
-	AdminId  *string
+	Username string
+	AdminId  string
 }
 
 type UpdateAdminsProfileParams struct {
@@ -70,7 +70,7 @@ type IncreaseTotalModeratesParams struct {
 	TotalModerates int32
 }
 
-//go:generate mockgen -source=seller.go -destination=../repository/mock/seller_repo_mock.go -package=mockrepo
+//go:generate mockgen -source=seller.go -destination=../repository/mock/admin_repo_mock.go -package=mockrepo
 type AdminRepository interface {
 	CreateAdmin(ctx context.Context, params CreateAdminParams) (*Admin, error)
 	GetAdmin(ctx context.Context, params GetAdminProfileParams) (*Admin, error)
@@ -82,5 +82,5 @@ type AdminRepository interface {
 
 type AdminRedis interface {
 	Profile(ctx context.Context, username string) (*Admin, error)
-	SetProfile(ctx context.Context, user *Admin) error
+	SetProfile(ctx context.Context, admin *Admin) error
 }

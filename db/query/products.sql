@@ -1,15 +1,15 @@
 -- name: CreateProduct :one
 INSERT INTO products (seller_id, category_id, title, description, price, tags)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, seller_id, category_id, title, description, price, tags, status, sales_count, rating, reviews_count, created_at, updated_at;
+RETURNING *;
 
 -- name: GetProductByID :one
-SELECT id, seller_id, category_id, title, description, price, tags, status, sales_count, rating, reviews_count, created_at, updated_at
+SELECT *
 FROM products
 WHERE id = $1;
 
 -- name: ListProducts :many
-SELECT id, seller_id, category_id, title, description, price, tags, status, sales_count, rating, reviews_count, created_at, updated_at
+SELECT *
 FROM products
 WHERE (sqlc.narg('seller_id')::uuid IS NULL OR seller_id = sqlc.narg('seller_id')::uuid)
   AND (sqlc.narg('category_id')::int IS NULL OR category_id = sqlc.narg('category_id')::int)
@@ -29,7 +29,7 @@ WHERE (sqlc.narg('seller_id')::uuid IS NULL OR seller_id = sqlc.narg('seller_id'
   AND status = sqlc.arg('status');
 
 -- name: SearchProducts :many
-SELECT id, seller_id, category_id, title, description, price, tags, status, sales_count, rating, reviews_count, created_at, updated_at
+SELECT *
 FROM products
 WHERE fts @@ plainto_tsquery('english', sqlc.arg('query'))
   AND status = 'active'
@@ -51,7 +51,7 @@ SET title       = $2,
     status      = $6,
     updated_at  = NOW()
 WHERE id = $1
-RETURNING id, seller_id, category_id, title, description, price, tags, status, sales_count, rating, reviews_count, created_at, updated_at;
+RETURNING *;
 
 -- name: DeleteProduct :exec
 DELETE FROM products WHERE id = $1;

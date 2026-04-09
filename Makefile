@@ -130,14 +130,14 @@ vet:
 
 ##  ─── Redis ───────────────────────────────────────────────────────────────────
 redis:
-	@docker run -d -p 127.0.0.1:6380:6380 -v ./redis-config:/usr/local/etc/redis --name servicehub-redis redis:7-alpine redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
+	@docker run -d -p 127.0.0.1:6380:6380 -v ./redis-config:/usr/local/etc/redis --name redis7 redis:7-alpine redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
 
 cli-redis:
 	@redis-cli -h localhost -p 6380 --user $(REDIS_USER) -a $(REDIS_USER_PASSWORD)
 
 ##  ─── MinIO ───────────────────────────────────────────────────────────────────
 minio:
-	@docker run -d --name servicehub-minio \
+	@docker run -d --name minioRELEASE.2025-09-07T16-13-09Z-cpuv1 \
 		-p 9000:9000 -p 9001:9001 \
 		-e MINIO_ROOT_USER=$(MINIO_ACCESS_KEY) \
 		-e MINIO_ROOT_PASSWORD=$(MINIO_SECRET_KEY) \

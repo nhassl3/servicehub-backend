@@ -14,6 +14,8 @@ import (
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	moderationv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/moderation/v1"
+	adminv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/admin/v1"
 	authv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/auth/v1"
 	balancev1 "github.com/nhassl3/servicehub-contracts/pkg/pb/balance/v1"
 	cartv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/cart/v1"
@@ -36,17 +38,18 @@ import (
 
 // Services aggregates all application services passed down to handlers.
 type Services struct {
-	Admin    *service.AdminService
-	Auth     *service.AuthService
-	User     *service.UserService
-	Category *service.CategoryService
-	Product  *service.ProductService
-	Cart     *service.CartService
-	Order    *service.OrderService
-	Review   *service.ReviewService
-	Wishlist *service.WishlistService
-	Seller   *service.SellerService
-	Balance  *service.BalanceService
+	Admin      *service.AdminService
+	Auth       *service.AuthService
+	User       *service.UserService
+	Category   *service.CategoryService
+	Product    *service.ProductService
+	Cart       *service.CartService
+	Order      *service.OrderService
+	Review     *service.ReviewService
+	Wishlist   *service.WishlistService
+	Seller     *service.SellerService
+	Balance    *service.BalanceService
+	Moderation *service.ModerationService
 }
 
 // Handlers holds all gRPC handler implementations.
@@ -68,16 +71,18 @@ type Services struct {
 //	SellerHandler   : CreateSeller · GetSellerProfile · UpdateSeller
 //	BalanceHandler  : GetBalance · Deposit · GetTransactionHistory
 type Handlers struct {
-	Auth     *AuthHandler
-	User     *UserHandler
-	Category *CategoryHandler
-	Product  *ProductHandler
-	Cart     *CartHandler
-	Order    *OrderHandler
-	Review   *ReviewHandler
-	Wishlist *WishlistHandler
-	Seller   *SellerHandler
-	Balance  *BalanceHandler
+	Admin      *AdminHandler
+	Auth       *AuthHandler
+	User       *UserHandler
+	Category   *CategoryHandler
+	Product    *ProductHandler
+	Cart       *CartHandler
+	Order      *OrderHandler
+	Review     *ReviewHandler
+	Wishlist   *WishlistHandler
+	Seller     *SellerHandler
+	Balance    *BalanceHandler
+	Moderation *ModerationHandler
 }
 
 // Server wraps the gRPC server with its handler set.
@@ -99,16 +104,18 @@ func NewServer(services *Services, tokenManager auth.TokenManager, log *zap.Logg
 	)
 
 	handlers := &Handlers{
-		Auth:     NewAuthHandler(services.Auth, tokenManager),
-		User:     NewUserHandler(services.User),
-		Category: NewCategoryHandler(services.Category),
-		Product:  NewProductHandler(services.Product),
-		Cart:     NewCartHandler(services.Cart),
-		Order:    NewOrderHandler(services.Order),
-		Review:   NewReviewHandler(services.Review),
-		Wishlist: NewWishlistHandler(services.Wishlist),
-		Seller:   NewSellerHandler(services.Seller),
-		Balance:  NewBalanceHandler(services.Balance),
+		Admin:      NewAdminHandler(services.Admin),
+		Auth:       NewAuthHandler(services.Auth, tokenManager),
+		User:       NewUserHandler(services.User),
+		Category:   NewCategoryHandler(services.Category),
+		Product:    NewProductHandler(services.Product),
+		Cart:       NewCartHandler(services.Cart),
+		Order:      NewOrderHandler(services.Order),
+		Review:     NewReviewHandler(services.Review),
+		Wishlist:   NewWishlistHandler(services.Wishlist),
+		Seller:     NewSellerHandler(services.Seller),
+		Balance:    NewBalanceHandler(services.Balance),
+		Moderation: NewModerationHandler(services.Moderation),
 	}
 
 	registerHandlers(grpcServer, handlers)
@@ -121,6 +128,7 @@ func NewServer(services *Services, tokenManager auth.TokenManager, log *zap.Logg
 // To add a new service: implement its handler, add it to Handlers, and call
 // the generated Register<Name>Server here.
 func registerHandlers(srv *grpc.Server, h *Handlers) {
+	adminv1.RegisterAdminServiceServer(srv, h.Admin)
 	authv1.RegisterAuthServiceServer(srv, h.Auth)
 	userv1.RegisterUserServiceServer(srv, h.User)
 	categoryv1.RegisterCategoryServiceServer(srv, h.Category)
@@ -131,6 +139,7 @@ func registerHandlers(srv *grpc.Server, h *Handlers) {
 	wishlistv1.RegisterWishlistServiceServer(srv, h.Wishlist)
 	sellerv1.RegisterSellerServiceServer(srv, h.Seller)
 	balancev1.RegisterBalanceServiceServer(srv, h.Balance)
+	moderationv1.RegisterModerationServiceServer(srv, h.Moderation)
 }
 
 // Start begins accepting gRPC connections on addr (e.g. ":9090").
@@ -171,6 +180,7 @@ func (s *Server) StartGateway(ctx context.Context, grpcAddr, httpAddr string) er
 
 	// Register every service handler with the gateway mux.
 	for _, fn := range []func(context.Context, *runtime.ServeMux, *grpc.ClientConn) error{
+		adminv1.RegisterAdminServiceHandler,
 		authv1.RegisterAuthServiceHandler,
 		userv1.RegisterUserServiceHandler,
 		categoryv1.RegisterCategoryServiceHandler,
@@ -181,6 +191,7 @@ func (s *Server) StartGateway(ctx context.Context, grpcAddr, httpAddr string) er
 		wishlistv1.RegisterWishlistServiceHandler,
 		sellerv1.RegisterSellerServiceHandler,
 		balancev1.RegisterBalanceServiceHandler,
+		moderationv1.RegisterModerationServiceHandler,
 	} {
 		if err := fn(ctx, mux, conn); err != nil {
 			return err
@@ -197,6 +208,7 @@ func (s *Server) StartGateway(ctx context.Context, grpcAddr, httpAddr string) er
 func corsMiddleware(next http.Handler) http.Handler {
 	allowedOrigins := map[string]struct{}{
 		"http://localhost:5173": {},
+		"http://localhost:3000": {},
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

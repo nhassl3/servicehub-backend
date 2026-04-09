@@ -42,18 +42,9 @@ func (h *AdminHandler) CreateAdmin(ctx context.Context, req *adminv1.CreateAdmin
 }
 
 func (h *AdminHandler) GetAdminProfile(ctx context.Context, req *adminv1.GetAdminProfileRequest) (*adminv1.GetAdminProfileResponse, error) {
-	var params domain.GetAdminProfileParams
-
-	if req.Username != nil {
-		v := *req.Username
-		params.Username = &v
-	}
-	if req.AdminId != nil {
-		v := *req.AdminId
-		params.AdminId = &v
-	}
-
-	admin, err := h.svc.GetAdminProfile(ctx, params)
+	admin, err := h.svc.GetAdminProfile(ctx, domain.GetAdminProfileParams{
+		Username: req.GetUsername(),
+	})
 	if err != nil {
 		return nil, domainErr(err)
 	}

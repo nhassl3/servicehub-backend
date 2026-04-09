@@ -1,9 +1,9 @@
 -- name: GetAdmin :one
 SELECT *
 FROM admins
-WHERE (sqlc.arg(username)::varchar IS NULL OR username = sqlc.arg(username)::varchar)
-  AND (sqlc.arg(admin_id)::uuid IS NULL OR id = sqlc.arg(admin_id)::uuid)
-  AND (sqlc.arg(username)::varchar IS NOT NULL OR sqlc.arg(admin_id)::uuid IS NOT NULL) LIMIT 1;
+WHERE (sqlc.narg(username)::varchar IS NULL OR username = sqlc.narg(username)::varchar)
+  AND (sqlc.narg(admin_id)::uuid IS NULL OR id = sqlc.narg(admin_id)::uuid)
+  AND (sqlc.narg(username)::varchar IS NOT NULL OR sqlc.narg(admin_id)::uuid IS NOT NULL) LIMIT 1;
 
 -- name: GetAdminUsernameByProductId :one
 SELECT username FROM admins

@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/nhassl3/servicehub/internal/db"
 	"github.com/nhassl3/servicehub/internal/domain"
 )
@@ -37,9 +35,7 @@ func (r *ProductRepo) Create(ctx context.Context, params domain.CreateProductPar
 	if err != nil {
 		return nil, fmt.Errorf("product_repo.Create: %w", err)
 	}
-	return mapProduct(row.ID, row.SellerID, row.CategoryID, row.Title, row.Description,
-		row.Price, row.Tags, row.Status, row.SalesCount, row.Rating, row.ReviewsCount,
-		row.CreatedAt, row.UpdatedAt), nil
+	return mapProduct(&row), nil
 }
 
 func (r *ProductRepo) GetByID(ctx context.Context, id string) (*domain.Product, error) {
@@ -54,9 +50,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, id string) (*domain.Product, 
 		}
 		return nil, fmt.Errorf("product_repo.GetByID: %w", err)
 	}
-	return mapProduct(row.ID, row.SellerID, row.CategoryID, row.Title, row.Description,
-		row.Price, row.Tags, row.Status, row.SalesCount, row.Rating, row.ReviewsCount,
-		row.CreatedAt, row.UpdatedAt), nil
+	return mapProduct(&row), nil
 }
 
 func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams) ([]domain.Product, int64, error) {
@@ -92,14 +86,11 @@ func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams
 
 	products := make([]domain.Product, len(rows))
 	for i, row := range rows {
-		products[i] = *mapProduct(row.ID, row.SellerID, row.CategoryID, row.Title, row.Description,
-			row.Price, row.Tags, row.Status, row.SalesCount, row.Rating, row.ReviewsCount,
-			row.CreatedAt, row.UpdatedAt)
+		products[i] = *mapProduct(&row)
 	}
 	return products, total, nil
 }
 
-// Search TODO: change the method
 func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
 	total, err := r.store.CountSearchProducts(ctx, params.Query)
 	if err != nil {
@@ -117,35 +108,59 @@ func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsPa
 
 	products := make([]domain.Product, len(rows))
 	for i, row := range rows {
-		products[i] = *mapProduct(row.ID, row.SellerID, row.CategoryID, row.Title, row.Description,
-			row.Price, row.Tags, row.Status, row.SalesCount, row.Rating, row.ReviewsCount,
-			row.CreatedAt, row.UpdatedAt)
+		products[i] = *mapProduct(&row)
 	}
 	return products, total, nil
 }
 
 func (r *ProductRepo) Update(ctx context.Context, params domain.UpdateProductParams) (*domain.Product, error) {
+	var row db.Product
 	uid, err := parseUUID(params.ID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
-	row, err := r.store.UpdateProduct(ctx, db.UpdateProductParams{
-		ID:          uid,
-		Title:       params.Title,
-		Description: params.Description,
-		Price:       params.Price,
-		Tags:        params.Tags,
-		Status:      params.Status,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrNotFound
+	if err := r.store.ExecTx(ctx, func(q *db.Queries) (fnErr error) {
+		row, fnErr = r.store.GetProductByID(ctx, uid)
+		if fnErr != nil {
+			if errors.Is(fnErr, pgx.ErrNoRows) {
+				return domain.ErrNotFound
+			}
+			return fnErr
 		}
-		return nil, fmt.Errorf("product_repo.Update: %w", err)
+
+		if params.Status == nil {
+			params.Status = &row.Status
+		}
+		if params.Title == nil {
+			params.Title = &row.Title
+		}
+		if len(params.Tags) == 0 {
+			params.Tags = row.Tags
+		}
+		if params.Price == nil {
+			params.Price = &row.Price
+		}
+		if params.Description == nil {
+			params.Description = &row.Description
+		}
+
+		row, fnErr = r.store.UpdateProduct(ctx, db.UpdateProductParams{
+			ID:          uid,
+			Title:       *params.Title,
+			Description: *params.Description,
+			Price:       *params.Price,
+			Tags:        params.Tags,
+			Status:      *params.Status,
+		})
+		if fnErr != nil {
+			return fnErr
+		}
+
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("product_repo.Update: failed to execute transaction %w", err)
 	}
-	return mapProduct(row.ID, row.SellerID, row.CategoryID, row.Title, row.Description,
-		row.Price, row.Tags, row.Status, row.SalesCount, row.Rating, row.ReviewsCount,
-		row.CreatedAt, row.UpdatedAt), nil
+	return mapProduct(&row), nil
 }
 
 func (r *ProductRepo) Delete(ctx context.Context, id string) error {
@@ -185,31 +200,20 @@ func (r *ProductRepo) UpdateRating(ctx context.Context, id string, newRating flo
 
 // mapProduct maps raw product fields (common across all SQLC product row types)
 // to a domain.Product value.
-func mapProduct(
-	id, sellerID uuid.UUID,
-	categoryID int32,
-	title, description string,
-	price float64,
-	tags []string,
-	status string,
-	salesCount int32,
-	rating float64,
-	reviewsCount int32,
-	createdAt, updatedAt pgtype.Timestamptz,
-) *domain.Product {
+func mapProduct(row *db.Product) *domain.Product {
 	return &domain.Product{
-		ID:           id.String(),
-		SellerID:     sellerID.String(),
-		CategoryID:   int(categoryID),
-		Title:        title,
-		Description:  description,
-		Price:        price,
-		Tags:         tags,
-		Status:       status,
-		SalesCount:   int(salesCount),
-		Rating:       rating,
-		ReviewsCount: int(reviewsCount),
-		CreatedAt:    pgTimeTZ(createdAt, time.UTC),
-		UpdatedAt:    pgTimeTZ(updatedAt, time.UTC),
+		ID:           row.ID.String(),
+		SellerID:     row.SellerID.String(),
+		CategoryID:   int(row.CategoryID),
+		Title:        row.Title,
+		Description:  row.Description,
+		Price:        row.Price,
+		Tags:         row.Tags,
+		Status:       row.Status,
+		SalesCount:   int(row.SalesCount),
+		Rating:       row.Rating,
+		ReviewsCount: int(row.ReviewsCount),
+		CreatedAt:    pgTimeTZ(row.CreatedAt, time.UTC),
+		UpdatedAt:    pgTimeTZ(row.UpdatedAt, time.UTC),
 	}
 }
