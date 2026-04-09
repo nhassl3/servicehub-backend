@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/nhassl3/servicehub/internal/domain"
+	repoRedis "github.com/nhassl3/servicehub/internal/repository/redis"
 )
 
 type AdminService struct {
@@ -15,10 +16,11 @@ type AdminService struct {
 	fileStorage domain.PhotoStorage
 }
 
-func NewAdminService(adminRepo domain.AdminRepository, fileStorage domain.PhotoStorage) *AdminService {
+func NewAdminService(adminRepo domain.AdminRepository, fileStorage domain.PhotoStorage, adminRedis *repoRedis.AdminRedis) *AdminService {
 	return &AdminService{
 		adminRepo:   adminRepo,
 		fileStorage: fileStorage,
+		adminRedis:  adminRedis,
 	}
 }
 
@@ -54,7 +56,7 @@ func (a *AdminService) UploadAdminAvatar(ctx context.Context, params domain.Uplo
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
 			admin, err = a.adminRepo.GetAdmin(ctx, domain.GetAdminProfileParams{
-				Username: &params.Username,
+				Username: params.Username,
 			})
 			if err != nil {
 				return nil, err

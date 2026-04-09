@@ -24,6 +24,7 @@ type Product struct {
 type ListProductsParams struct {
 	CategoryID *int
 	SellerID   *string
+	AdminId    *string
 	MinPrice   *float64
 	MaxPrice   *float64
 	Status     string
@@ -48,11 +49,11 @@ type CreateProductParams struct {
 
 type UpdateProductParams struct {
 	ID          string
-	Title       string
-	Description string
-	Price       float64
+	Title       *string
+	Description *string
+	Price       *float64
 	Tags        []string
-	Status      string
+	Status      *string
 }
 
 //go:generate mockgen -source=product.go -destination=../repository/mock/product_repo_mock.go -package=mockrepo

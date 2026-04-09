@@ -19,6 +19,8 @@ func NewProductService(productRepo domain.ProductRepository, sellerRepo domain.S
 func (s *ProductService) ListProducts(ctx context.Context, params domain.ListProductsParams) ([]domain.Product, int64, error) {
 	if params.Limit <= 0 {
 		params.Limit = 20
+	} else if params.Offset < 0 {
+		params.Offset = 0
 	}
 	return s.productRepo.List(ctx, params)
 }

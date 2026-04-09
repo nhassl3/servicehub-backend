@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS moderation DROP COLUMN IF EXISTS reason;

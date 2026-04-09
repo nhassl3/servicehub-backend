@@ -60,7 +60,7 @@ WHERE ($1::varchar IS NULL OR username = $1::varchar)
 `
 
 type GetAdminParams struct {
-	Username pgtype.Text    `json:"username"`
+	Username pgtype.Text `json:"username"`
 	AdminID  pgtype.UUID `json:"admin_id"`
 }
 

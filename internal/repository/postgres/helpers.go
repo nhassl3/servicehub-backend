@@ -26,6 +26,15 @@ func parseUUID(s string) (uuid.UUID, error) {
 	return u, nil
 }
 
+// uuidStringFromPg formats a pgtype.UUID as a canonical UUID string,
+// returning "" when the value is NULL.
+func uuidStringFromPg(u pgtype.UUID) string {
+	if !u.Valid {
+		return ""
+	}
+	return uuid.UUID(u.Bytes).String()
+}
+
 // uuidPtrToNullable converts an optional string UUID pointer to pgtype.UUID.
 func uuidPtrToNullable(s *string) pgtype.UUID {
 	if s == nil {

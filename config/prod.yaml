@@ -17,6 +17,8 @@ redis:
     categories: 1h
     auth_block: 5m
     product: 5m
+    admin: 15m
+    claim: 20m
 
 auth:
   access_token_ttl: 15m

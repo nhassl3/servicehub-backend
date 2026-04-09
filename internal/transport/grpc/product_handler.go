@@ -39,16 +39,13 @@ func (h *ProductHandler) ListProducts(ctx context.Context, req *productv1.ListPr
 		params.CategoryID = &v
 	}
 	if req.SellerId != nil {
-		v := *req.SellerId
-		params.SellerID = &v
+		params.SellerID = req.SellerId
 	}
 	if req.MinPrice != nil {
-		v := *req.MinPrice
-		params.MinPrice = &v
+		params.MinPrice = req.MinPrice
 	}
 	if req.MaxPrice != nil {
-		v := *req.MaxPrice
-		params.MaxPrice = &v
+		params.MaxPrice = req.MaxPrice
 	}
 
 	products, total, err := h.svc.ListProducts(ctx, params)
@@ -57,7 +54,7 @@ func (h *ProductHandler) ListProducts(ctx context.Context, req *productv1.ListPr
 	}
 	proto := make([]*productv1.Product, len(products))
 	for i, p := range products {
-		proto[i] = protoProduct(&p)
+		proto[i] = ProtoProduct(&p)
 	}
 	return &productv1.ListProductsResponse{Products: proto, Total: total}, nil
 }
@@ -67,7 +64,7 @@ func (h *ProductHandler) GetProduct(ctx context.Context, req *productv1.GetProdu
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	return &productv1.GetProductResponse{Product: protoProduct(p)}, nil
+	return &productv1.GetProductResponse{Product: ProtoProduct(p)}, nil
 }
 
 func (h *ProductHandler) SearchProducts(ctx context.Context, req *productv1.SearchProductsRequest) (*productv1.SearchProductsResponse, error) {
@@ -81,7 +78,7 @@ func (h *ProductHandler) SearchProducts(ctx context.Context, req *productv1.Sear
 	}
 	proto := make([]*productv1.Product, len(products))
 	for i, p := range products {
-		proto[i] = protoProduct(&p)
+		proto[i] = ProtoProduct(&p)
 	}
 	return &productv1.SearchProductsResponse{Products: proto, Total: total}, nil
 }
@@ -101,7 +98,7 @@ func (h *ProductHandler) CreateProduct(ctx context.Context, req *productv1.Creat
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	return &productv1.CreateProductResponse{Product: protoProduct(p)}, nil
+	return &productv1.CreateProductResponse{Product: ProtoProduct(p)}, nil
 }
 
 func (h *ProductHandler) UpdateProduct(ctx context.Context, req *productv1.UpdateProductRequest) (*productv1.UpdateProductResponse, error) {
@@ -120,7 +117,7 @@ func (h *ProductHandler) UpdateProduct(ctx context.Context, req *productv1.Updat
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	return &productv1.UpdateProductResponse{Product: protoProduct(p)}, nil
+	return &productv1.UpdateProductResponse{Product: ProtoProduct(p)}, nil
 }
 
 func (h *ProductHandler) DeleteProduct(ctx context.Context, req *productv1.DeleteProductRequest) (*productv1.DeleteProductResponse, error) {
@@ -136,7 +133,7 @@ func (h *ProductHandler) DeleteProduct(ctx context.Context, req *productv1.Delet
 
 // ── Proto mapper ─────────────────────────────────────────────────────────────
 
-func protoProduct(p *domain.Product) *productv1.Product {
+func ProtoProduct(p *domain.Product) *productv1.Product {
 	return &productv1.Product{
 		Id:           p.ID,
 		SellerId:     p.SellerID,

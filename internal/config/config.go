@@ -44,9 +44,11 @@ type RedisConfig struct {
 
 type RedisTTL struct {
 	User,
+	Admin,
 	Categories,
 	AuthBlock,
-	Product time.Duration
+	Product,
+	Claim time.Duration
 }
 
 type AuthConfig struct {
@@ -87,6 +89,8 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetDefault("redis.ttl.categories", "1h")
 	yv.SetDefault("redis.ttl.auth_block", "5m")
 	yv.SetDefault("redis.ttl.product", "5m")
+	yv.SetDefault("redis.ttl.claim", "20m")
+	yv.SetDefault("redis.ttl.admin", "15m")
 	yv.SetDefault("minio.endpoint", "localhost:9000")
 	yv.SetDefault("minio.use_ssl", "true")
 
@@ -124,10 +128,14 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Redis.Username = ev.GetString("REDIS_USER")
 	cfg.Redis.Password = ev.GetString("REDIS_USER_PASSWORD")
 	cfg.Redis.DB = yv.GetInt("redis.db")
+
+	// Redis TTL
 	cfg.Redis.TTL.User = yv.GetDuration("redis.ttl.user")
 	cfg.Redis.TTL.Categories = yv.GetDuration("redis.ttl.categories")
 	cfg.Redis.TTL.AuthBlock = yv.GetDuration("redis.ttl.auth_block")
 	cfg.Redis.TTL.Product = yv.GetDuration("redis.ttl.product")
+	cfg.Redis.TTL.Admin = yv.GetDuration("redis.ttl.admin")
+	cfg.Redis.TTL.Claim = yv.GetDuration("redis.ttl.claim")
 
 	cfg.Auth.AccessTokenTTL = yv.GetDuration("auth.access_token_ttl")
 	cfg.Auth.RefreshTokenTTL = yv.GetDuration("auth.refresh_token_ttl")
