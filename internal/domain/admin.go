@@ -70,7 +70,7 @@ type IncreaseTotalModeratesParams struct {
 	TotalModerates int32
 }
 
-//go:generate mockgen -source=seller.go -destination=../repository/mock/admin_repo_mock.go -package=mockrepo
+//go:generate mockgen -source=admin.go -destination=../repository/mock/admin_repo_mock.go -package=mockrepo
 type AdminRepository interface {
 	CreateAdmin(ctx context.Context, params CreateAdminParams) (*Admin, error)
 	GetAdmin(ctx context.Context, params GetAdminProfileParams) (*Admin, error)
