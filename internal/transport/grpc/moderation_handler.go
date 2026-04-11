@@ -131,7 +131,6 @@ func (h *ModerationHandler) Stats(ctx context.Context, _ *moderationv1.StatsRequ
 	}
 	return &moderationv1.StatsResponse{
 		TotalPending:  stats.TotalPending,
-		TotalClaimed:  stats.TotalClaimed,
 		TotalApproved: stats.TotalApproved,
 		TotalRejected: stats.TotalRejected,
 	}, nil
