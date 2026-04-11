@@ -28,10 +28,9 @@ type QueueRow struct {
 
 // ModerationStats aggregates dashboard counters surfaced via /moderation/stats.
 type ModerationStats struct {
-	TotalPending  int32 // products.status='draft'
-	TotalClaimed  int32 // moderation.active=true AND admin_id = current
-	TotalApproved int32 // products.status='active'
-	TotalRejected int32 // products.status='inactive'
+	TotalPending  int32 // moderation.status='draft', moderation.active=true, moderation.admin_id=ID
+	TotalApproved int32 // moderation.status='active', moderation.active=false, moderation.admin_id=ID
+	TotalRejected int32 // moderation.status='inactive', moderation.active=false, moderation.amdin_id=ID
 }
 
 // ModerationLock is the value persisted in Redis under
