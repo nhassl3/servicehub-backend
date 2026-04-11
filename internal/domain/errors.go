@@ -22,4 +22,5 @@ var (
 	ErrFileTooLarge        = errors.New("file too large")
 	ErrInvalidFileType     = errors.New("invalid file type")
 	ErrCategoryNotFound    = errors.New("category not found")
+	ErrMoreThan5Claimed    = errors.New("claimed more than 5 products to review")
 )
