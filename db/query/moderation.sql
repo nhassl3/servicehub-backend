@@ -5,6 +5,7 @@ SELECT * FROM moderation WHERE id=$1 LIMIT 1;
 SELECT COUNT(*)
 FROM moderation
 WHERE (sqlc.narg('admin_id')::uuid IS NULL OR admin_id = sqlc.narg('admin_id')::uuid)
+    AND (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status')::text)
     AND active = $1;
 
 -- name: ListModerationItems :many
