@@ -79,8 +79,15 @@ func numericToFloat64(n pgtype.Numeric) float64 {
 
 // usernamePtrToNullable safely converts string pointer to pgtype.Text.
 func usernamePtrToNullable(s *string) pgtype.Text {
-	if s == nil || len(*s) == 0 || *s == "" {
+	if s == nil {
 		return pgtype.Text{}
 	}
-	return pgtype.Text{String: *s, Valid: true}
+	return stringToNullable(*s)
+}
+
+func stringToNullable(s string) pgtype.Text {
+	if len(s) == 0 || s == "" {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: s, Valid: true}
 }
