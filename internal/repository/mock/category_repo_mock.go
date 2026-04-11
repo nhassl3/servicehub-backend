@@ -51,10 +51,10 @@ func (mr *MockCategoryRepositoryMockRecorder) GetBySlug(ctx, slug interface{}) *
 }
 
 // List mocks base method.
-func (m *MockCategoryRepository) List(ctx context.Context) ([]domain.Category, error) {
+func (m *MockCategoryRepository) List(ctx context.Context) (*domain.ListCategories, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx)
-	ret0, _ := ret[0].([]domain.Category)
+	ret0, _ := ret[0].(*domain.ListCategories)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -63,4 +63,71 @@ func (m *MockCategoryRepository) List(ctx context.Context) ([]domain.Category, e
 func (mr *MockCategoryRepositoryMockRecorder) List(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockCategoryRepository)(nil).List), ctx)
+}
+
+// Update mocks base method.
+func (m *MockCategoryRepository) Update(ctx context.Context, params domain.UpdateCategoryParams) (*domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, params)
+	ret0, _ := ret[0].(*domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockCategoryRepositoryMockRecorder) Update(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockCategoryRepository)(nil).Update), ctx, params)
+}
+
+// MockCategoriesRedis is a mock of CategoriesRedis interface.
+type MockCategoriesRedis struct {
+	ctrl     *gomock.Controller
+	recorder *MockCategoriesRedisMockRecorder
+}
+
+// MockCategoriesRedisMockRecorder is the mock recorder for MockCategoriesRedis.
+type MockCategoriesRedisMockRecorder struct {
+	mock *MockCategoriesRedis
+}
+
+// NewMockCategoriesRedis creates a new mock instance.
+func NewMockCategoriesRedis(ctrl *gomock.Controller) *MockCategoriesRedis {
+	mock := &MockCategoriesRedis{ctrl: ctrl}
+	mock.recorder = &MockCategoriesRedisMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCategoriesRedis) EXPECT() *MockCategoriesRedisMockRecorder {
+	return m.recorder
+}
+
+// Categories mocks base method.
+func (m *MockCategoriesRedis) Categories(ctx context.Context) (*domain.ListCategories, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Categories", ctx)
+	ret0, _ := ret[0].(*domain.ListCategories)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Categories indicates an expected call of Categories.
+func (mr *MockCategoriesRedisMockRecorder) Categories(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Categories", reflect.TypeOf((*MockCategoriesRedis)(nil).Categories), ctx)
+}
+
+// SetCategories mocks base method.
+func (m *MockCategoriesRedis) SetCategories(ctx context.Context, categories *domain.ListCategories) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetCategories", ctx, categories)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetCategories indicates an expected call of SetCategories.
+func (mr *MockCategoriesRedisMockRecorder) SetCategories(ctx, categories interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCategories", reflect.TypeOf((*MockCategoriesRedis)(nil).SetCategories), ctx, categories)
 }

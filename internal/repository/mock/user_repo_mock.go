@@ -51,11 +51,12 @@ func (mr *MockUserRepositoryMockRecorder) Create(ctx, params interface{}) *gomoc
 }
 
 // CreateSession mocks base method.
-func (m *MockUserRepository) CreateSession(ctx context.Context, params domain.CreateSessionParams) error {
+func (m *MockUserRepository) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSession", ctx, params)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*domain.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // CreateSession indicates an expected call of CreateSession.
@@ -65,17 +66,17 @@ func (mr *MockUserRepositoryMockRecorder) CreateSession(ctx, params interface{})
 }
 
 // DeleteSession mocks base method.
-func (m *MockUserRepository) DeleteSession(ctx context.Context, refreshToken string) error {
+func (m *MockUserRepository) DeleteSession(ctx context.Context, username string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteSession", ctx, refreshToken)
+	ret := m.ctrl.Call(m, "DeleteSession", ctx, username)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteSession indicates an expected call of DeleteSession.
-func (mr *MockUserRepositoryMockRecorder) DeleteSession(ctx, refreshToken interface{}) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) DeleteSession(ctx, username interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSession", reflect.TypeOf((*MockUserRepository)(nil).DeleteSession), ctx, refreshToken)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSession", reflect.TypeOf((*MockUserRepository)(nil).DeleteSession), ctx, username)
 }
 
 // ExistsByEmail mocks base method.
@@ -211,4 +212,143 @@ func (m *MockUserRepository) UpdatePassword(ctx context.Context, params domain.U
 func (mr *MockUserRepositoryMockRecorder) UpdatePassword(ctx, params interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockUserRepository)(nil).UpdatePassword), ctx, params)
+}
+
+// MockUserRedis is a mock of UserRedis interface.
+type MockUserRedis struct {
+	ctrl     *gomock.Controller
+	recorder *MockUserRedisMockRecorder
+}
+
+// MockUserRedisMockRecorder is the mock recorder for MockUserRedis.
+type MockUserRedisMockRecorder struct {
+	mock *MockUserRedis
+}
+
+// NewMockUserRedis creates a new mock instance.
+func NewMockUserRedis(ctrl *gomock.Controller) *MockUserRedis {
+	mock := &MockUserRedis{ctrl: ctrl}
+	mock.recorder = &MockUserRedisMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockUserRedis) EXPECT() *MockUserRedisMockRecorder {
+	return m.recorder
+}
+
+// AuthBlock mocks base method.
+func (m *MockUserRedis) AuthBlock(ctx context.Context, clientIP string) (bool, float64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AuthBlock", ctx, clientIP)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(float64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// AuthBlock indicates an expected call of AuthBlock.
+func (mr *MockUserRedisMockRecorder) AuthBlock(ctx, clientIP interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthBlock", reflect.TypeOf((*MockUserRedis)(nil).AuthBlock), ctx, clientIP)
+}
+
+// DelProfile mocks base method.
+func (m *MockUserRedis) DelProfile(ctx context.Context, username string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DelProfile", ctx, username)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DelProfile indicates an expected call of DelProfile.
+func (mr *MockUserRedisMockRecorder) DelProfile(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelProfile", reflect.TypeOf((*MockUserRedis)(nil).DelProfile), ctx, username)
+}
+
+// DelSession mocks base method.
+func (m *MockUserRedis) DelSession(ctx context.Context, username string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DelSession", ctx, username)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DelSession indicates an expected call of DelSession.
+func (mr *MockUserRedisMockRecorder) DelSession(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelSession", reflect.TypeOf((*MockUserRedis)(nil).DelSession), ctx, username)
+}
+
+// Profile mocks base method.
+func (m *MockUserRedis) Profile(ctx context.Context, username string) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Profile", ctx, username)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Profile indicates an expected call of Profile.
+func (mr *MockUserRedisMockRecorder) Profile(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Profile", reflect.TypeOf((*MockUserRedis)(nil).Profile), ctx, username)
+}
+
+// Session mocks base method.
+func (m *MockUserRedis) Session(ctx context.Context, username string) (*domain.Session, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Session", ctx, username)
+	ret0, _ := ret[0].(*domain.Session)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Session indicates an expected call of Session.
+func (mr *MockUserRedisMockRecorder) Session(ctx, username interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Session", reflect.TypeOf((*MockUserRedis)(nil).Session), ctx, username)
+}
+
+// SetAuthBlock mocks base method.
+func (m *MockUserRedis) SetAuthBlock(ctx context.Context, clientIP string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetAuthBlock", ctx, clientIP)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetAuthBlock indicates an expected call of SetAuthBlock.
+func (mr *MockUserRedisMockRecorder) SetAuthBlock(ctx, clientIP interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAuthBlock", reflect.TypeOf((*MockUserRedis)(nil).SetAuthBlock), ctx, clientIP)
+}
+
+// SetProfile mocks base method.
+func (m *MockUserRedis) SetProfile(ctx context.Context, user *domain.User) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetProfile", ctx, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetProfile indicates an expected call of SetProfile.
+func (mr *MockUserRedisMockRecorder) SetProfile(ctx, user interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProfile", reflect.TypeOf((*MockUserRedis)(nil).SetProfile), ctx, user)
+}
+
+// SetSession mocks base method.
+func (m *MockUserRedis) SetSession(ctx context.Context, session *domain.Session) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSession", ctx, session)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSession indicates an expected call of SetSession.
+func (mr *MockUserRedisMockRecorder) SetSession(ctx, session interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSession", reflect.TypeOf((*MockUserRedis)(nil).SetSession), ctx, session)
 }
