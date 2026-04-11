@@ -205,16 +205,18 @@ const total = `-- name: Total :one
 SELECT COUNT(*)
 FROM moderation
 WHERE ($2::uuid IS NULL OR admin_id = $2::uuid)
+    AND ($3::text IS NULL OR status = $3::text)
     AND active = $1
 `
 
 type TotalParams struct {
 	Active  bool        `json:"active"`
 	AdminID pgtype.UUID `json:"admin_id"`
+	Status  pgtype.Text `json:"status"`
 }
 
 func (q *Queries) Total(ctx context.Context, arg TotalParams) (int64, error) {
-	row := q.db.QueryRow(ctx, total, arg.Active, arg.AdminID)
+	row := q.db.QueryRow(ctx, total, arg.Active, arg.AdminID, arg.Status)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
