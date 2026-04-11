@@ -122,6 +122,17 @@ func (repo *ModerationRepo) Queue(ctx context.Context, params domain.ListParams)
 // admin. The Postgres-side check is the authoritative tie-breaker; Redis lock
 // is only the fast path. ON CONFLICT preserves the row across re-claims.
 func (repo *ModerationRepo) ClaimProduct(ctx context.Context, params domain.ClaimProductParams) (*domain.Moderation, error) {
+	pending, err := repo.store.Total(ctx, db.TotalParams{
+		Active:  true,
+		AdminID: uuidPtrToNullable(&params.AdminID),
+		Status:  stringToNullable("draft"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("moderation_repo.Stats: pending: %w", err)
+	}
+	if pending >= 5 {
+		return nil, domain.ErrMoreThan5Claimed
+	}
 	adminID, err := parseUUID(params.AdminID)
 	if err != nil {
 		return nil, fmt.Errorf("moderation_repo.ClaimProduct: invalid admin id: %w", err)
@@ -160,37 +171,34 @@ func (repo *ModerationRepo) ReleaseProduct(ctx context.Context, params domain.Re
 // the schema doesn't keep an audit log per admin yet — see ADMIN_PANEL_BACKEND_TODO.md
 // section "5. Опциональные улучшения".
 func (repo *ModerationRepo) Stats(ctx context.Context, adminID string) (*domain.ModerationStats, error) {
-	pending, err := repo.store.CountListProducts(ctx, db.CountListProductsParams{
-		Status: "draft",
+	claimedAdminID := uuidPtrToNullable(&adminID)
+	pending, err := repo.store.Total(ctx, db.TotalParams{
+		Active:  true,
+		AdminID: claimedAdminID,
+		Status:  stringToNullable("draft"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("moderation_repo.Stats: pending: %w", err)
 	}
-	approved, err := repo.store.CountListProducts(ctx, db.CountListProductsParams{
-		Status: "active",
+	approved, err := repo.store.Total(ctx, db.TotalParams{
+		Active:  false,
+		AdminID: claimedAdminID,
+		Status:  stringToNullable("active"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("moderation_repo.Stats: approved: %w", err)
 	}
-	rejected, err := repo.store.CountListProducts(ctx, db.CountListProductsParams{
-		Status: "inactive",
+	rejected, err := repo.store.Total(ctx, db.TotalParams{
+		Active:  false,
+		AdminID: claimedAdminID,
+		Status:  stringToNullable("inactive"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("moderation_repo.Stats: rejected: %w", err)
 	}
 
-	claimedAdminID := uuidPtrToNullable(&adminID)
-	claimed, err := repo.store.Total(ctx, db.TotalParams{
-		Active:  true,
-		AdminID: claimedAdminID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("moderation_repo.Stats: claimed: %w", err)
-	}
-
 	return &domain.ModerationStats{
 		TotalPending:  int32(pending),
-		TotalClaimed:  int32(claimed),
 		TotalApproved: int32(approved),
 		TotalRejected: int32(rejected),
 	}, nil
