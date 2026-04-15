@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -86,11 +86,11 @@ func (a *AdminRedis) Acquire(ctx context.Context, productID, adminUsername strin
 		return false, nil, err
 	}
 
-	ok, err := a.client.SetNX(ctx, lockPrefix+productID, payload, a.claimTTL).Result()
-	if err != nil {
-		return false, nil, err
-	}
-	if !ok {
+	if err := a.client.SetArgs(ctx, lockPrefix+productID, payload, redis.SetArgs{
+		Mode: "NX",
+		Get:  false,
+		TTL:  a.claimTTL,
+	}).Err(); err != nil {
 		// Someone else holds the lock — try to surface its owner.
 		current, getErr := a.Get(ctx, productID)
 		if getErr != nil && !errors.Is(getErr, domain.ErrRedisNotFound) {
@@ -98,6 +98,7 @@ func (a *AdminRedis) Acquire(ctx context.Context, productID, adminUsername strin
 		}
 		return false, current, nil
 	}
+
 	return true, lock, nil
 }
 

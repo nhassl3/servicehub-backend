@@ -55,7 +55,7 @@ func (m *PasetoMaker) CreateRefreshToken(username, uid, role string) (string, *P
 }
 
 func (m *PasetoMaker) createTokenWithJTI(username, uid, role, jti string, startTime time.Time) (string, error) {
-	if startTime == (time.Time{}) {
+	if startTime.Equal(time.Time{}) {
 		startTime = time.Now()
 	}
 

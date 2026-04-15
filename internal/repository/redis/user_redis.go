@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -82,7 +82,7 @@ func (u *UserRedis) SetProfile(ctx context.Context, user *domain.User) error {
 // SetSession write a record in Redis database with a ttl that equal left of refreshToken
 // ExpiresAt - Now = ttl of record Redis session
 func (u *UserRedis) SetSession(ctx context.Context, session *domain.Session) error {
-	return u.client.Set(ctx, sessionPrefix+session.Username, session, session.ExpiresAt.Sub(time.Now())).Err()
+	return u.client.Set(ctx, sessionPrefix+session.Username, session, time.Until(session.ExpiresAt)).Err()
 }
 
 // SetAuthBlock this method calls when user successfully log in or sign up.

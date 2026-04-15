@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/pkg/auth"
-	"github.com/nhassl3/servicehub/pkg/hash"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/pkg/hash"
 	"google.golang.org/grpc/metadata"
 )
 

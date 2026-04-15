@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/service"
+	"github.com/nhassl3/servicehub-backend/internal/transport/grpc/interceptors"
 	userv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/user/v1"
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/internal/service"
-	"github.com/nhassl3/servicehub/internal/transport/grpc/interceptors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

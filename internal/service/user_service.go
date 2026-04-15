@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-passwd/validator"
 	"github.com/google/uuid"
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/pkg/hash"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/pkg/hash"
 )
 
 const maxAvatarSize = 5 << 20 // 5 MB

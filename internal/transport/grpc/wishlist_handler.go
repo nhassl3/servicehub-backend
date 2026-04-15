@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/service"
 	wishlistv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/wishlist/v1"
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/internal/service"
 )
 
 // WishlistHandler implements wishlistv1.WishlistServiceServer.

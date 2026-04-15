@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nhassl3/servicehub/internal/domain"
-	repoRedis "github.com/nhassl3/servicehub/internal/repository/redis"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 )
 
 type AdminService struct {

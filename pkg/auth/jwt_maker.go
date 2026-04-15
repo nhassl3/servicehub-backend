@@ -51,7 +51,7 @@ func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payl
 }
 
 func (m *JWTMaker) createToken(username, uid, role, jti string, start time.Time) (string, error) {
-	if start == (time.Time{}) {
+	if start.Equal(time.Time{}) {
 		start = time.Now()
 	}
 

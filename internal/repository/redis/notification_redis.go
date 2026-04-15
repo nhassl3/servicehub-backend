@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/redis/go-redis/v9"
 )
 

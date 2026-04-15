@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/service"
 	reviewv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/review/v1"
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/internal/service"
 )
 
 // ReviewHandler implements reviewv1.ReviewServiceServer.

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 type CategoryService struct {

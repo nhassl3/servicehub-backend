@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/nhassl3/servicehub/internal/app"
-	"github.com/nhassl3/servicehub/internal/config"
+	"github.com/nhassl3/servicehub-backend/internal/app"
+	"github.com/nhassl3/servicehub-backend/internal/config"
 )
 
 func main() {

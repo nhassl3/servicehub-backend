@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/service"
 	adminv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/admin/v1"
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/internal/service"
 )
 
 // AdminHandler implements adminv1.AdminServiceServer.

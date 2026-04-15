@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 // ModerationService implements the admin-panel moderation workflow:
