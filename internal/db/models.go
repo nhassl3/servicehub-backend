@@ -69,6 +69,23 @@ type Moderation struct {
 	Status    string             `json:"status"`
 }
 
+type Notification struct {
+	ID             uuid.UUID          `json:"id"`
+	Username       string             `json:"username"`
+	Message        string             `json:"message"`
+	GroupOfMessage int32              `json:"group_of_message"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type NotificationGroup struct {
+	ID          int32              `json:"id"`
+	Slug        string             `json:"slug"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	IconUrl     string             `json:"icon_url"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type Order struct {
 	ID          uuid.UUID          `json:"id"`
 	Uid         uuid.UUID          `json:"uid"`
