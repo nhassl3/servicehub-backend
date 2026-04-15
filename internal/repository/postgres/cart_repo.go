@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/nhassl3/servicehub/internal/db"
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/db"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 type CartRepo struct {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 type ProductService struct {

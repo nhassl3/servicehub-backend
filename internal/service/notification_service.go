@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/nhassl3/servicehub/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 type NotificationService struct {

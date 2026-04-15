@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	domain "github.com/nhassl3/servicehub/internal/domain"
+	domain "github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
 // MockSellerRepository is a mock of SellerRepository interface.

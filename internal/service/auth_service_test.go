@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nhassl3/servicehub/internal/domain"
-	"github.com/nhassl3/servicehub/internal/service"
-	"github.com/nhassl3/servicehub/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/service"
+	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/stretchr/testify/require"
 )
 

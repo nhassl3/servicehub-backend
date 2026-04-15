@@ -98,10 +98,18 @@ func Load(configFile, envFile string) (*Config, error) {
 		return nil, fmt.Errorf("config: read yaml %q: %w", configFile, err)
 	}
 
-	yv.BindEnv("db.host", "DB_HOST")
-	yv.BindEnv("db.port", "DB_PORT")
-	yv.BindEnv("redis.addr", "REDIS_ADDR")
-	yv.BindEnv("minio.endpoint", "MINIO_ENDPOINT")
+	if err := yv.BindEnv("db.host", "DB_HOST"); err != nil {
+		return nil, fmt.Errorf("config: bind env DB_HOST: %w", err)
+	}
+	if err := yv.BindEnv("db.port", "DB_PORT"); err != nil {
+		return nil, fmt.Errorf("config: bind env DB_PORT: %w", err)
+	}
+	if err := yv.BindEnv("redis.addr", "REDIS_ADDR"); err != nil {
+		return nil, fmt.Errorf("config: bind env REDIS_ADDR: %w", err)
+	}
+	if err := yv.BindEnv("minio.endpoint", "MINIO_ENDPOINT"); err != nil {
+		return nil, fmt.Errorf("config: bind env MINIO_ENDPOINT: %w", err)
+	}
 
 	// ── .env: secrets ─────────────────────────────────────────────────────────
 	ev := viper.New()

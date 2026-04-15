@@ -5,8 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/nhassl3/servicehub/pkg/auth"
-	tknErrors "github.com/nhassl3/servicehub/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -55,7 +54,7 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 
 		payload, err := tokenManager.VerifyToken(token)
 		if err != nil {
-			if tknErrors.IsAny(err) {
+			if auth.IsAny(err) {
 				return nil, status.Error(codes.Unauthenticated, err.Error())
 			}
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")

@@ -3,7 +3,7 @@ package service_test
 import (
 	"testing"
 
-	"github.com/nhassl3/servicehub/pkg/hash"
+	"github.com/nhassl3/servicehub-backend/pkg/hash"
 	"github.com/stretchr/testify/require"
 )
 
