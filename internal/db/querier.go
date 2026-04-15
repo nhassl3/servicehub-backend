@@ -25,6 +25,7 @@ type Querier interface {
 	CreateAdmin(ctx context.Context, arg CreateAdminParams) (Admin, error)
 	CreateBalanceTx(ctx context.Context, arg CreateBalanceTxParams) (BalanceTransaction, error)
 	CreateModeration(ctx context.Context, arg CreateModerationParams) (Moderation, error)
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) (uuid.UUID, error)
 	CreateOrder(ctx context.Context, username string) (Order, error)
 	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
@@ -46,6 +47,7 @@ type Querier interface {
 	GetCartItems(ctx context.Context, cartID int64) ([]CartItem, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (GetCategoryBySlugRow, error)
 	GetModeration(ctx context.Context, id uuid.UUID) (Moderation, error)
+	GetNotification(ctx context.Context, id uuid.UUID) (Notification, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByUID(ctx context.Context, uid uuid.UUID) (Order, error)
 	GetOrderItems(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
@@ -69,6 +71,7 @@ type Querier interface {
 	ListBalanceTxByUsername(ctx context.Context, arg ListBalanceTxByUsernameParams) ([]BalanceTransaction, error)
 	ListCategories(ctx context.Context) ([]ListCategoriesRow, error)
 	ListModerationItems(ctx context.Context, arg ListModerationItemsParams) ([]ListModerationItemsRow, error)
+	ListNotification(ctx context.Context, arg ListNotificationParams) ([]Notification, error)
 	ListOrdersByUsername(ctx context.Context, arg ListOrdersByUsernameParams) ([]Order, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	Reject(ctx context.Context, id uuid.UUID) error
