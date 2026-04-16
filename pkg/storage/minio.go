@@ -7,31 +7,32 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/nhassl3/servicehub-backend/internal/config"
 )
 
 type MinIO struct {
 	client *minio.Client
-	cfg    *config.MinIOConfig
+	endpoint,
+	bucket string
+	useSSL bool
 }
 
-func NewMinIO(ctx context.Context, cfg *config.MinIOConfig) (*MinIO, error) {
-	minioClient, err := minio.New(cfg.Endpoint, &minio.Options{
-		Creds:      credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure:     cfg.UseSSL,
+func NewMinIO(ctx context.Context, endpoint, accessKey, secretKey, token, bucket string, useSSL bool) (*MinIO, error) {
+	minioClient, err := minio.New(endpoint, &minio.Options{
+		Creds:      credentials.NewStaticV4(accessKey, secretKey, token),
+		Secure:     useSSL,
 		MaxRetries: 5,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("minio: create client: %w", err)
 	}
 
-	exists, err := minioClient.BucketExists(ctx, cfg.Bucket)
+	exists, err := minioClient.BucketExists(ctx, bucket)
 	if err != nil {
-		return nil, fmt.Errorf("minio: check bucket %q: %w", cfg.Bucket, err)
+		return nil, fmt.Errorf("minio: check bucket %q: %w", bucket, err)
 	}
 	if !exists {
-		if err := minioClient.MakeBucket(ctx, cfg.Bucket, minio.MakeBucketOptions{}); err != nil {
-			return nil, fmt.Errorf("minio: create bucket %q: %w", cfg.Bucket, err)
+		if err := minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+			return nil, fmt.Errorf("minio: create bucket %q: %w", bucket, err)
 		}
 
 		policy := fmt.Sprintf(`{
@@ -42,13 +43,13 @@ func NewMinIO(ctx context.Context, cfg *config.MinIOConfig) (*MinIO, error) {
 				"Action": ["s3:GetObject"],
 				"Resource": ["arn:aws:s3:::%s/*"]
 			}]
-		}`, cfg.Bucket)
-		if err := minioClient.SetBucketPolicy(ctx, cfg.Bucket, policy); err != nil {
+		}`, bucket)
+		if err := minioClient.SetBucketPolicy(ctx, bucket, policy); err != nil {
 			return nil, fmt.Errorf("minio: set bucket policy: %w", err)
 		}
 	}
 
-	return &MinIO{client: minioClient, cfg: cfg}, nil
+	return &MinIO{client: minioClient, endpoint: endpoint, bucket: bucket, useSSL: useSSL}, nil
 }
 
 func (m *MinIO) Upload(
@@ -57,7 +58,7 @@ func (m *MinIO) Upload(
 	reader io.Reader,
 	size int64,
 ) (string, error) {
-	_, err := m.client.PutObject(ctx, m.cfg.Bucket, objectName, reader, size, minio.PutObjectOptions{
+	_, err := m.client.PutObject(ctx, m.bucket, objectName, reader, size, minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
@@ -67,7 +68,7 @@ func (m *MinIO) Upload(
 }
 
 func (m *MinIO) Delete(ctx context.Context, objectName string) error {
-	err := m.client.RemoveObject(ctx, m.cfg.Bucket, objectName, minio.RemoveObjectOptions{})
+	err := m.client.RemoveObject(ctx, m.bucket, objectName, minio.RemoveObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("minio: delete %q: %w", objectName, err)
 	}
@@ -76,8 +77,8 @@ func (m *MinIO) Delete(ctx context.Context, objectName string) error {
 
 func (m *MinIO) objectURL(objectName string) string {
 	protocol := "http"
-	if m.cfg.UseSSL {
+	if m.useSSL {
 		protocol = "https"
 	}
-	return fmt.Sprintf("%s://%s/%s/%s", protocol, m.cfg.Endpoint, m.cfg.Bucket, objectName)
+	return fmt.Sprintf("%s://%s/%s/%s", protocol, m.endpoint, m.bucket, objectName)
 }
