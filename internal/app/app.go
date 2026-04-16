@@ -81,7 +81,15 @@ func Run(cfg *config.Config) error {
 	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
-	minIOClient, err := minio.NewMinIO(ctx, &cfg.MinIO)
+	minIOClient, err := minio.NewMinIO(
+		ctx,
+		cfg.MinIO.Endpoint,
+		cfg.MinIO.AccessKey,
+		cfg.MinIO.SecretKey,
+		"",
+		cfg.MinIO.Bucket,
+		cfg.MinIO.UseSSL,
+	)
 	if err != nil {
 		return fmt.Errorf("minio.NewMinIO: failed to initialize minio client: %w", err)
 	}
