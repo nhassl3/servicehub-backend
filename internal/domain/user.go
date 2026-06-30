@@ -99,6 +99,45 @@ type UploadAvatarParams struct {
 	ContentType string
 }
 
+type RequestResetPasswordParams struct {
+	Username,
+	Email *string
+}
+
+type ResetPasswordState struct {
+	Email,
+	Code string
+}
+
+// MarshalBinary this method needed for correct work of Redis
+// because Redis only work with JSON, but not with a structures
+// marshalling User structure to the []byte code (JSON)
+func (c *ResetPasswordState) MarshalBinary() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+// UnmarshalBinary this method needed for correct work of Redis
+// because Redis only work with JSON, but not with a structures
+// unmarshalling source data and convert to User structure
+func (c *ResetPasswordState) UnmarshalBinary(data []byte) error {
+	if c == nil {
+		return ErrRedisNotFound
+	}
+	return json.Unmarshal(data, c)
+}
+
+func NewCode(email, code string) *ResetPasswordState {
+	return &ResetPasswordState{
+		Email: email,
+		Code:  code,
+	}
+}
+
+type VerifyEmailAccount struct {
+	Email,
+	Username *string
+}
+
 //go:generate mockgen -source=user.go -destination=../repository/mock/user_repo_mock.go -package=mockrepo
 type UserRepository interface {
 	Create(ctx context.Context, params CreateUserParams) (*User, error)
@@ -113,6 +152,7 @@ type UserRepository interface {
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	Update(ctx context.Context, params UpdateUserParams) (*User, error)
 	UpdatePassword(ctx context.Context, params UpdateUserPasswordParams) (*User, error)
+	VerifyEmail(ctx context.Context, params VerifyEmailAccount) (*User, error)
 }
 
 type UserRedis interface {
@@ -124,4 +164,10 @@ type UserRedis interface {
 	SetAuthBlock(ctx context.Context, clientIP string) error
 	DelProfile(ctx context.Context, username string) error
 	DelSession(ctx context.Context, username string) error
+	Code(ctx context.Context, enterKeyCode string, operationId string) (*ResetPasswordState, error)
+	SetCode(ctx context.Context, enterKeyCode, operationId string, code *ResetPasswordState) error
+	Verified(ctx context.Context, entryCode, token string) (string, error)
+	SetVerified(ctx context.Context, entryCode, token, email string) error
+	DelVerified(ctx context.Context, entryCode, token string) error
+	DelCode(ctx context.Context, enterKeyCode, operationId string) error
 }

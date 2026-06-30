@@ -46,3 +46,11 @@ SET role       = $2,
     updated_at = NOW()
 WHERE username = $1
 RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at;
+
+-- name: VerifyEmailAccount :one
+UPDATE users
+SET is_active=true,
+    updated_at=NOW()
+WHERE (sqlc.narg(email)::varchar IS NULL OR email = sqlc.narg(email)::varchar)
+    AND (sqlc.narg(username)::varchar IS NULL OR username = sqlc.narg(username)::varchar)
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at;

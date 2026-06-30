@@ -51,6 +51,8 @@ func domainErr(err error) error {
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrCategoryNotFound):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrBuiltToken):
+		return status.Error(codes.Internal, err.Error())
 	default:
 		return status.Error(codes.Internal, fmt.Sprintf("internal server error: %s", err.Error()))
 	}

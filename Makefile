@@ -148,3 +148,11 @@ minio:
 minio-stop:
 	@docker stop servicehub-minio && docker rm servicehub-minio
 	@echo "MinIO stopped"
+
+##  ─── GitHub ───────────────────────────────────────────────────────────────────
+push:
+	@eval "$(ssh-agent -s)"
+	@ssh-add servicehub_backend_sshkey
+
+get-contracts:
+	@go get -u github.com/nhassl3/servicehub-contracts@$(VER)
