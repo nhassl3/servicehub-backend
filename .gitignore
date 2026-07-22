@@ -1,4 +1,6 @@
 .env
+AGENTS.md
+.claude/
 servicehub_backend_sshkey
 servicehub_backend_sshkey.pub
 proto/
