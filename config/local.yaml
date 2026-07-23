@@ -20,6 +20,15 @@ redis:
     admin: 15m
     claim: 20m
 
+kafka:
+  topics:
+    order_events: "order_events"
+    transaction_event: "transaction_events"
+    notifications: "notifications"
+  brokers:
+    - "kakfa:9092"
+  group_id: "servicehub-backend"
+
 auth:
   access_token_ttl: 15m
   refresh_token_ttl: 168h
