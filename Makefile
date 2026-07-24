@@ -1,4 +1,4 @@
-.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer
+.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker
 
 .DEFAULT_GOAL := build
 
@@ -154,9 +154,13 @@ minio-stop:
 build-consumer:
 	@go build -o $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH) $(CONSUMER_PATH)
 	@chmod +x $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+	@echo "Successful built consumer"
 
 run-consumer:
 	@go run $(CONSUMER_PATH)
 
 runb-consumer:
 	@./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+
+kafka-docker:
+	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest
