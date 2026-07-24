@@ -231,7 +231,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // Shutdown gracefully drains in-flight RPCs and stops the server.
-func (s *Server) Shutdown(_ context.Context) error {
+func (s *Server) Shutdown(_ context.Context) {
 	s.grpcServer.GracefulStop()
-	return nil
 }
