@@ -35,7 +35,7 @@ RUN chmod +x /app/start.sh /app/migrate
 
 ENV ENVIRONMENT=prod
 
-EXPOSE 8080 9090
+EXPOSE 8080 50051 9092
 
 ENTRYPOINT ["/app/start.sh"]
 CMD ["/app/servicehub"]
