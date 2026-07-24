@@ -16,9 +16,10 @@ import (
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/internal/service"
+	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
-	"github.com/nhassl3/servicehub-backend/pkg/logger"
+	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 	pkgRedis "github.com/nhassl3/servicehub-backend/pkg/redis"
 	minio "github.com/nhassl3/servicehub-backend/pkg/storage"
@@ -26,16 +27,7 @@ import (
 )
 
 // Run bootstraps and starts the application.
-func Run(cfg *config.Config) error {
-	// ─── Logger ───────────────────────────────────────────────────────────────
-	log, err := logger.NewZapLogger(cfg.Log.Level)
-	if err != nil {
-		return fmt.Errorf("app: init logger: %w", err)
-	}
-	defer func(log *zap.Logger) {
-		_ = log.Sync()
-	}(log) //nolint:errcheck
-
+func Run(cfg *config.Config, log *zap.Logger) error {
 	// ─── Database ─────────────────────────────────────────────────────────────
 	ctx := context.Background()
 	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
@@ -79,6 +71,16 @@ func Run(cfg *config.Config) error {
 
 	// RedisProducts store categories and products closed on a page a few moments later
 	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
+
+	producers := make([]*kafka.Producer, 0, 3)
+	kafkaOrderProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, log)
+	kafkaTransactionProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, log)
+	kafkaNotificationsProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log)
+	producers = append(producers, kafkaOrderProducer, kafkaTransactionProducer, kafkaNotificationsProducer)
+
+	eventPublisher := serviceKafka.NewEventPublisher(kafkaOrderProducer, kafkaTransactionProducer)
+
+	_ = eventPublisher
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
@@ -142,12 +144,14 @@ func Run(cfg *config.Config) error {
 	// ─── Start servers ────────────────────────────────────────────────────────
 	errCh := make(chan error, 2)
 
+	// gRPC server
 	go func() {
 		if err := grpcServer.Start(cfg.Server.GRPCPort); err != nil {
 			errCh <- fmt.Errorf("grpc server: %w", err)
 		}
 	}()
 
+	// gateway gRPC server (HTTP)
 	go func() {
 		if err := grpcServer.StartGateway(ctx, "localhost"+cfg.Server.GRPCPort, cfg.Server.HTTPPort); err != nil {
 			errCh <- fmt.Errorf("error http gateway: %w", err)
@@ -171,7 +175,17 @@ func Run(cfg *config.Config) error {
 		log.Info("shutting down gracefully...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*1e9)
 		defer cancel()
-		return grpcServer.Shutdown(shutdownCtx)
+
+		var kafkaProducerError error
+		for _, e := range producers {
+			kafkaProducerError = errors.Join(e.Close())
+		}
+		if kafkaProducerError != nil {
+			return kafkaProducerError
+		}
+
+		grpcServer.Shutdown(shutdownCtx)
+		return nil
 	}
 }
 
