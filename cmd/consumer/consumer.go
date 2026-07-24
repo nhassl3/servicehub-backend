@@ -25,10 +25,7 @@ func main() {
 	cfg := cmd.MustLoadConfig()
 	log := cmd.MustLoadLogger(cfg.Log.Level)
 	defer func(log *zap.Logger) {
-		err := log.Sync()
-		if err != nil {
-			log.Fatal("logger sync error", zap.Error(err))
-		}
+		_ = log.Sync()
 	}(log)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
