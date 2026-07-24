@@ -1,6 +1,9 @@
-package event
+package domain
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Type int8
 
@@ -11,6 +14,14 @@ const (
 	TransactionCreated Type = 4 // transaction.created
 	BalanceUpdated     Type = 8 // balance.updated
 )
+
+type EventPublisher interface {
+	PublishOrderCreated(ctx context.Context, payload OrderCreatedPayload) error
+	PublishOrderStatusChanged(ctx context.Context, payload OrderStatusChangedPayload) error
+	PublishTransactionCreated(ctx context.Context, payload TransactionCreatedPayload) error
+	PublishBalanceUpdated(ctx context.Context, payload BalanceUpdatedPayload) error
+	Close() error
+}
 
 // Envelope — единый конверт для всех событий, чтобы консьюмеры
 // могли определить тип события до разбора payload.
