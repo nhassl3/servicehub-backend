@@ -23,10 +23,10 @@ redis:
 kafka:
   topics:
     order_events: "order_events"
-    transaction_event: "transaction_events"
+    transaction_events: "transaction_events"
     notifications: "notifications"
   brokers:
-    - "kakfa:9092"
+    - "127.0.0.1:9092"
   group_id: "servicehub-backend"
 
 auth:
