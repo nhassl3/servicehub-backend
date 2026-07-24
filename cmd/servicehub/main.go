@@ -11,11 +11,8 @@ import (
 func main() {
 	cfg := cmd.MustLoadConfig()
 	zapLogger := cmd.MustLoadLogger(cfg.Log.Level)
-	defer func(log *zap.Logger) {
-		err := log.Sync()
-		if err != nil {
-			log.Fatal("logger sync error", zap.Error(err))
-		}
+	defer func(zapLogger *zap.Logger) {
+		_ = zapLogger.Sync()
 	}(zapLogger)
 	if err := app.Run(cfg, zapLogger); err != nil {
 		log.Fatalf("application error: %s", err)
