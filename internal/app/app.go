@@ -80,8 +80,6 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 
 	eventPublisher := serviceKafka.NewEventPublisher(kafkaOrderProducer, kafkaTransactionProducer)
 
-	_ = eventPublisher
-
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
 		ctx,
@@ -130,7 +128,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Category:   service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:    service.NewProductService(productRepo, sellerRepo),
 		Cart:       service.NewCartService(cartRepo),
-		Order:      service.NewOrderService(orderRepo),
+		Order:      service.NewOrderService(orderRepo, eventPublisher, log),
 		Review:     service.NewReviewService(reviewRepo),
 		Wishlist:   service.NewWishlistService(wishlistRepo),
 		Seller:     service.NewSellerService(sellerRepo, minIOClient),
