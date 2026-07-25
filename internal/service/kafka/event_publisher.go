@@ -25,22 +25,22 @@ func NewEventPublisher(orderProducer, transactionProducer *kafka.Producer) *Even
 
 func (p *EventPublisher) PublishOrderCreated(ctx context.Context, payload domain.OrderCreatedPayload) error {
 	env := domain.NewEnvelope(domain.OrderCreated, payload)
-	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%d", payload.OrderID), env)
+	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
 }
 
 func (p *EventPublisher) PublishOrderStatusChanged(ctx context.Context, payload domain.OrderStatusChangedPayload) error {
 	env := domain.NewEnvelope(domain.OrderStatusChanged, payload)
-	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%d", payload.OrderID), env)
+	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
 }
 
 func (p *EventPublisher) PublishTransactionCreated(ctx context.Context, payload domain.TransactionCreatedPayload) error {
 	env := domain.NewEnvelope(domain.TransactionCreated, payload)
-	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%d", payload.UserID), env)
+	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
 }
 
 func (p *EventPublisher) PublishBalanceUpdated(ctx context.Context, payload domain.BalanceUpdatedPayload) error {
 	env := domain.NewEnvelope(domain.BalanceUpdated, payload)
-	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%d", payload.UserID), env)
+	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
 }
 
 // Close закрывает оба продюсера независимо: ошибка закрытия одного

@@ -16,8 +16,8 @@ import (
 // stdoutNotifier — временная заглушка. Замените на реальный email/push/websocket сервис.
 type stdoutNotifier struct{ log *zap.Logger }
 
-func (n *stdoutNotifier) Notify(_ context.Context, userID int64, title, body string) error {
-	n.log.Info("notification", zap.Int64("user_id", userID), zap.String("title", title), zap.String("body", body))
+func (n *stdoutNotifier) Notify(_ context.Context, username string, title, body string) error {
+	n.log.Info("notification", zap.String("username", username), zap.String("title", title), zap.String("body", body))
 	return nil
 }
 

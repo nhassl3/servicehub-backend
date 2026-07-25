@@ -22,7 +22,7 @@ type NotificationConsumer struct {
 // Notifier — интерфейс, который реализуется конкретным каналом доставки.
 // Сюда позже подключается, например, email-сервис или push-сервис.
 type Notifier interface {
-	Notify(ctx context.Context, userID int64, title, body string) error
+	Notify(ctx context.Context, Username string, title, body string) error
 }
 
 func NewNotificationConsumer(consumer *Consumer, notifier Notifier, log *zap.Logger) *NotificationConsumer {
@@ -58,7 +58,7 @@ func (c *NotificationConsumer) handleOrderCreated(ctx context.Context, env domai
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, payload.UserID, "Заказ оформлен",
+	return c.notifier.Notify(ctx, payload.Username, "Заказ оформлен",
 		"Ваш заказ успешно создан и передан в обработку.")
 }
 
@@ -67,8 +67,8 @@ func (c *NotificationConsumer) handleOrderStatusChanged(ctx context.Context, env
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, 0, "Статус заказа изменён",
-		"Заказ #"+util.Itoa(payload.OrderID)+" теперь: "+payload.NewStatus)
+	return c.notifier.Notify(ctx, "", "Статус заказа изменён",
+		"Заказ #"+payload.OrderUID+" теперь: "+payload.NewStatus)
 }
 
 func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env domain.Envelope) error {
@@ -76,6 +76,6 @@ func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, payload.UserID, "Новая транзакция",
+	return c.notifier.Notify(ctx, payload.Username, "Новая транзакция",
 		"Операция на сумму "+util.Ftoa(payload.Amount)+" зафиксирована.")
 }
