@@ -40,26 +40,25 @@ func NewEnvelope(t Type, payload interface{}) Envelope {
 }
 
 type OrderCreatedPayload struct {
-	OrderID  int64   `json:"order_id"`
-	UserID   int64   `json:"user_id"`
-	SellerID int64   `json:"seller_id"`
+	OrderUID string  `json:"order_uid"`
+	Username string  `json:"username"`
 	Total    float64 `json:"total"`
 }
 
 type OrderStatusChangedPayload struct {
-	OrderID   int64  `json:"order_id"`
+	OrderUID  string `json:"order_uid"`
 	OldStatus string `json:"old_status"`
 	NewStatus string `json:"new_status"`
 }
 
 type TransactionCreatedPayload struct {
 	TransactionID int64   `json:"transaction_id"`
-	UserID        int64   `json:"user_id"`
+	Username      string  `json:"username"`
 	Amount        float64 `json:"amount"`
 	Type          string  `json:"type"` // deposit | withdrawal | payment
 }
 
 type BalanceUpdatedPayload struct {
-	UserID     int64   `json:"user_id"`
+	Username   string  `json:"username"`
 	NewBalance float64 `json:"new_balance"`
 }
