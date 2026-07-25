@@ -2,7 +2,7 @@ environment: local
 
 server:
   grpc_port: ":50051"
-  http_port: ":8080"
+  http_port: ":8082"
 
 db:
   host: localhost
