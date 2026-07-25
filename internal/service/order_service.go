@@ -2,20 +2,39 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"go.uber.org/zap"
 )
 
 type OrderService struct {
-	orderRepo domain.OrderRepository
+	eventPublisher domain.EventPublisher
+	orderRepo      domain.OrderRepository
+	log            *zap.Logger
 }
 
-func NewOrderService(orderRepo domain.OrderRepository) *OrderService {
-	return &OrderService{orderRepo: orderRepo}
+func NewOrderService(orderRepo domain.OrderRepository, publisher domain.EventPublisher, logger *zap.Logger) *OrderService {
+	return &OrderService{eventPublisher: publisher, orderRepo: orderRepo, log: logger}
 }
 
+// CreateOrder creates order and in parallel send to notifier service message with notifying user action.
+// This is mechanism realizing with Apache Kafka data flow broker
 func (s *OrderService) CreateOrder(ctx context.Context, username string) (*domain.Order, error) {
-	return s.orderRepo.Checkout(ctx, username)
+	order, err := s.orderRepo.Checkout(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("order_service.CreateOrder: failed to create order (call checkout): %w", err)
+	}
+
+	if err = s.eventPublisher.PublishOrderCreated(ctx, domain.OrderCreatedPayload{
+		OrderUID: order.ID,
+		Username: order.Username,
+		Total:    order.TotalAmount,
+	}); err != nil {
+		s.log.Error("failed to publish order.created event", zap.Error(err))
+	}
+
+	return order, nil
 }
 
 func (s *OrderService) GetOrder(ctx context.Context, username, id string) (*domain.Order, error) {
