@@ -10,6 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type codeTemplate struct {
+	FooterMessage,
+	Code string
+}
+
+type anyTemplate struct {
+	FooterMessage,
+	Title,
+	Body string
+}
+
 type job struct {
 	subject,
 	body,
@@ -20,6 +31,9 @@ const (
 	queueSize   = 100
 	numWorkers  = 2
 	sendTimeout = 15 * time.Second
+
+	codeTemplateFooter     = "Если вы не запрашивали никаких кодов,\nпросто проигнорируйте это письмо."
+	happyDayTemplateFooter = "Счастливого Вам дня \U0001F604"
 )
 
 type SMTPMailer struct {
@@ -122,7 +136,7 @@ func (m *SMTPMailer) sendToUser(ctx context.Context, subject, body, to string) e
 }
 
 func (m *SMTPMailer) NotifyResetPassword(ctx context.Context, code, email string) error {
-	body, err := Render(ResetPassword, struct{ Code string }{Code: code})
+	body, err := Render(ResetPassword, codeTemplate{Code: code, FooterMessage: codeTemplateFooter})
 	if err != nil {
 		return fmt.Errorf("mailer.NotifyResetPassword: failed to render reset password: %w", err)
 	}
@@ -137,7 +151,7 @@ func (m *SMTPMailer) NotifyResetPassword(ctx context.Context, code, email string
 }
 
 func (m *SMTPMailer) NotifyEmailConfirmation(ctx context.Context, code, email string) error {
-	body, err := Render(EmailConfirmation, struct{ Code string }{Code: code})
+	body, err := Render(EmailConfirmation, codeTemplate{Code: code, FooterMessage: codeTemplateFooter})
 	if err != nil {
 		return fmt.Errorf("mailer.NotifyEmailConfirmation: failed to render email confirmation: %w", err)
 	}
@@ -152,7 +166,7 @@ func (m *SMTPMailer) NotifyEmailConfirmation(ctx context.Context, code, email st
 }
 
 func (m *SMTPMailer) NotifyAnyMessage(ctx context.Context, title, body, email string) error {
-	body, err := Render(AnyMessage, struct{ Title, Body string }{Title: title, Body: body})
+	body, err := Render(AnyMessage, anyTemplate{Title: title, Body: body, FooterMessage: happyDayTemplateFooter})
 	if err != nil {
 		return fmt.Errorf("mailer.NotifyAnyMessage: failed to render any message: %w", err)
 	}
