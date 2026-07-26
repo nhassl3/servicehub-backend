@@ -3,8 +3,10 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	segmentio "github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 
@@ -15,17 +17,11 @@ import (
 // их в уведомления пользователю (email/push/websocket — реализация подставляется через notifier).
 type NotificationConsumer struct {
 	consumer *Consumer
-	notifier Notifier
+	notifier mailer.Notifier
 	log      *zap.Logger
 }
 
-// Notifier — интерфейс, который реализуется конкретным каналом доставки.
-// Сюда позже подключается, например, email-сервис или push-сервис.
-type Notifier interface {
-	Notify(ctx context.Context, Username string, title, body string) error
-}
-
-func NewNotificationConsumer(consumer *Consumer, notifier Notifier, log *zap.Logger) *NotificationConsumer {
+func NewNotificationConsumer(consumer *Consumer, notifier mailer.Notifier, log *zap.Logger) *NotificationConsumer {
 	return &NotificationConsumer{consumer: consumer, notifier: notifier, log: log}
 }
 
@@ -58,8 +54,10 @@ func (c *NotificationConsumer) handleOrderCreated(ctx context.Context, env domai
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, payload.Username, "Заказ оформлен",
-		"Ваш заказ успешно создан и передан в обработку.")
+	return c.notifier.NotifyAnyMessage(ctx, "Заказ оформлен",
+		fmt.Sprintf(
+			"%s, Ваш заказ #%s на сумму $ %.2f успешно создан и передан в обработку.",
+			payload.Username, payload.OrderUID, payload.Total), payload.Email)
 }
 
 func (c *NotificationConsumer) handleOrderStatusChanged(ctx context.Context, env domain.Envelope) error {
@@ -67,8 +65,8 @@ func (c *NotificationConsumer) handleOrderStatusChanged(ctx context.Context, env
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, "", "Статус заказа изменён",
-		"Заказ #"+payload.OrderUID+" теперь: "+payload.NewStatus)
+	return c.notifier.NotifyAnyMessage(ctx, "Статус заказа изменён",
+		fmt.Sprintf("Статус заказа #%s изменился:\n%s ⟶ %s", payload.OrderUID, payload.OldStatus, payload.NewStatus), payload.Email)
 }
 
 func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env domain.Envelope) error {
@@ -76,6 +74,6 @@ func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.Notify(ctx, payload.Username, "Новая транзакция",
-		"Операция на сумму "+util.Ftoa(payload.Amount)+" зафиксирована.")
+	return c.notifier.NotifyAnyMessage(ctx, "Новая транзакция",
+		fmt.Sprintf("Зафиксирована операция на сумму $ %.2f", payload.Amount), payload.Email)
 }
