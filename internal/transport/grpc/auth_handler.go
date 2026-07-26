@@ -107,6 +107,74 @@ func (h *AuthHandler) GetMe(ctx context.Context, _ *authv1.GetMeRequest) (*authv
 	return &authv1.GetMeResponse{User: protoUserInfo(user)}, nil
 }
 
+func (h *AuthHandler) ResetPassword(ctx context.Context, req *authv1.ResetPasswordRequest) (*authv1.ResetPasswordResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	ok, err := h.svc.ResetPassword(ctx, req.GetResetToken(), req.GetPassword())
+	if err != nil {
+		return nil, domainErr(err)
+	}
+
+	return &authv1.ResetPasswordResponse{
+		Success: ok,
+	}, nil
+}
+
+func (h *AuthHandler) RequestResetPassword(ctx context.Context, req *authv1.RequestResetPasswordRequest) (*authv1.RequestResetPasswordResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	operationId, err := h.svc.RequestResetPassword(ctx, domain.RequestResetPasswordParams{
+		Username: req.Username,
+		Email:    req.Email,
+	})
+	if err != nil {
+		return nil, domainErr(err)
+	}
+
+	return &authv1.RequestResetPasswordResponse{
+		OperationId: operationId,
+	}, nil
+}
+
+func (h *AuthHandler) RequestVerifyEmail(ctx context.Context, req *authv1.RequestVerifyEmailRequest) (*authv1.RequestVerifyEmailResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	operationId, err := h.svc.RequestVerifyEmail(ctx, req.GetEmail())
+	if err != nil {
+		return nil, domainErr(err)
+	}
+
+	return &authv1.RequestVerifyEmailResponse{
+		OperationId: operationId,
+	}, nil
+}
+
+func (h *AuthHandler) VerifyEmail(ctx context.Context, req *authv1.VerifyEmailRequest) (*authv1.VerifyEmailResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	tokens, ok, err := h.svc.VerifyEmailAccount(ctx, req.GetVerifyToken())
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	if tokens == nil || tokens.AccessToken == "" || tokens.RefreshToken == "" {
+		return nil, domainErr(domain.ErrBuiltToken)
+	}
+
+	return &authv1.VerifyEmailResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		Success:      ok,
+	}, nil
+}
+
 // ── Shared proto mapper ───────────────────────────────────────────────────────
 
 // protoUserInfo converts a domain.User to authv1.UserInfo.

@@ -15,6 +15,7 @@ var (
 	ErrPasswordDontMatch   = errors.New("passwords don't match")
 	ErrExpiredToken        = errors.New("expired token")
 	ErrInvalidToken        = errors.New("invalid token")
+	ErrBuiltToken          = errors.New("error built token")
 	ErrSessionIsBlocked    = errors.New("session is blocked")
 	ErrDeviceMistake       = errors.New("device mistake")
 	ErrRedisNotFound       = errors.New("key does not exists")

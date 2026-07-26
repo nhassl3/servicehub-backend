@@ -13,19 +13,28 @@ const (
 	sessionPrefix   = "session:"
 	profilePrefix   = "profile:"
 	authBlockPrefix = "auth:block:"
+	codePrefix      = "code:"
+	verifiedPrefix  = "verified::"
+
+	ResetPasswordEnterKey = "reset_password:"
+	VerifyEmailEnterKey   = "verify_email:"
 )
 
 type UserRedis struct {
-	client       *redis.Client
-	profileTTL   time.Duration
-	authBlockTTL time.Duration
+	client *redis.Client
+	profileTTL,
+	authBlockTTL,
+	codeTTL,
+	resetPasswordTTL time.Duration
 }
 
-func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL time.Duration) *UserRedis {
+func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL, codeTTL, resetPasswordTTL time.Duration) *UserRedis {
 	return &UserRedis{
-		client:       client,
-		profileTTL:   profileTTL,
-		authBlockTTL: authBlockTTL,
+		client:           client,
+		profileTTL:       profileTTL,
+		authBlockTTL:     authBlockTTL,
+		codeTTL:          codeTTL,
+		resetPasswordTTL: resetPasswordTTL,
 	}
 }
 
@@ -97,4 +106,46 @@ func (u *UserRedis) DelProfile(ctx context.Context, username string) error {
 
 func (u *UserRedis) DelSession(ctx context.Context, username string) error {
 	return u.client.Del(ctx, sessionPrefix+username).Err()
+}
+
+func (u *UserRedis) Code(ctx context.Context, enterKeyCode, operationId string) (*domain.ResetPasswordState, error) {
+	var code domain.ResetPasswordState
+
+	if err := u.client.Get(ctx, codePrefix+enterKeyCode+operationId).Scan(&code); err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, domain.ErrRedisNotFound
+		}
+		return nil, err
+	}
+
+	return &code, nil
+}
+
+func (u *UserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.ResetPasswordState) error {
+	return u.client.Set(ctx, codePrefix+enterKeyCode+operationId, code, u.codeTTL).Err()
+}
+
+func (u *UserRedis) Verified(ctx context.Context, entryCode, token string) (string, error) {
+	var email string
+
+	if err := u.client.Get(ctx, verifiedPrefix+entryCode+token).Scan(&email); err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", domain.ErrRedisNotFound
+		}
+		return "", err
+	}
+
+	return email, nil
+}
+
+func (u *UserRedis) SetVerified(ctx context.Context, entryCode, token, email string) error {
+	return u.client.Set(ctx, verifiedPrefix+entryCode+token, email, u.resetPasswordTTL).Err()
+}
+
+func (u *UserRedis) DelVerified(ctx context.Context, entryCode, token string) error {
+	return u.client.Del(ctx, verifiedPrefix+entryCode+token).Err()
+}
+
+func (u *UserRedis) DelCode(ctx context.Context, enterKeyCode, operationId string) error {
+	return u.client.Del(ctx, codePrefix+enterKeyCode+operationId).Err()
 }

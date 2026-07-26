@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url    TEXT         NOT NULL DEFAULT '',
     role          VARCHAR(20)  NOT NULL DEFAULT 'buyer'
                   CHECK (role IN ('buyer', 'seller', 'admin')),
-    is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    is_active     BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );

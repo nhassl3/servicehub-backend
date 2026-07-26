@@ -9,6 +9,7 @@ import (
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/nhassl3/servicehub-backend/internal/service"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +39,7 @@ type mockTokenManager struct {
 	verifyErr error
 }
 
-func (m *mockTokenManager) CreateRefreshToken(_, _, _ string) (string, *auth.Payload, error) {
+func (m *mockTokenManager) CreateRefreshToken(_, _, _ string, _ bool) (string, *auth.Payload, error) {
 	if m.createErr != nil {
 		return "", nil, m.createErr
 	}
@@ -51,7 +52,7 @@ func (m *mockTokenManager) CreateRefreshToken(_, _, _ string) (string, *auth.Pay
 	}, nil
 }
 
-func (m *mockTokenManager) CreateToken(_, _, _ string) (string, error) {
+func (m *mockTokenManager) CreateToken(_, _, _ string, _ bool) (string, error) {
 	if m.createErr != nil {
 		return "", m.createErr
 	}
@@ -107,6 +108,30 @@ func (m *mockUserRedis) DelSession(_ context.Context, _ string) error {
 	return nil
 }
 
+func (m *mockUserRedis) Code(_ context.Context, _, _ string) (*domain.ResetPasswordState, error) {
+	return nil, domain.ErrRedisNotFound
+}
+
+func (m *mockUserRedis) SetCode(_ context.Context, _, _ string, _ *domain.ResetPasswordState) error {
+	return nil
+}
+
+func (m *mockUserRedis) Verified(_ context.Context, _, _ string) (string, error) {
+	return "", domain.ErrRedisNotFound
+}
+
+func (m *mockUserRedis) SetVerified(_ context.Context, _, _, _ string) error {
+	return nil
+}
+
+func (m *mockUserRedis) DelVerified(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (m *mockUserRedis) DelCode(_ context.Context, _, _ string) error {
+	return nil
+}
+
 // ─── Mock UserRepository ──────────────────────────────────────────────────────
 
 type mockUserRepo struct {
@@ -122,6 +147,7 @@ type mockUserRepo struct {
 	getSessionByUsernameFunc func(ctx context.Context, username string) (*domain.Session, error)
 	deleteSessionFunc        func(ctx context.Context, username string) error
 	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
+	verifyEmailFunc          func(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error)
 }
 
 func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
@@ -213,6 +239,13 @@ func (m *mockUserRepo) GetByUID(ctx context.Context, uid string) (*domain.User, 
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockUserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+	if m.verifyEmailFunc != nil {
+		return m.verifyEmailFunc(ctx, params)
+	}
+	return nil, domain.ErrNotFound
+}
+
 func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, params)
@@ -226,7 +259,7 @@ func newAuthService(repo domain.UserRepository) *service.AuthService {
 	tm := &mockTokenManager{}
 	bl := newMockBlacklist()
 	redis := &mockUserRedis{}
-	return service.NewAuthService(repo, redis, tm, tm, bl)
+	return service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{})
 }
 
 func TestAuthService_Register_OK(t *testing.T) {
@@ -339,7 +372,7 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	tm := &mockTokenManager{verifyErr: auth.ErrInvalidToken}
 	bl := newMockBlacklist()
 	redis := &mockUserRedis{}
-	svc := service.NewAuthService(repo, redis, tm, tm, bl)
+	svc := service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{})
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)

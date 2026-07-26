@@ -10,6 +10,7 @@ type Payload struct {
 	Username  string    `json:"username"`
 	UID       string    `json:"uid"`
 	Role      string    `json:"role"`
+	IsActive  bool      `json:"is_active"`
 	IssuedAt  time.Time `json:"issued_at"`
 	ExpiredAt time.Time `json:"expired_at"`
 }

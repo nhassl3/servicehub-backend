@@ -20,6 +20,8 @@ const PayloadKey contextKey = "auth_payload"
 var publicMethods = []string{
 	"/auth.v1.AuthService/Register",
 	"/auth.v1.AuthService/Login",
+	"/auth.v1.AuthService/RequestResetPassword",
+	"/auth.v1.AuthService/ResetPassword",
 	"/auth.v1.AuthService/RefreshToken",
 	"/category.v1.CategoryService/ListCategories",
 	"/product.v1.ProductService/ListProducts",
@@ -27,6 +29,12 @@ var publicMethods = []string{
 	"/product.v1.ProductService/SearchProducts",
 	"/seller.v1.SellerService/GetSellerProfile",
 	"/review.v1.ReviewService/ListReviews",
+	"/notification.v1.NotificationService/ApproveCode",
+}
+
+var guestMethods = []string{
+	"/auth.v1.AuthService/RequestVerifyEmail",
+	"/auth.v1.AuthService/VerifyEmail",
 }
 
 // AuthInterceptor returns a gRPC unary interceptor for PASETO token verification.
@@ -58,6 +66,13 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 				return nil, status.Error(codes.Unauthenticated, err.Error())
 			}
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
+		}
+
+		if payload.IsActive == false {
+			if slices.Contains(guestMethods, info.FullMethod) {
+				return handler(ctx, req)
+			}
+			return nil, status.Error(codes.PermissionDenied, "email not verified")
 		}
 
 		ctx = context.WithValue(ctx, PayloadKey, payload)
