@@ -153,9 +153,9 @@ minio-stop:
 
 ##  ─── Kafka ───────────────────────────────────────────────────────────────────
 build-consumer:
-	@go build -o $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH) $(CONSUMER_PATH)
+	go build -o $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH) $(CONSUMER_PATH)
 	@chmod +x $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
-	@echo "Successful built consumer"
+	@echo "Successfully built consumer"
 
 run-consumer:
 	@go run $(CONSUMER_PATH)
