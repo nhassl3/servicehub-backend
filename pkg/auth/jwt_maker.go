@@ -19,6 +19,7 @@ type jwtClaims struct {
 	Username string `json:"username"`
 	UID      string `json:"uid"`
 	Role     string `json:"role"`
+	IsActive bool   `json:"is_active"`
 }
 
 // NewJWTMaker creates a new JWTMaker.
@@ -29,14 +30,14 @@ func NewJWTMaker(secret string, ttl time.Duration) (*JWTMaker, error) {
 	return &JWTMaker{secret: []byte(secret), ttl: ttl}, nil
 }
 
-func (m *JWTMaker) CreateToken(username, uid, role string) (string, error) {
-	return m.createToken(username, uid, role, uuid.New().String(), time.Now())
+func (m *JWTMaker) CreateToken(username, uid, role string, isActive bool) (string, error) {
+	return m.createToken(username, uid, role, uuid.New().String(), isActive, time.Now())
 }
 
-func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payload, error) {
+func (m *JWTMaker) CreateRefreshToken(username, uid, role string, isActive bool) (string, *Payload, error) {
 	begin := time.Now()
 	jti := uuid.New().String()
-	token, err := m.createToken(username, uid, role, jti, begin)
+	token, err := m.createToken(username, uid, role, jti, isActive, begin)
 	if err != nil {
 		return "", nil, err
 	}
@@ -50,7 +51,7 @@ func (m *JWTMaker) CreateRefreshToken(username, uid, role string) (string, *Payl
 	}, nil
 }
 
-func (m *JWTMaker) createToken(username, uid, role, jti string, start time.Time) (string, error) {
+func (m *JWTMaker) createToken(username, uid, role, jti string, isActive bool, start time.Time) (string, error) {
 	if start.Equal(time.Time{}) {
 		start = time.Now()
 	}
@@ -64,6 +65,7 @@ func (m *JWTMaker) createToken(username, uid, role, jti string, start time.Time)
 		Username: username,
 		UID:      uid,
 		Role:     role,
+		IsActive: isActive,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -100,6 +102,7 @@ func (m *JWTMaker) VerifyToken(tokenStr string) (*Payload, error) {
 		Username:  claims.Username,
 		UID:       claims.UID,
 		Role:      claims.Role,
+		IsActive:  claims.IsActive,
 		IssuedAt:  claims.IssuedAt.Time,
 		ExpiredAt: claims.ExpiresAt.Time,
 	}, nil

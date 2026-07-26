@@ -20,6 +20,7 @@ import (
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
+	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 	pkgRedis "github.com/nhassl3/servicehub-backend/pkg/redis"
 	minio "github.com/nhassl3/servicehub-backend/pkg/storage"
@@ -66,7 +67,9 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 
 	// RedisClient store tokens, sessions, profiles
 	tokenBlacklist := repoRedis.NewTokenBlacklist(redisClient)
-	userRedis := repoRedis.NewUserRedis(redisClient, cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock)
+	userRedis := repoRedis.NewUserRedis(
+		redisClient, cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock, cfg.Redis.TTL.Code, cfg.Redis.TTL.ResetPassword,
+	)
 	adminRedis := repoRedis.NewAdminRedis(redisClient, cfg.Redis.TTL.Product, cfg.Redis.TTL.Claim)
 
 	// RedisProducts store categories and products closed on a page a few moments later
@@ -107,6 +110,14 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		return fmt.Errorf("app: create paseto refresh maker: %w", err)
 	}
 
+	// ─── Mailer (SMTP Client) ─────────────────────────────────────────────────
+	smtpClient, err := mailer.NewSMTPMailer(
+		cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
+	)
+	if err != nil {
+		return fmt.Errorf("app: create smtp client: %w", err)
+	}
+
 	// ─── Repositories ─────────────────────────────────────────────────────────
 	userRepo := repoPostgres.NewUserRepo(store)
 	categoryRepo := repoPostgres.NewCategoryRepo(store)
@@ -119,21 +130,23 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	balanceRepo := repoPostgres.NewBalanceRepo(store)
 	adminRepo := repoPostgres.NewAdminRepo(store)
 	moderationRepo := repoPostgres.NewModerationRepo(store)
+	notificationRepo := repoPostgres.NewNotificationRepository(store)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
 	svcs := &transportGRPC.Services{
-		Admin:      service.NewAdminService(adminRepo, minIOClient, adminRedis),
-		Auth:       service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist),
-		User:       service.NewUserService(userRepo, minIOClient, userRedis),
-		Category:   service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
-		Product:    service.NewProductService(productRepo, sellerRepo),
-		Cart:       service.NewCartService(cartRepo),
-		Order:      service.NewOrderService(orderRepo, eventPublisher, log),
-		Review:     service.NewReviewService(reviewRepo),
-		Wishlist:   service.NewWishlistService(wishlistRepo),
-		Seller:     service.NewSellerService(sellerRepo, minIOClient),
-		Balance:    service.NewBalanceService(balanceRepo),
-		Moderation: service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
+		Admin:        service.NewAdminService(adminRepo, minIOClient, adminRedis),
+		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient),
+		User:         service.NewUserService(userRepo, minIOClient, userRedis),
+		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
+		Product:      service.NewProductService(productRepo, sellerRepo),
+		Cart:         service.NewCartService(cartRepo),
+		Order:        service.NewOrderService(orderRepo, eventPublisher, log),
+		Review:       service.NewReviewService(reviewRepo),
+		Wishlist:     service.NewWishlistService(wishlistRepo),
+		Seller:       service.NewSellerService(sellerRepo, minIOClient),
+		Balance:      service.NewBalanceService(balanceRepo),
+		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
+		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo),
 	}
 
 	// ─── gRPC Server ──────────────────────────────────────────────────────────

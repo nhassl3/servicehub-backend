@@ -165,3 +165,11 @@ runb-consumer:
 
 kafka-docker:
 	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest
+
+##  ─── GitHub ───────────────────────────────────────────────────────────────────
+push:
+	@eval "$(ssh-agent -s)"
+	@ssh-add servicehub_backend_sshkey
+
+get-contracts:
+	@go get -u github.com/nhassl3/servicehub-contracts@$(VER)

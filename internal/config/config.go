@@ -19,6 +19,7 @@ type Config struct {
 	Log         LogConfig
 	MinIO       MinIOConfig
 	Kafka       KafkaConfig
+	SMTP        SMTPConfig
 }
 
 type ServerConfig struct {
@@ -49,7 +50,9 @@ type RedisTTL struct {
 	Categories,
 	AuthBlock,
 	Product,
-	Claim time.Duration
+	Claim,
+	Code,
+	ResetPassword time.Duration
 }
 
 type AuthConfig struct {
@@ -82,6 +85,14 @@ type TopicsConfig struct {
 	Notifications string
 }
 
+type SMTPConfig struct {
+	Host      string
+	Port      int
+	FromEmail string
+	Username  string
+	Password  string
+}
+
 // Load reads public configuration from a YAML file and secrets from an env file.
 //
 //	configFile — path to the YAML file, e.g. "config/local.yaml"
@@ -104,8 +115,12 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetDefault("redis.ttl.product", "5m")
 	yv.SetDefault("redis.ttl.claim", "20m")
 	yv.SetDefault("redis.ttl.admin", "15m")
+	yv.SetDefault("redis.ttl.code", "5m")
+	yv.SetDefault("redis.ttl.reset_password", "15m")
 	yv.SetDefault("minio.endpoint", "localhost:9000")
 	yv.SetDefault("minio.use_ssl", "true")
+	yv.SetDefault("smtp.host", "smtp.yandex.ru")
+	yv.SetDefault("smtp.port", 587)
 
 	if err := yv.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("config: read yaml %q: %w", configFile, err)
@@ -157,6 +172,8 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Redis.TTL.Product = yv.GetDuration("redis.ttl.product")
 	cfg.Redis.TTL.Admin = yv.GetDuration("redis.ttl.admin")
 	cfg.Redis.TTL.Claim = yv.GetDuration("redis.ttl.claim")
+	cfg.Redis.TTL.Code = yv.GetDuration("redis.ttl.code")
+	cfg.Redis.TTL.ResetPassword = yv.GetDuration("redis.ttl.reset_password")
 
 	cfg.Auth.AccessTokenTTL = yv.GetDuration("auth.access_token_ttl")
 	cfg.Auth.RefreshTokenTTL = yv.GetDuration("auth.refresh_token_ttl")
@@ -173,6 +190,12 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Kafka.Topics.OrderEvents = yv.GetString("kafka.topics.order_events")
 	cfg.Kafka.Topics.TransactionEvents = yv.GetString("kafka.topics.transaction_events")
 	cfg.Kafka.Topics.Notifications = yv.GetString("kafka.topics.notifications")
+
+	cfg.SMTP.Host = yv.GetString("smtp.host")
+	cfg.SMTP.Port = yv.GetInt("smtp.port")
+	cfg.SMTP.FromEmail = ev.GetString("SMTP_FROM")
+	cfg.SMTP.Username = ev.GetString("SMTP_USERNAME")
+	cfg.SMTP.Password = ev.GetString("SMTP_Password")
 
 	cfg.Log.Level = yv.GetString("log.level")
 

@@ -19,6 +19,8 @@ redis:
     product: 5m
     admin: 15m
     claim: 20m
+    code: 5m
+    reset_password: 15m
 
 kafka:
   topics:
@@ -40,3 +42,7 @@ minio:
 
 log:
   level: info
+
+smtp:
+  host: "smtp.yandex.ru"
+  port: 465

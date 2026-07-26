@@ -7,9 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-passwd/validator"
+	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/hash"
+	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -19,12 +23,14 @@ type AuthService struct {
 	tokenManager   auth.TokenManager
 	refreshManager auth.TokenManager
 	blacklist      auth.TokenBlacklist
+	smtpClient     mailer.Notifier
 }
 
 func NewAuthService(
 	userRepo domain.UserRepository, userRedis domain.UserRedis,
 	tokenManager, refreshManager auth.TokenManager,
 	blacklist auth.TokenBlacklist,
+	smtpClient mailer.Notifier,
 ) *AuthService {
 	return &AuthService{
 		userRepo:       userRepo,
@@ -32,6 +38,7 @@ func NewAuthService(
 		tokenManager:   tokenManager,
 		refreshManager: refreshManager,
 		blacklist:      blacklist,
+		smtpClient:     smtpClient,
 	}
 }
 
@@ -52,7 +59,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 	clientIP, _ := getMetadataFromContext(ctx)
 
 	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
-		return nil, nil, fmt.Errorf("%w: %f", domain.ErrAuthBlock, ttl)
+		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
 	}
 
 	existsUsername, err := s.userRepo.ExistsByUsername(ctx, input.Username)
@@ -86,16 +93,10 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 		return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
 	}
 
-	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role)
+	tokens, err := s.createTokensAndSession(ctx, user, input.Username)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	if err := s.createSession(ctx, input.Username, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
-		return nil, nil, err
-	}
-
-	_ = s.userRedis.SetProfile(ctx, user)
 
 	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
 
@@ -125,20 +126,165 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 		return nil, nil, domain.ErrInvalidCredentials
 	}
 
-	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role)
+	tokens, err := s.createTokensAndSession(ctx, user, username)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if err := s.createSession(ctx, username, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
-		return nil, nil, err
-	}
-
-	_ = s.userRedis.SetProfile(ctx, user)
-
 	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
 
 	return user, tokens, nil
+}
+
+func (s *AuthService) RequestResetPassword(ctx context.Context, params domain.RequestResetPasswordParams) (string, error) {
+	var email string
+	if params.Username != nil && *params.Username != "" {
+		user, err := s.userRedis.Profile(ctx, *params.Username)
+		if err != nil {
+			if errors.Is(err, domain.ErrRedisNotFound) {
+				user, err = s.userRepo.GetByUsername(ctx, *params.Username)
+				if err != nil {
+					return "", fmt.Errorf("auth_service.GetMe get from database: %w", err)
+				}
+				_ = s.userRedis.SetProfile(ctx, user)
+			} else {
+				return "", fmt.Errorf("auth_service:GetMe get from redis: %w", err)
+			}
+		}
+		email = user.Email
+	} else if params.Email != nil && *params.Email != "" && strings.Contains(*params.Email, "@") {
+		ok, err := s.userRepo.ExistsByEmail(ctx, *params.Email)
+		if err != nil {
+			return "", fmt.Errorf("auth_serivce.ResetPassword check email: %w", err)
+		}
+		if !ok {
+			return "", domain.ErrNotFound
+		}
+		email = *params.Email
+	} else {
+		return "", domain.ErrInvalidCredentials
+	}
+
+	return s.requestToEntryKey(ctx, redis.ResetPasswordEnterKey, email)
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword string) (bool, error) {
+	email, err := s.userRedis.Verified(ctx, redis.ResetPasswordEnterKey, resetToken)
+	if err != nil {
+		if errors.Is(err, domain.ErrRedisNotFound) {
+			return false, domain.ErrNotFound
+		}
+		return false, fmt.Errorf("auth_service.ResetPassword verify reset token: %w", err)
+	}
+
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return false, err
+	}
+
+	ok, err := hash.VerifyPassword(newPassword, user.PasswordHash)
+	if err != nil {
+		return false, fmt.Errorf("user_service.UpdatePassword verify password: %w", err)
+	}
+	if ok {
+		return false, domain.ErrTooSimilarPasswords
+	}
+
+	// similarity by default is 0.7 - DO NOT CHANGE THIS THRESHOLD
+	passwordValidator := validator.New(
+		validator.Similarity([]string{user.PasswordHash}, nil, domain.ErrTooSimilarPasswords),
+	)
+	if err := passwordValidator.Validate(newPassword); err != nil {
+		return false, err
+	}
+
+	newPasswordHashed, err := hash.CreateHashPassword(newPassword)
+	if err != nil {
+		return false, fmt.Errorf("user_service.UpdatePassword.NewPassword: %w", err)
+	}
+
+	params := domain.UpdateUserPasswordParams{
+		Username:    user.Username,
+		NewPassword: newPasswordHashed,
+	}
+
+	if _, err = s.userRepo.UpdatePassword(ctx, params); err != nil {
+		return false, fmt.Errorf("auth_service.UpdatePassword: %w", err)
+	}
+
+	_ = s.userRedis.DelVerified(ctx, redis.ResetPasswordEnterKey, resetToken) // optional operation
+
+	return true, nil
+}
+
+func (s *AuthService) RequestVerifyEmail(ctx context.Context, email string) (string, error) {
+	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, email)
+}
+
+func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email string) (string, error) {
+	var code string
+	for range 5 {
+		code = GenerateResetPasswordCode()
+		if code != "" {
+			break
+		}
+	}
+	if code == "" {
+		return "", fmt.Errorf("auth_service.requestToEntryKey reset code is empty")
+	}
+
+	operationId := uuid.NewString()
+
+	if err := s.userRedis.SetCode(ctx, entryKey, operationId, domain.NewCode(email, code)); err != nil {
+		return "", fmt.Errorf("auth_service.requestToEntryKey set code: %w", err)
+	}
+
+	var err error
+	switch entryKey {
+	case redis.VerifyEmailEnterKey:
+		err = s.smtpClient.NotifyEmailConfirmation(code, email)
+	case redis.ResetPasswordEnterKey:
+		err = s.smtpClient.NotifyResetPassword(code, email)
+	default:
+		return "", fmt.Errorf("auth_service.requestToEntryKey unknown entry key")
+	}
+	if err != nil {
+		return "", fmt.Errorf("auth_service.requestToEntryKey: failed to notify: %w", err)
+	}
+
+	return operationId, nil
+}
+
+func (s *AuthService) VerifyEmailAccount(ctx context.Context, verifyToken string) (*TokenPair, bool, error) {
+	email, err := s.userRedis.Verified(ctx, redis.VerifyEmailEnterKey, verifyToken)
+	if err != nil {
+		return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify token: %w", err)
+	}
+
+	// slow request to database
+	exists, err := s.userRepo.ExistsByEmail(ctx, email)
+	if !exists {
+		if err != nil {
+			return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount verify email: %w", err)
+		}
+		return nil, false, domain.ErrNotFound
+	}
+
+	user, err := s.userRepo.VerifyEmail(ctx, domain.VerifyEmailAccount{
+		Email: &email,
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify email account %w", err)
+	}
+
+	tokens, err := s.createTokensAndSession(ctx, user, user.Username)
+	if err != nil {
+		return nil, false, err
+	}
+
+	_ = s.userRedis.DelVerified(ctx, redis.VerifyEmailEnterKey, verifyToken)
+
+	return tokens, true, nil
 }
 
 func (s *AuthService) Logout(ctx context.Context, accessPayload *auth.Payload) error {
@@ -184,7 +330,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		return nil, domain.ErrSessionIsBlocked
 	}
 
-	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role)
+	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role, payload.IsActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
@@ -213,13 +359,13 @@ func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User,
 	return user, nil
 }
 
-func (s *AuthService) createTokenPair(username, uid, role string) (*TokenPair, error) {
-	accessToken, err := s.tokenManager.CreateToken(username, uid, role)
+func (s *AuthService) createTokenPair(username, uid, role string, isActive bool) (*TokenPair, error) {
+	accessToken, err := s.tokenManager.CreateToken(username, uid, role, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
 
-	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role)
+	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create refresh token: %w", err)
 	}
@@ -269,6 +415,21 @@ func (s *AuthService) createSession(ctx context.Context, username, refreshToken 
 	}
 
 	return nil
+}
+
+func (s *AuthService) createTokensAndSession(ctx context.Context, user *domain.User, sessionUsername string) (*TokenPair, error) {
+	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role, user.IsActive)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.createSession(ctx, sessionUsername, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
+		return nil, err
+	}
+
+	_ = s.userRedis.SetProfile(ctx, user)
+
+	return tokens, nil
 }
 
 // getMetadataFromContext TODO: update function (wrong ip and user-agent on response)

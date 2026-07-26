@@ -23,6 +23,7 @@ import (
 	cartv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/cart/v1"
 	categoryv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/category/v1"
 	moderationv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/moderation/v1"
+	notificationv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/notification/v1"
 	orderv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/order/v1"
 	productv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/product/v1"
 	reviewv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/review/v1"
@@ -38,18 +39,19 @@ import (
 
 // Services aggregates all application services passed down to handlers.
 type Services struct {
-	Admin      *service.AdminService
-	Auth       *service.AuthService
-	User       *service.UserService
-	Category   *service.CategoryService
-	Product    *service.ProductService
-	Cart       *service.CartService
-	Order      *service.OrderService
-	Review     *service.ReviewService
-	Wishlist   *service.WishlistService
-	Seller     *service.SellerService
-	Balance    *service.BalanceService
-	Moderation *service.ModerationService
+	Admin        *service.AdminService
+	Auth         *service.AuthService
+	User         *service.UserService
+	Category     *service.CategoryService
+	Product      *service.ProductService
+	Cart         *service.CartService
+	Order        *service.OrderService
+	Review       *service.ReviewService
+	Wishlist     *service.WishlistService
+	Seller       *service.SellerService
+	Balance      *service.BalanceService
+	Moderation   *service.ModerationService
+	Notification *service.NotificationService
 }
 
 // Handlers holds all gRPC handler implementations.
@@ -71,18 +73,19 @@ type Services struct {
 //	SellerHandler   : CreateSeller · GetSellerProfile · UpdateSeller
 //	BalanceHandler  : GetBalance · Deposit · GetTransactionHistory
 type Handlers struct {
-	Admin      *AdminHandler
-	Auth       *AuthHandler
-	User       *UserHandler
-	Category   *CategoryHandler
-	Product    *ProductHandler
-	Cart       *CartHandler
-	Order      *OrderHandler
-	Review     *ReviewHandler
-	Wishlist   *WishlistHandler
-	Seller     *SellerHandler
-	Balance    *BalanceHandler
-	Moderation *ModerationHandler
+	Admin        *AdminHandler
+	Auth         *AuthHandler
+	User         *UserHandler
+	Category     *CategoryHandler
+	Product      *ProductHandler
+	Cart         *CartHandler
+	Order        *OrderHandler
+	Review       *ReviewHandler
+	Wishlist     *WishlistHandler
+	Seller       *SellerHandler
+	Balance      *BalanceHandler
+	Moderation   *ModerationHandler
+	Notification *NotificationHandler
 }
 
 // Server wraps the gRPC server with its handler set.
@@ -104,18 +107,19 @@ func NewServer(services *Services, tokenManager auth.TokenManager, log *zap.Logg
 	)
 
 	handlers := &Handlers{
-		Admin:      NewAdminHandler(services.Admin),
-		Auth:       NewAuthHandler(services.Auth, tokenManager),
-		User:       NewUserHandler(services.User),
-		Category:   NewCategoryHandler(services.Category),
-		Product:    NewProductHandler(services.Product),
-		Cart:       NewCartHandler(services.Cart),
-		Order:      NewOrderHandler(services.Order),
-		Review:     NewReviewHandler(services.Review),
-		Wishlist:   NewWishlistHandler(services.Wishlist),
-		Seller:     NewSellerHandler(services.Seller),
-		Balance:    NewBalanceHandler(services.Balance),
-		Moderation: NewModerationHandler(services.Moderation),
+		Admin:        NewAdminHandler(services.Admin),
+		Auth:         NewAuthHandler(services.Auth, tokenManager),
+		User:         NewUserHandler(services.User),
+		Category:     NewCategoryHandler(services.Category),
+		Product:      NewProductHandler(services.Product),
+		Cart:         NewCartHandler(services.Cart),
+		Order:        NewOrderHandler(services.Order),
+		Review:       NewReviewHandler(services.Review),
+		Wishlist:     NewWishlistHandler(services.Wishlist),
+		Seller:       NewSellerHandler(services.Seller),
+		Balance:      NewBalanceHandler(services.Balance),
+		Moderation:   NewModerationHandler(services.Moderation),
+		Notification: NewNotificationHandler(services.Notification),
 	}
 
 	registerHandlers(grpcServer, handlers)
@@ -140,6 +144,7 @@ func registerHandlers(srv *grpc.Server, h *Handlers) {
 	sellerv1.RegisterSellerServiceServer(srv, h.Seller)
 	balancev1.RegisterBalanceServiceServer(srv, h.Balance)
 	moderationv1.RegisterModerationServiceServer(srv, h.Moderation)
+	notificationv1.RegisterNotificationServiceServer(srv, h.Notification)
 }
 
 // Start begins accepting gRPC connections on addr (e.g. ":9090").
@@ -192,6 +197,7 @@ func (s *Server) StartGateway(ctx context.Context, grpcAddr, httpAddr string) er
 		sellerv1.RegisterSellerServiceHandler,
 		balancev1.RegisterBalanceServiceHandler,
 		moderationv1.RegisterModerationServiceHandler,
+		notificationv1.RegisterNotificationServiceHandler,
 	} {
 		if err := fn(ctx, mux, conn); err != nil {
 			return err

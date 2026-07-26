@@ -13,3 +13,5 @@ redis-config/redis.conf
 redis-config/users.acl
 go.work
 go.work.sum
+AGENTS.md
+.claude/

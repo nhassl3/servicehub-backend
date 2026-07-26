@@ -192,6 +192,20 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserP
 	}), nil
 }
 
+func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+	user, err := r.store.VerifyEmailAccount(ctx, db.VerifyEmailAccountParams{
+		Email:    usernamePtrToNullable(params.Email),
+		Username: usernamePtrToNullable(params.Username),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, fmt.Errorf("user_repo.VerifyEmail: %w", err)
+	}
+	return mapUser(user), nil
+}
+
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
 func mapUser(u db.User) *domain.User {
