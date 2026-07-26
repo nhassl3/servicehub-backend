@@ -18,6 +18,7 @@ BINARY_NAME=servicehub
 BUILD_DIR=./bin
 CMD_PATH=./cmd/servicehub
 CONSUMER_PATH=./cmd/consumer
+ENVIRONMENT=local
 
 # Migrations
 MIGRATE_BIN=$(shell which migrate 2>/dev/null || echo "migrate")
@@ -47,7 +48,7 @@ run:
 	go run $(CMD_PATH)/main.go
 
 runb:
-	@./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)
 
 ## ─── Test ────────────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ run-consumer:
 	@go run $(CONSUMER_PATH)
 
 runb-consumer:
-	@./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+	@ENVIRONMENT=$(ENVIRONMENT)  ./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
 
 kafka-docker:
 	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest

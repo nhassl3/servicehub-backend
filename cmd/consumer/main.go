@@ -62,7 +62,7 @@ func main() {
 		}
 	}()
 
-	log.Info("kafka consumer service started")
+	log.Info("kafka consumer service started", zap.String("env", cfg.Environment), zap.String("Mode", cfg.Log.Level))
 	wg.Wait()
 	log.Info("kafka consumer service stopped gracefully")
 }
