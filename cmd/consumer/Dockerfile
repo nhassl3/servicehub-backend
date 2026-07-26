@@ -22,7 +22,7 @@ COPY --from=builder /app/config/prod.yaml config/prod.yaml
 COPY --from=builder /app/config/local.yaml config/local.yaml
 COPY --from=builder /app/.env .
 
-ENV ENVIRONMENT=local
+ENV ENVIRONMENT=dev
 
 EXPOSE 9092
 

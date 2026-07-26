@@ -30,7 +30,7 @@ COPY --from=builder /app/start.sh .
 
 RUN chmod +x /app/start.sh /app/migrate
 
-ENV ENVIRONMENT=local
+ENV ENVIRONMENT=dev
 
 EXPOSE 8082 50051
 
