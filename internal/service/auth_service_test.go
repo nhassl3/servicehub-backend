@@ -39,12 +39,13 @@ type mockTokenManager struct {
 	verifyErr error
 }
 
-func (m *mockTokenManager) CreateRefreshToken(_, _, _ string, _ bool) (string, *auth.Payload, error) {
+func (m *mockTokenManager) CreateRefreshToken(_, _, _, _ string, _ bool) (string, *auth.Payload, error) {
 	if m.createErr != nil {
 		return "", nil, m.createErr
 	}
 	return "test-refresh-token", &auth.Payload{
 		Username:  "alice",
+		Email:     "alice@example.com",
 		UID:       "uid-123",
 		Role:      "buyer",
 		IssuedAt:  time.Now(),
@@ -52,7 +53,7 @@ func (m *mockTokenManager) CreateRefreshToken(_, _, _ string, _ bool) (string, *
 	}, nil
 }
 
-func (m *mockTokenManager) CreateToken(_, _, _ string, _ bool) (string, error) {
+func (m *mockTokenManager) CreateToken(_, _, _, _ string, _ bool) (string, error) {
 	if m.createErr != nil {
 		return "", m.createErr
 	}
@@ -65,6 +66,7 @@ func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
 	}
 	return &auth.Payload{
 		Username:  "alice",
+		Email:     "alice@example.com",
 		UID:       "uid-123",
 		Role:      "buyer",
 		IssuedAt:  time.Now(),

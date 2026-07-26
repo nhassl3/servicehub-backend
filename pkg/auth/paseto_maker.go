@@ -33,28 +33,30 @@ func NewPasetoMaker(keyHex string, ttl time.Duration) (*PasetoMaker, error) {
 	return &PasetoMaker{key: key, ttl: ttl}, nil
 }
 
-func (m *PasetoMaker) CreateToken(username, uid, role string, isActive bool) (string, error) {
-	return m.createTokenWithJTI(username, uid, role, uuid.New().String(), isActive, time.Now())
+func (m *PasetoMaker) CreateToken(username, uid, role, email string, isActive bool) (string, error) {
+	return m.createTokenWithJTI(username, uid, role, email, uuid.New().String(), isActive, time.Now())
 }
 
-func (m *PasetoMaker) CreateRefreshToken(username, uid, role string, isActive bool) (string, *Payload, error) {
+func (m *PasetoMaker) CreateRefreshToken(username, uid, role, email string, isActive bool) (string, *Payload, error) {
 	begin := time.Now()
 	jti := uuid.New().String()
-	token, err := m.createTokenWithJTI(username, uid, role, jti, isActive, begin)
+	token, err := m.createTokenWithJTI(username, uid, role, email, jti, isActive, begin)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, &Payload{
 		JTI:       jti,
 		Username:  username,
+		Email:     email,
 		UID:       uid,
 		Role:      role,
+		IsActive:  isActive,
 		IssuedAt:  begin,
 		ExpiredAt: begin.Add(m.ttl),
 	}, nil
 }
 
-func (m *PasetoMaker) createTokenWithJTI(username, uid, role, jti string, isActive bool, startTime time.Time) (string, error) {
+func (m *PasetoMaker) createTokenWithJTI(username, uid, role, email, jti string, isActive bool, startTime time.Time) (string, error) {
 	if startTime.Equal(time.Time{}) {
 		startTime = time.Now()
 	}
@@ -66,6 +68,7 @@ func (m *PasetoMaker) createTokenWithJTI(username, uid, role, jti string, isActi
 	token.SetString("username", username)
 	token.SetString("uid", uid)
 	token.SetString("role", role)
+	token.SetString("email", email)
 	token.Set("is_active", isActive)
 
 	encrypted := token.V4Encrypt(m.key, nil)
@@ -116,9 +119,15 @@ func (m *PasetoMaker) VerifyToken(tokenStr string) (*Payload, error) {
 		return nil, ErrInvalidToken
 	}
 
+	email, err := token.GetString("email")
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
 	return &Payload{
 		JTI:       jti,
 		Username:  username,
+		Email:     email,
 		UID:       uid,
 		Role:      role,
 		IsActive:  isActive,

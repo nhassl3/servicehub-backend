@@ -17,6 +17,7 @@ type JWTMaker struct {
 type jwtClaims struct {
 	jwt.RegisteredClaims
 	Username string `json:"username"`
+	Email    string `json:"email"`
 	UID      string `json:"uid"`
 	Role     string `json:"role"`
 	IsActive bool   `json:"is_active"`
@@ -30,28 +31,30 @@ func NewJWTMaker(secret string, ttl time.Duration) (*JWTMaker, error) {
 	return &JWTMaker{secret: []byte(secret), ttl: ttl}, nil
 }
 
-func (m *JWTMaker) CreateToken(username, uid, role string, isActive bool) (string, error) {
-	return m.createToken(username, uid, role, uuid.New().String(), isActive, time.Now())
+func (m *JWTMaker) CreateToken(username, uid, role, email string, isActive bool) (string, error) {
+	return m.createToken(username, uid, role, email, uuid.New().String(), isActive, time.Now())
 }
 
-func (m *JWTMaker) CreateRefreshToken(username, uid, role string, isActive bool) (string, *Payload, error) {
+func (m *JWTMaker) CreateRefreshToken(username, uid, role, email string, isActive bool) (string, *Payload, error) {
 	begin := time.Now()
 	jti := uuid.New().String()
-	token, err := m.createToken(username, uid, role, jti, isActive, begin)
+	token, err := m.createToken(username, uid, role, email, jti, isActive, begin)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, &Payload{
 		JTI:       jti,
 		Username:  username,
+		Email:     email,
 		UID:       uid,
 		Role:      role,
+		IsActive:  isActive,
 		IssuedAt:  begin,
 		ExpiredAt: begin.Add(m.ttl),
 	}, nil
 }
 
-func (m *JWTMaker) createToken(username, uid, role, jti string, isActive bool, start time.Time) (string, error) {
+func (m *JWTMaker) createToken(username, uid, role, email, jti string, isActive bool, start time.Time) (string, error) {
 	if start.Equal(time.Time{}) {
 		start = time.Now()
 	}
@@ -63,6 +66,7 @@ func (m *JWTMaker) createToken(username, uid, role, jti string, isActive bool, s
 			ExpiresAt: jwt.NewNumericDate(start.Add(m.ttl)),
 		},
 		Username: username,
+		Email:    email,
 		UID:      uid,
 		Role:     role,
 		IsActive: isActive,
@@ -100,6 +104,7 @@ func (m *JWTMaker) VerifyToken(tokenStr string) (*Payload, error) {
 	return &Payload{
 		JTI:       claims.ID,
 		Username:  claims.Username,
+		Email:     claims.Email,
 		UID:       claims.UID,
 		Role:      claims.Role,
 		IsActive:  claims.IsActive,
