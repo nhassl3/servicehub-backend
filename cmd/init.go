@@ -30,6 +30,8 @@ func MustLoadConfig() *config.Config {
 		switch env {
 		case "prod":
 			configFile = "config/prod.yaml"
+		case "dev":
+			configFile = "config/dev.yaml"
 		default:
 			configFile = "config/local.yaml"
 		}

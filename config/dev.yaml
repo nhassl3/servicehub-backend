@@ -1,4 +1,4 @@
-environment: prod
+environment: dev
 
 server:
   grpc_port: ":50051"
@@ -39,4 +39,4 @@ minio:
   use_ssl: false
 
 log:
-  level: info
+  level: debug
