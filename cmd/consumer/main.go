@@ -39,9 +39,12 @@ func main() {
 		}
 	}
 
+	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
+	defer dlqProducer.Close()
+
 	orderConsumer := pkgkafka.NewConsumer(
 		cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, cfg.Kafka.GroupID+"-order-events", log,
-	)
+	).WithDLQ(dlqProducer)
 	txConsumer := pkgkafka.NewConsumer(
 		cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, cfg.Kafka.GroupID+"-transaction-events", log,
 	)

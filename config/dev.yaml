@@ -25,6 +25,7 @@ kafka:
     order_events: "order_events"
     transaction_events: "transaction_events"
     notifications: "notifications"
+    notifications_dlq: "notification_dlq"
   brokers:
     - "kafka:9092"
   group_id: "servicehub-backend"

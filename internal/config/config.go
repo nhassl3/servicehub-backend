@@ -82,7 +82,8 @@ type KafkaConfig struct {
 type TopicsConfig struct {
 	OrderEvents,
 	TransactionEvents,
-	Notifications string
+	Notifications,
+	NotificationsDLQ string
 }
 
 type SMTPConfig struct {
@@ -190,6 +191,7 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Kafka.Topics.OrderEvents = yv.GetString("kafka.topics.order_events")
 	cfg.Kafka.Topics.TransactionEvents = yv.GetString("kafka.topics.transaction_events")
 	cfg.Kafka.Topics.Notifications = yv.GetString("kafka.topics.notifications")
+	cfg.Kafka.Topics.NotificationsDLQ = yv.GetString("kafka.topics.notifications_dlq")
 
 	cfg.SMTP.Host = yv.GetString("smtp.host")
 	cfg.SMTP.Port = yv.GetInt("smtp.port")
