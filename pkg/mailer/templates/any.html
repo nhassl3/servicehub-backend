@@ -1,0 +1,72 @@
+{{define "content"}}
+
+<div style="
+    font-size:30px;
+    font-weight:700;
+    color:#082F49;
+    margin-bottom:20px;
+    line-height:40px;
+">
+    {{.Title}}
+</div>
+
+<div style="
+    font-size:16px;
+    line-height:30px;
+    color:#0C4A6E;
+">
+    {{.Body}}
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:44px;">
+    <tr>
+        <td>
+            <div style="
+                border-top:1px solid #BAE6FD;
+                margin-bottom:28px;
+            "></div>
+
+            <div style="
+                background:#E0F2FE;
+                border-left:5px solid #0284C7;
+                border-radius:12px;
+                padding:20px 24px;
+            ">
+                <div style="
+                    font-size:16px;
+                    font-weight:700;
+                    color:#082F49;
+                    margin-bottom:10px;
+                ">
+                    Важная информация
+                </div>
+
+                <div style="
+                    font-size:15px;
+                    line-height:28px;
+                    color:#0C4A6E;
+                ">
+                    Если вы не совершали никаких действий в <b>ServiceHub</b>,
+                    немедленно обратитесь в <b>Support Team ServiceHub</b>.
+                    <br><br>
+
+                    <b>Telegram:</b>
+                    <a href="https://t.me/servicehub_team"
+                       style="color:#0284C7;text-decoration:none;">
+                        @servicehub_team
+                    </a>
+
+                    <br>
+
+                    <b>Email:</b>
+                    <a href="mailto:servicehub-team@servicehub.com"
+                       style="color:#0284C7;text-decoration:none;">
+                        servicehub-team@servicehub.com
+                    </a>
+                </div>
+            </div>
+        </td>
+    </tr>
+</table>
+
+{{end}}
