@@ -33,7 +33,7 @@ const (
 	sendTimeout = 15 * time.Second
 
 	codeTemplateFooter     = "Если вы не запрашивали никаких кодов,\nпросто проигнорируйте это письмо."
-	happyDayTemplateFooter = "Счастливого Вам дня \U0001F604"
+	happyDayTemplateFooter = "Хорошего Вам дня \U0001F604"
 )
 
 type SMTPMailer struct {
