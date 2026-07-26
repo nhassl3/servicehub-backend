@@ -25,12 +25,11 @@ COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /go/bin/migrate ./migrate
 COPY --from=builder /app/config/prod.yaml config/prod.yaml
 COPY --from=builder /app/config/local.yaml config/local.yaml
+COPY --from=builder /app/config/dev.yaml config/dev.yaml
 COPY --from=builder /app/.env .
 COPY --from=builder /app/start.sh .
 
 RUN chmod +x /app/start.sh /app/migrate
-
-ENV ENVIRONMENT=dev
 
 EXPOSE 8082 50051
 

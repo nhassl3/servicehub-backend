@@ -20,9 +20,8 @@ WORKDIR /app
 COPY --from=builder /bin/consumer .
 COPY --from=builder /app/config/prod.yaml config/prod.yaml
 COPY --from=builder /app/config/local.yaml config/local.yaml
+COPY --from=builder /app/config/dev.yaml config/dev.yaml
 COPY --from=builder /app/.env .
-
-ENV ENVIRONMENT=dev
 
 EXPOSE 9092
 
