@@ -111,11 +111,16 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	}
 
 	// ─── Mailer (SMTP Client) ─────────────────────────────────────────────────
-	smtpClient, err := mailer.NewSMTPMailer(
-		cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
-	)
-	if err != nil {
-		return fmt.Errorf("app: create smtp client: %w", err)
+	var smtpClient mailer.Notifier
+	if cfg.Environment == "local" {
+		smtpClient = mailer.NewNoopNotifier(log)
+	} else {
+		smtpClient, err = mailer.NewSMTPMailer(
+			cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
+		)
+		if err != nil {
+			return fmt.Errorf("app: create smtp client: %w", err)
+		}
 	}
 
 	// ─── Repositories ─────────────────────────────────────────────────────────
@@ -140,7 +145,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:      service.NewProductService(productRepo, sellerRepo),
 		Cart:         service.NewCartService(cartRepo),
-		Order:        service.NewOrderService(orderRepo, eventPublisher, log),
+		Order:        service.NewOrderService(orderRepo, eventPublisher, userRedis, log),
 		Review:       service.NewReviewService(reviewRepo),
 		Wishlist:     service.NewWishlistService(wishlistRepo),
 		Seller:       service.NewSellerService(sellerRepo, minIOClient),
