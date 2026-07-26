@@ -25,8 +25,9 @@ func NewConsumer(brokers []string, topic, groupID string, log *zap.Logger) *Cons
 		Brokers:  brokers,
 		Topic:    topic,
 		GroupID:  groupID, // consumer group — офсеты хранятся в Kafka, ребалансировка партий между инстансами
-		MinBytes: 10e3,    // 10KB
-		MaxBytes: 10e6,    // 10MB
+		MinBytes: 1,       // не ждать накопления батча — топики с низким трафиком (order/tx events) должны доставляться сразу
+		MaxBytes: 10e6,    // 10MB — потолок на случай крупных сообщений
+		MaxWait:  1 * time.Second,
 	})
 
 	return &Consumer{reader: r, log: log}
@@ -41,9 +42,15 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 			if errors.Is(err, context.Canceled) {
 				return nil
 			}
-			c.log.Error("kafka: fetch message failed", zap.Error(err))
+			c.log.Error("kafka: fetch message failed", zap.String("topic", c.reader.Config().Topic), zap.Error(err))
 			continue
 		}
+
+		c.log.Debug("kafka: message fetched",
+			zap.String("topic", msg.Topic),
+			zap.Int("partition", msg.Partition),
+			zap.Int64("offset", msg.Offset),
+		)
 
 		if err := handler(ctx, msg); err != nil {
 			c.log.Error("kafka: handler failed",
@@ -58,6 +65,8 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 
 		if err := c.reader.CommitMessages(ctx, msg); err != nil {
 			c.log.Error("kafka: commit failed", zap.Error(err))
+		} else {
+			c.log.Debug("kafka: offset committed", zap.String("topic", msg.Topic), zap.Int64("offset", msg.Offset))
 		}
 	}
 }
