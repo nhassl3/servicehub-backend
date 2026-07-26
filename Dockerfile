@@ -27,6 +27,7 @@ COPY --from=builder /app/config/prod.yaml config/prod.yaml
 COPY --from=builder /app/config/local.yaml config/local.yaml
 COPY --from=builder /app/config/dev.yaml config/dev.yaml
 COPY --from=builder /app/.env .
+COPY --from=builder /app/pkg/mailer/templates/*.html pkg/mailer/templates/
 COPY --from=builder /app/start.sh .
 
 RUN chmod +x /app/start.sh /app/migrate
