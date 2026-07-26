@@ -6,20 +6,13 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
 
 	"github.com/nhassl3/servicehub-backend/cmd"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	pkgkafka "github.com/nhassl3/servicehub-backend/pkg/kafka"
 )
-
-// stdoutNotifier — временная заглушка. Замените на реальный email/push/websocket сервис.
-type stdoutNotifier struct{ log *zap.Logger }
-
-func (n *stdoutNotifier) Notify(_ context.Context, username string, title, body string) error {
-	n.log.Info("notification", zap.String("username", username), zap.String("title", title), zap.String("body", body))
-	return nil
-}
 
 func main() {
 	cfg := cmd.MustLoadConfig()
@@ -31,7 +24,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	notifier := &stdoutNotifier{log: log}
+	var (
+		smtpClient mailer.Notifier
+		err        error
+	)
+	if cfg.Environment == "local" {
+		smtpClient = mailer.NewNoopNotifier(log)
+	} else {
+		smtpClient, err = mailer.NewSMTPMailer(
+			cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
+		)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}
 
 	orderConsumer := pkgkafka.NewConsumer(
 		cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, cfg.Kafka.GroupID+"-order-events", log,
@@ -42,8 +48,8 @@ func main() {
 	defer orderConsumer.Close()
 	defer txConsumer.Close()
 
-	orderNotifConsumer := kafka.NewNotificationConsumer(orderConsumer, notifier, log)
-	txNotifConsumer := kafka.NewNotificationConsumer(txConsumer, notifier, log)
+	orderNotifConsumer := kafka.NewNotificationConsumer(orderConsumer, smtpClient, log)
+	txNotifConsumer := kafka.NewNotificationConsumer(txConsumer, smtpClient, log)
 
 	var wg sync.WaitGroup
 	wg.Add(2) // len(cfg.Kafka.Topic)
