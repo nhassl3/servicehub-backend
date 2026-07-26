@@ -10,6 +10,7 @@ import (
 const (
 	ResetPassword     = "reset_password.html"
 	EmailConfirmation = "email_confirmation.html"
+	AnyMessage        = "any.html"
 )
 
 // Render rendering new html message on email client
