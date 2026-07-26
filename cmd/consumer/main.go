@@ -33,8 +33,12 @@ func main() {
 
 	notifier := &stdoutNotifier{log: log}
 
-	orderConsumer := pkgkafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, cfg.Kafka.GroupID, log)
-	txConsumer := pkgkafka.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, cfg.Kafka.GroupID, log)
+	orderConsumer := pkgkafka.NewConsumer(
+		cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, cfg.Kafka.GroupID+"-order-events", log,
+	)
+	txConsumer := pkgkafka.NewConsumer(
+		cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, cfg.Kafka.GroupID+"-transaction-events", log,
+	)
 	defer orderConsumer.Close()
 	defer txConsumer.Close()
 
@@ -42,7 +46,7 @@ func main() {
 	txNotifConsumer := kafka.NewNotificationConsumer(txConsumer, notifier, log)
 
 	var wg sync.WaitGroup
-	wg.Add(2) // len(cfg.Kafka.
+	wg.Add(2) // len(cfg.Kafka.Topic)
 
 	go func() {
 		defer wg.Done()
