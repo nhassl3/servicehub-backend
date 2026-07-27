@@ -7,7 +7,6 @@ import (
 
 type Type int8
 
-// TODO: change type from string to bits
 const (
 	OrderCreated       Type = 1 // order.created
 	OrderStatusChanged Type = 2 // order.changed
@@ -62,7 +61,7 @@ type TransactionCreatedPayload struct {
 }
 
 type BalanceUpdatedPayload struct {
-	Email      string  `json:"email"`
-	Username   string  `json:"username"`
-	NewBalance float64 `json:"new_balance"`
+	Email    string  `json:"email"`
+	Username string  `json:"username"`
+	Amount   float64 `json:"amount"`
 }
