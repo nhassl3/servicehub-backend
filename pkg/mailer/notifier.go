@@ -21,6 +21,12 @@ type anyTemplate struct {
 	Body string
 }
 
+type balanceUpdateTemplate struct {
+	FooterMessage,
+	Username string
+	Amount float64
+}
+
 type job struct {
 	subject,
 	body,
@@ -32,8 +38,9 @@ const (
 	numWorkers  = 2
 	sendTimeout = 15 * time.Second
 
-	codeTemplateFooter     = "Если вы не запрашивали никаких кодов,\nпросто проигнорируйте это письмо."
-	happyDayTemplateFooter = "Хорошего Вам дня \U0001F604"
+	codeTemplateFooter           = "Если вы не запрашивали никаких кодов,\nпросто проигнорируйте это письмо."
+	happyDayTemplateFooter       = "Хорошего Вам дня \U0001F604"
+	balanceUpdatedTemplateFooter = "\U0001F4B0 Мы пересчитали — всё на месте. Теперь очередь за приятными тратами!"
 )
 
 type SMTPMailer struct {
@@ -173,6 +180,21 @@ func (m *SMTPMailer) NotifyAnyMessage(ctx context.Context, title, body, email st
 
 	m.enqueue(ctx, job{
 		subject: fmt.Sprintf("ServiceHub | %s", title),
+		body:    body,
+		to:      email,
+	})
+
+	return nil
+}
+
+func (m *SMTPMailer) NotifyBalanceUpdate(ctx context.Context, amount float64, username, email string) error {
+	body, err := Render(BalanceUpdate, balanceUpdateTemplate{Username: username, Amount: amount, FooterMessage: balanceUpdatedTemplateFooter})
+	if err != nil {
+		return fmt.Errorf("mailer.NotifyBalanceUpdate: failed to render balance update: %w", err)
+	}
+
+	m.enqueue(ctx, job{
+		subject: "ServiceHub | Пополнение баланса",
 		body:    body,
 		to:      email,
 	})

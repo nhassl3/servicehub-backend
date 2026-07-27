@@ -2,6 +2,7 @@ package mailer
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 )
@@ -38,6 +39,16 @@ func (n *NoopNotifier) NotifyAnyMessage(_ context.Context, title, body, email st
 	n.log.Info("NEW ANY MESSAGE",
 		zap.String("title", title),
 		zap.String("body", body),
+		zap.String("email", email),
+	)
+	return nil
+}
+
+func (n *NoopNotifier) NotifyBalanceUpdate(_ context.Context, amount float64, username, email string) error {
+	n.log.Info("NEW BALANCE UPDATE",
+		zap.String("title", "Balance updated"),
+		zap.String("amount", fmt.Sprintf("%.2f", amount)),
+		zap.String("username", username),
 		zap.String("email", email),
 	)
 	return nil
