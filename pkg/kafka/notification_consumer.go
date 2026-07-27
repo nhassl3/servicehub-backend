@@ -43,6 +43,8 @@ func (c *NotificationConsumer) handle(ctx context.Context, msg segmentio.Message
 		return c.handleOrderStatusChanged(ctx, env)
 	case domain.TransactionCreated:
 		return c.handleTransactionCreated(ctx, env)
+	case domain.BalanceUpdated:
+		return c.handlerBalanceUpdated(ctx, env)
 	default:
 		c.log.Debug("notification-consumer: skipping unknown event type", zap.Int8("type", int8(env.Type)))
 		return nil
@@ -69,6 +71,7 @@ func (c *NotificationConsumer) handleOrderStatusChanged(ctx context.Context, env
 		fmt.Sprintf("Статус заказа #%s изменился:\n%s ⟶ %s", payload.OrderUID, payload.OldStatus, payload.NewStatus), payload.Email)
 }
 
+// handleTransactionCreated TODO: not needed handler
 func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env domain.Envelope) error {
 	var payload domain.TransactionCreatedPayload
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
@@ -76,4 +79,12 @@ func (c *NotificationConsumer) handleTransactionCreated(ctx context.Context, env
 	}
 	return c.notifier.NotifyAnyMessage(ctx, "Новая транзакция",
 		fmt.Sprintf("Зафиксирована операция на сумму $ %.2f", payload.Amount), payload.Email)
+}
+
+func (c *NotificationConsumer) handlerBalanceUpdated(ctx context.Context, env domain.Envelope) error {
+	var payload domain.BalanceUpdatedPayload
+	if err := util.DecodePayload(env.Payload, &payload); err != nil {
+		return err
+	}
+	return c.notifier.NotifyBalanceUpdate(ctx, payload.Amount, payload.Username, payload.Email)
 }
