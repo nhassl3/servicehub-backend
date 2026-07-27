@@ -75,6 +75,19 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	// RedisProducts store categories and products closed on a page a few moments later
 	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
 
+	// ─── Kafka ────────────────────────────────────────────────────────────────
+
+	// Топики создаются явно ДО подписки консьюмеров — иначе при auto.create.topics.enable=true
+	// consumer group может попытаться присоединиться к топику, которого физически ещё нет
+	// (он создастся позже, лениво, при первой публикации из backend), и не восстановится сама.
+	topics := []kafka.TopicSpec{
+		{Name: cfg.Kafka.Topics.OrderEvents, NumPartitions: 3, ReplicationFactor: 1},
+		{Name: cfg.Kafka.Topics.TransactionEvents, NumPartitions: 3, ReplicationFactor: 1},
+	}
+	if err = kafka.EnsureTopics(ctx, cfg.Kafka.Brokers, topics, log); err != nil {
+		log.Fatal("kafka: failed to ensure topics exist, exiting for restart", zap.Error(err))
+	}
+
 	producers := make([]*kafka.Producer, 0, 3)
 	kafkaOrderProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, log)
 	kafkaTransactionProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, log)
