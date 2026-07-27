@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countOrdersByUsername = `-- name: CountOrdersByUsername :one
@@ -166,6 +167,58 @@ func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusPa
 		&i.TotalAmount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateOrderStatusWithOldStatus = `-- name: UpdateOrderStatusWithOldStatus :one
+WITH old_order AS (
+    SELECT oldo.id, oldo.status
+    FROM orders as oldo
+    WHERE oldo.id = $1
+),
+     updated AS (
+UPDATE orders as o
+SET status = $2,
+    updated_at = NOW()
+WHERE o.id = $1
+    RETURNING o.id, o.uid, o.username, o.status, o.total_amount, o.created_at, o.updated_at
+)
+SELECT
+    updated.id, updated.uid, updated.username, updated.status, updated.total_amount, updated.created_at, updated.updated_at,
+    old_order.status AS old_status
+FROM updated
+         JOIN old_order ON updated.id = old_order.id
+`
+
+type UpdateOrderStatusWithOldStatusParams struct {
+	ID     uuid.UUID `json:"id"`
+	Status string    `json:"status"`
+}
+
+type UpdateOrderStatusWithOldStatusRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Uid         uuid.UUID          `json:"uid"`
+	Username    string             `json:"username"`
+	Status      string             `json:"status"`
+	TotalAmount float64            `json:"total_amount"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	OldStatus   string             `json:"old_status"`
+}
+
+func (q *Queries) UpdateOrderStatusWithOldStatus(ctx context.Context, arg UpdateOrderStatusWithOldStatusParams) (UpdateOrderStatusWithOldStatusRow, error) {
+	row := q.db.QueryRow(ctx, updateOrderStatusWithOldStatus, arg.ID, arg.Status)
+	var i UpdateOrderStatusWithOldStatusRow
+	err := row.Scan(
+		&i.ID,
+		&i.Uid,
+		&i.Username,
+		&i.Status,
+		&i.TotalAmount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OldStatus,
 	)
 	return i, err
 }
