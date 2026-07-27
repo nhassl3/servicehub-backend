@@ -1,4 +1,5 @@
-.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker
+.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
+.els-docker
 
 .DEFAULT_GOAL := build
 
@@ -173,3 +174,11 @@ push:
 
 get-contracts:
 	@go get -u github.com/nhassl3/servicehub-contracts@$(VER)
+
+##  ─── Elasticsearch (FTS) ──────────────────────────────────────────────────────
+els-docker:
+	@docker run -d --name servicehub-elasticsearch-local-9.3.8 \
+	-p 9200:9200 \
+	-e "discovery.type=single-node" \
+	-e "xpack.security.enabled=false" \
+	elasticsearch:9.3.8

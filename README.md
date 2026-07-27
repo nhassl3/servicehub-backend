@@ -5,12 +5,15 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nhassl3/servicehub-backend?style=flat-square" alt="License"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/actions"><img src="https://img.shields.io/github/actions/workflow/status/nhassl3/servicehub-backend/go.yaml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/github/v/tag/nhassl3/servicehub-backend?style=flat-square&label=version" alt="Version"></a>
+  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/badge/version-v0.2.0-2C8EBB?style=flat-square" alt="Version v0.2.0"></a>
   <a href="https://grpc.io"><img src="https://img.shields.io/badge/gRPC-gateway-244c5a?style=flat-square" alt="gRPC"></a>
   <a href="https://paseto.io"><img src="https://img.shields.io/badge/auth-PASETO%20v4-2C8EBB?style=flat-square" alt="PASETO v4"></a>
   <a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/PostgreSQL-18-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 18"></a>
   <a href="https://redis.io"><img src="https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis 7"></a>
   <a href="https://min.io"><img src="https://img.shields.io/badge/MinIO-Object%20Store-72CBE8?style=flat-square&logo=minio&logoColor=white" alt="MinIO"></a>
+  <a href="https://kafka.apache.org"><img src="https://img.shields.io/badge/Kafka-latest-231F20?style=flat-square&logo=apachekafka&logoColor=white" alt="Kafka"></a>
+  <a href="https://www.elastic.co/elasticsearch"><img src="https://img.shields.io/badge/Elasticsearch-9.3.8-005571?style=flat-square&logo=elasticsearch&logoColor=white" alt="Elasticsearch 9.3.8"></a>
+  <a href="https://www.elastic.co/kibana"><img src="https://img.shields.io/badge/Kibana-9.3.8-005571?style=flat-square&logo=kibana&logoColor=white" alt="Kibana 9.3.8"></a>
   <a href="https://sqlc.dev"><img src="https://img.shields.io/badge/sqlc-generated-16253D?style=flat-square" alt="sqlc"></a>
   <a href="https://github.com/golang-migrate/migrate"><img src="https://img.shields.io/badge/migrate-golang--migrate-6479EB?style=flat-square" alt="golang-migrate"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
