@@ -1,0 +1,69 @@
+{{define "content"}}
+
+<div style="
+    font-size:30px;
+    font-weight:700;
+    color:#082F49;
+    margin-bottom:16px;
+">
+    💰 Баланс успешно пополнен
+</div>
+
+<div style="
+    font-size:16px;
+    line-height:30px;
+    color:#0C4A6E;
+">
+    Здравствуйте, <b>{{.Username}}</b>! 👋
+    <br><br>
+
+    Отличные новости — Ваш баланс в <b>ServiceHub</b> успешно пополнен.
+    Средства уже доступны, и Вы можете использовать их для оплаты услуг, записи к мастерам и других возможностей платформы.
+</div>
+
+<!-- Amount -->
+<table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center">
+
+            <div style="
+                background:#E2E8F0;
+                border-radius:18px;
+                padding:28px;
+                margin-top:40px;
+                margin-bottom:40px;
+            ">
+
+                <div style="
+                    font-size:16px;
+                    color:#0C4A6E;
+                    margin-bottom:10px;
+                ">
+                    На Ваш счет зачислено
+                </div>
+
+                <span style="
+                    font-size:42px;
+                    font-weight:800;
+                    color:#0284C7;
+                ">
+                    💳 $ {{.Amount}}
+                </span>
+
+            </div>
+
+        </td>
+    </tr>
+</table>
+
+<div style="
+    font-size:15px;
+    line-height:28px;
+    color:#0C4A6E;
+">
+    🎉 Спасибо, что выбираете <b>ServiceHub</b>!
+    <br>
+    Мы ценим Ваше доверие и постоянно работаем над тем, чтобы сделать сервис еще удобнее для Вас.
+</div>
+
+{{end}}
