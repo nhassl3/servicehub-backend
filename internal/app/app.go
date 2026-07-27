@@ -149,7 +149,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Review:       service.NewReviewService(reviewRepo),
 		Wishlist:     service.NewWishlistService(wishlistRepo),
 		Seller:       service.NewSellerService(sellerRepo, minIOClient),
-		Balance:      service.NewBalanceService(balanceRepo),
+		Balance:      service.NewBalanceService(balanceRepo, eventPublisher, userRedis, log),
 		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
 		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo),
 	}
