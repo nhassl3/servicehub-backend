@@ -44,13 +44,18 @@ type SellerTotalAmount struct {
 	TotalAmount float64
 }
 
+type UpdateOrderStatus struct {
+	Order     *Order `db:"order"`
+	OldStatus string `db:"old_status"`
+}
+
 //go:generate mockgen -source=order.go -destination=../repository/mock/order_repo_mock.go -package=mockrepo
 type OrderRepository interface {
 	Create(ctx context.Context, username string) (*Order, error)
 	GetByID(ctx context.Context, id string) (*Order, error)
 	GetByUID(ctx context.Context, uid string) (*Order, error)
 	List(ctx context.Context, params ListOrdersParams) ([]Order, int64, error)
-	UpdateStatus(ctx context.Context, id, status string) (*Order, error)
+	UpdateStatus(ctx context.Context, id, status string) (*UpdateOrderStatus, error)
 	// Checkout performs a transactional checkout: create order + items + deduct balance + increment sales
 	Checkout(ctx context.Context, username string) (*Order, error)
 }
