@@ -22,7 +22,7 @@ func NewBalanceService(
 	userRedis domain.UserRedis,
 	log *zap.Logger,
 ) *BalanceService {
-	return &BalanceService{repo: repo, eventPublisher: eventPublisher, userRedis: userRedis}
+	return &BalanceService{repo: repo, eventPublisher: eventPublisher, userRedis: userRedis, log: log}
 }
 
 func (s *BalanceService) GetBalance(ctx context.Context, username string) (*domain.Balance, error) {
