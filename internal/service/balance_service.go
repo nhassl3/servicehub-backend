@@ -38,8 +38,6 @@ func (s *BalanceService) Deposit(ctx context.Context, username string, amount fl
 		return nil, fmt.Errorf("balance_service.Deposit: failed to deposit amount on user balance: %w", err)
 	}
 
-	s.log.Info("AMOUNT COMPARE", zap.Float64("amount", amount), zap.Float64("balance", balance.Amount))
-
 	{
 		var email string
 		payload, ok := interceptors.PayloadFromContext(ctx)
