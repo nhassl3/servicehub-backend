@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
@@ -23,6 +24,14 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Если брокер не подтвердил готовность за 90с — падаем. С restart-политикой
+	// в docker-compose Docker поднимет контейнер заново; к этому моменту Kafka,
+	// скорее всего, уже полностью прошла холодную инициализацию (в частности,
+	// создание __consumer_offsets), и повторная попытка пройдёт быстро.
+	if err := pkgkafka.WaitReady(ctx, cfg.Kafka.Brokers, 90*time.Second, log); err != nil {
+		log.Fatal("kafka: broker did not become ready in time, exiting for restart", zap.Error(err))
+	}
 
 	var (
 		smtpClient mailer.Notifier
