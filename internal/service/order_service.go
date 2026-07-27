@@ -43,7 +43,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, username string) (*domai
 
 		if err = s.eventPublisher.PublishOrderCreated(ctx, domain.OrderCreatedPayload{
 			Email:    email,
-			OrderUID: order.ID,
+			OrderUID: order.UID,
 			Username: username,
 			Total:    order.TotalAmount,
 		}); err != nil {
@@ -83,9 +83,37 @@ func (s *OrderService) CancelOrder(ctx context.Context, username, id string) (*d
 	if order.Status != domain.OrderStatusPending && order.Status != domain.OrderStatusPaid {
 		return nil, domain.ErrInvalidInput
 	}
-	return s.orderRepo.UpdateStatus(ctx, id, domain.OrderStatusCancelled)
+	return s.UpdateOrderStatus(ctx, id, domain.OrderStatusCancelled)
 }
 
 func (s *OrderService) UpdateOrderStatus(ctx context.Context, id, status string) (*domain.Order, error) {
-	return s.orderRepo.UpdateStatus(ctx, id, status)
+	order, err := s.orderRepo.UpdateStatus(ctx, id, status)
+	if err != nil {
+		return nil, fmt.Errorf("order_service.UpdateOrderStatus: failed to update order: %w", err)
+	}
+
+	{
+		var email string
+		payload, ok := interceptors.PayloadFromContext(ctx)
+		if !ok {
+			user, err := s.userRedis.Profile(ctx, id)
+			if err != nil {
+				s.log.Error("order_service.UpdateOrderStatus: failed to get user from redis", zap.Error(err))
+			}
+			email = user.Email
+		} else {
+			email = payload.Email
+		}
+
+		if err = s.eventPublisher.PublishOrderStatusChanged(ctx, domain.OrderStatusChangedPayload{
+			Email:     email,
+			OrderUID:  order.Order.UID,
+			OldStatus: order.OldStatus,
+			NewStatus: status,
+		}); err != nil {
+			s.log.Error("failed to publish order.status event", zap.Error(err))
+		}
+	}
+
+	return order.Order, err
 }
