@@ -101,12 +101,12 @@ func (r *OrderRepo) List(ctx context.Context, params domain.ListOrdersParams) ([
 	return orders, total, nil
 }
 
-func (r *OrderRepo) UpdateStatus(ctx context.Context, id, status string) (*domain.Order, error) {
+func (r *OrderRepo) UpdateStatus(ctx context.Context, id, status string) (*domain.UpdateOrderStatus, error) {
 	uid, err := parseUUID(id)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
-	row, err := r.store.UpdateOrderStatus(ctx, db.UpdateOrderStatusParams{
+	row, err := r.store.UpdateOrderStatusWithOldStatus(ctx, db.UpdateOrderStatusWithOldStatusParams{
 		ID:     uid,
 		Status: status,
 	})
@@ -116,7 +116,18 @@ func (r *OrderRepo) UpdateStatus(ctx context.Context, id, status string) (*domai
 		}
 		return nil, fmt.Errorf("order_repo.UpdateStatus: %w", err)
 	}
-	return mapOrder(row), nil
+
+	domainOrder := mapOrder(db.Order{
+		ID:          row.ID,
+		Uid:         row.Uid,
+		Username:    row.Username,
+		Status:      row.Status,
+		TotalAmount: row.TotalAmount,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	})
+
+	return &domain.UpdateOrderStatus{Order: domainOrder, OldStatus: row.OldStatus}, nil
 }
 
 // Checkout performs a full transactional checkout:

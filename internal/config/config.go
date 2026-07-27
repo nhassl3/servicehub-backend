@@ -18,6 +18,7 @@ type Config struct {
 	Auth        AuthConfig
 	Log         LogConfig
 	MinIO       MinIOConfig
+	Kafka       KafkaConfig
 	SMTP        SMTPConfig
 }
 
@@ -70,6 +71,19 @@ type MinIOConfig struct {
 	SecretKey,
 	Bucket string
 	UseSSL bool
+}
+
+type KafkaConfig struct {
+	Brokers []string
+	GroupID string
+	Topics  TopicsConfig
+}
+
+type TopicsConfig struct {
+	OrderEvents,
+	TransactionEvents,
+	Notifications,
+	NotificationsDLQ string
 }
 
 type SMTPConfig struct {
@@ -171,6 +185,13 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.MinIO.SecretKey = ev.GetString("MINIO_SECRET_KEY")
 	cfg.MinIO.Bucket = yv.GetString("minio.bucket")
 	cfg.MinIO.UseSSL = yv.GetBool("minio.use_ssl")
+
+	cfg.Kafka.Brokers = yv.GetStringSlice("kafka.brokers")
+	cfg.Kafka.GroupID = yv.GetString("kafka.group_id")
+	cfg.Kafka.Topics.OrderEvents = yv.GetString("kafka.topics.order_events")
+	cfg.Kafka.Topics.TransactionEvents = yv.GetString("kafka.topics.transaction_events")
+	cfg.Kafka.Topics.Notifications = yv.GetString("kafka.topics.notifications")
+	cfg.Kafka.Topics.NotificationsDLQ = yv.GetString("kafka.topics.notifications_dlq")
 
 	cfg.SMTP.Host = yv.GetString("smtp.host")
 	cfg.SMTP.Port = yv.GetInt("smtp.port")

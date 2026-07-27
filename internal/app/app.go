@@ -16,9 +16,10 @@ import (
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/internal/service"
+	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
-	"github.com/nhassl3/servicehub-backend/pkg/logger"
+	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 	pkgRedis "github.com/nhassl3/servicehub-backend/pkg/redis"
@@ -27,16 +28,7 @@ import (
 )
 
 // Run bootstraps and starts the application.
-func Run(cfg *config.Config) error {
-	// ─── Logger ───────────────────────────────────────────────────────────────
-	log, err := logger.NewZapLogger(cfg.Log.Level)
-	if err != nil {
-		return fmt.Errorf("app: init logger: %w", err)
-	}
-	defer func(log *zap.Logger) {
-		_ = log.Sync()
-	}(log) //nolint:errcheck
-
+func Run(cfg *config.Config, log *zap.Logger) error {
 	// ─── Database ─────────────────────────────────────────────────────────────
 	ctx := context.Background()
 	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
@@ -83,6 +75,27 @@ func Run(cfg *config.Config) error {
 	// RedisProducts store categories and products closed on a page a few moments later
 	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
 
+	// ─── Kafka ────────────────────────────────────────────────────────────────
+
+	// Топики создаются явно ДО подписки консьюмеров — иначе при auto.create.topics.enable=true
+	// consumer group может попытаться присоединиться к топику, которого физически ещё нет
+	// (он создастся позже, лениво, при первой публикации из backend), и не восстановится сама.
+	topics := []kafka.TopicSpec{
+		{Name: cfg.Kafka.Topics.OrderEvents, NumPartitions: 3, ReplicationFactor: 1},
+		{Name: cfg.Kafka.Topics.TransactionEvents, NumPartitions: 3, ReplicationFactor: 1},
+	}
+	if err = kafka.EnsureTopics(ctx, cfg.Kafka.Brokers, topics, log); err != nil {
+		log.Fatal("kafka: failed to ensure topics exist, exiting for restart", zap.Error(err))
+	}
+
+	producers := make([]*kafka.Producer, 0, 3)
+	kafkaOrderProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, log)
+	kafkaTransactionProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, log)
+	kafkaNotificationsProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log)
+	producers = append(producers, kafkaOrderProducer, kafkaTransactionProducer, kafkaNotificationsProducer)
+
+	eventPublisher := serviceKafka.NewEventPublisher(kafkaOrderProducer, kafkaTransactionProducer)
+
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
 		ctx,
@@ -111,11 +124,16 @@ func Run(cfg *config.Config) error {
 	}
 
 	// ─── Mailer (SMTP Client) ─────────────────────────────────────────────────
-	smtpClient, err := mailer.NewSMTPMailer(
-		cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
-	)
-	if err != nil {
-		return fmt.Errorf("app: create smtp client: %w", err)
+	var smtpClient mailer.Notifier
+	if cfg.Environment == "local" {
+		smtpClient = mailer.NewNoopNotifier(log)
+	} else {
+		smtpClient, err = mailer.NewSMTPMailer(
+			cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.FromEmail, cfg.SMTP.Port, log,
+		)
+		if err != nil {
+			return fmt.Errorf("app: create smtp client: %w", err)
+		}
 	}
 
 	// ─── Repositories ─────────────────────────────────────────────────────────
@@ -140,11 +158,11 @@ func Run(cfg *config.Config) error {
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:      service.NewProductService(productRepo, sellerRepo),
 		Cart:         service.NewCartService(cartRepo),
-		Order:        service.NewOrderService(orderRepo),
+		Order:        service.NewOrderService(orderRepo, eventPublisher, userRedis, log),
 		Review:       service.NewReviewService(reviewRepo),
 		Wishlist:     service.NewWishlistService(wishlistRepo),
 		Seller:       service.NewSellerService(sellerRepo, minIOClient),
-		Balance:      service.NewBalanceService(balanceRepo),
+		Balance:      service.NewBalanceService(balanceRepo, eventPublisher, userRedis, log),
 		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
 		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo),
 	}
@@ -155,12 +173,14 @@ func Run(cfg *config.Config) error {
 	// ─── Start servers ────────────────────────────────────────────────────────
 	errCh := make(chan error, 2)
 
+	// gRPC server
 	go func() {
 		if err := grpcServer.Start(cfg.Server.GRPCPort); err != nil {
 			errCh <- fmt.Errorf("grpc server: %w", err)
 		}
 	}()
 
+	// gateway gRPC server (HTTP)
 	go func() {
 		if err := grpcServer.StartGateway(ctx, "localhost"+cfg.Server.GRPCPort, cfg.Server.HTTPPort); err != nil {
 			errCh <- fmt.Errorf("error http gateway: %w", err)
@@ -184,7 +204,17 @@ func Run(cfg *config.Config) error {
 		log.Info("shutting down gracefully...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*1e9)
 		defer cancel()
-		return grpcServer.Shutdown(shutdownCtx)
+
+		var kafkaProducerError error
+		for _, e := range producers {
+			kafkaProducerError = errors.Join(e.Close())
+		}
+		if kafkaProducerError != nil {
+			return kafkaProducerError
+		}
+
+		grpcServer.Shutdown(shutdownCtx)
+		return nil
 	}
 }
 

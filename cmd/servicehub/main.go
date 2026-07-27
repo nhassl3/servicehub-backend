@@ -2,38 +2,19 @@ package main
 
 import (
 	"log"
-	"os"
 
+	"github.com/nhassl3/servicehub-backend/cmd"
 	"github.com/nhassl3/servicehub-backend/internal/app"
-	"github.com/nhassl3/servicehub-backend/internal/config"
+	"go.uber.org/zap"
 )
 
 func main() {
-	// Config file: public settings (ports, DB host, log level, etc.)
-	// Controlled by CONFIG_FILE env var; defaults to environment-aware path.
-	configFile := os.Getenv("CONFIG_FILE")
-	if configFile == "" {
-		env := os.Getenv("ENVIRONMENT")
-		switch env {
-		case "prod":
-			configFile = "config/prod.yaml"
-		default:
-			configFile = "config/local.yaml"
-		}
-	}
-
-	// Env file: secrets (DB password, PASETO key, etc.)
-	envFile := os.Getenv("ENV_FILE")
-	if envFile == "" {
-		envFile = ".env"
-	}
-
-	cfg, err := config.Load(configFile, envFile)
-	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
-	}
-
-	if err := app.Run(cfg); err != nil {
-		log.Fatalf("application error: %v", err)
+	cfg := cmd.MustLoadConfig()
+	zapLogger := cmd.MustLoadLogger(cfg.Log.Level)
+	defer func(zapLogger *zap.Logger) {
+		_ = zapLogger.Sync()
+	}(zapLogger)
+	if err := app.Run(cfg, zapLogger); err != nil {
+		log.Fatalf("application error: %s", err)
 	}
 }

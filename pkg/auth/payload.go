@@ -8,6 +8,7 @@ import (
 type Payload struct {
 	JTI       string    `json:"jti"`
 	Username  string    `json:"username"`
+	Email     string    `json:"email"`
 	UID       string    `json:"uid"`
 	Role      string    `json:"role"`
 	IsActive  bool      `json:"is_active"`

@@ -2,7 +2,7 @@ environment: local
 
 server:
   grpc_port: ":50051"
-  http_port: ":8080"
+  http_port: ":8082"
 
 db:
   host: localhost
@@ -21,6 +21,16 @@ redis:
     claim: 20m
     code: 5m
     reset_password: 15m
+
+kafka:
+  topics:
+    order_events: "order_events"
+    transaction_events: "transaction_events"
+    notifications: "notifications"
+    notifications_dlq: "notification_dlq"
+  brokers:
+    - "127.0.0.1:9092"
+  group_id: "servicehub-backend"
 
 auth:
   access_token_ttl: 15m

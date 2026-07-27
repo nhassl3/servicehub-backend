@@ -1,4 +1,4 @@
-.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop
+.PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker
 
 .DEFAULT_GOAL := build
 
@@ -17,6 +17,8 @@ DB_SSL_MODE ?= disable
 BINARY_NAME=servicehub
 BUILD_DIR=./bin
 CMD_PATH=./cmd/servicehub
+CONSUMER_PATH=./cmd/consumer
+ENVIRONMENT=local
 
 # Migrations
 MIGRATE_BIN=$(shell which migrate 2>/dev/null || echo "migrate")
@@ -46,7 +48,7 @@ run:
 	go run $(CMD_PATH)/main.go
 
 runb:
-	@./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)
 
 ## ─── Test ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +150,21 @@ minio:
 minio-stop:
 	@docker stop servicehub-minio && docker rm servicehub-minio
 	@echo "MinIO stopped"
+
+##  ─── Kafka ───────────────────────────────────────────────────────────────────
+build-consumer:
+	go build -o $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH) $(CONSUMER_PATH)
+	@chmod +x $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+	@echo "Successfully built consumer"
+
+run-consumer:
+	@go run $(CONSUMER_PATH)
+
+runb-consumer:
+	@ENVIRONMENT=$(ENVIRONMENT)  ./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+
+kafka-docker:
+	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest
 
 ##  ─── GitHub ───────────────────────────────────────────────────────────────────
 push:

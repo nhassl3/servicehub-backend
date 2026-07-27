@@ -242,9 +242,9 @@ func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email str
 	var err error
 	switch entryKey {
 	case redis.VerifyEmailEnterKey:
-		err = s.smtpClient.NotifyEmailConfirmation(code, email)
+		err = s.smtpClient.NotifyEmailConfirmation(ctx, code, email)
 	case redis.ResetPasswordEnterKey:
-		err = s.smtpClient.NotifyResetPassword(code, email)
+		err = s.smtpClient.NotifyResetPassword(ctx, code, email)
 	default:
 		return "", fmt.Errorf("auth_service.requestToEntryKey unknown entry key")
 	}
@@ -330,7 +330,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		return nil, domain.ErrSessionIsBlocked
 	}
 
-	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role, payload.IsActive)
+	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role, payload.Email, payload.IsActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
@@ -359,13 +359,13 @@ func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User,
 	return user, nil
 }
 
-func (s *AuthService) createTokenPair(username, uid, role string, isActive bool) (*TokenPair, error) {
-	accessToken, err := s.tokenManager.CreateToken(username, uid, role, isActive)
+func (s *AuthService) createTokenPair(username, uid, role, email string, isActive bool) (*TokenPair, error) {
+	accessToken, err := s.tokenManager.CreateToken(username, uid, role, email, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
 
-	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role, isActive)
+	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role, email, isActive)
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create refresh token: %w", err)
 	}
@@ -418,7 +418,7 @@ func (s *AuthService) createSession(ctx context.Context, username, refreshToken 
 }
 
 func (s *AuthService) createTokensAndSession(ctx context.Context, user *domain.User, sessionUsername string) (*TokenPair, error) {
-	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role, user.IsActive)
+	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role, user.Email, user.IsActive)
 	if err != nil {
 		return nil, err
 	}

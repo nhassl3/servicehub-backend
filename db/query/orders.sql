@@ -34,6 +34,25 @@ SET status     = $2,
 WHERE id = $1
 RETURNING id, uid, username, status, total_amount, created_at, updated_at;
 
+-- name: UpdateOrderStatusWithOldStatus :one
+WITH old_order AS (
+    SELECT oldo.id, oldo.status
+    FROM orders as oldo
+    WHERE oldo.id = $1
+),
+     updated AS (
+UPDATE orders as o
+SET status = $2,
+    updated_at = NOW()
+WHERE o.id = $1
+    RETURNING o.id, o.uid, o.username, o.status, o.total_amount, o.created_at, o.updated_at
+)
+SELECT
+    updated.*,
+    old_order.status AS old_status
+FROM updated
+         JOIN old_order ON updated.id = old_order.id;
+
 -- name: UpdateOrderTotal :one
 UPDATE orders
 SET total_amount = $2,

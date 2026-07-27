@@ -14,13 +14,14 @@ func TestPasetoMaker_CreateAndVerify(t *testing.T) {
 	maker, err := auth.NewPasetoMaker(testPasetoKey, 15*time.Minute)
 	require.NoError(t, err)
 
-	token, err := maker.CreateToken("alice", "uid-123", "buyer", false)
+	token, err := maker.CreateToken("alice", "uid-123", "buyer", "alice@example.com", false)
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 
 	payload, err := maker.VerifyToken(token)
 	require.NoError(t, err)
 	require.Equal(t, "alice", payload.Username)
+	require.Equal(t, "alice@example.com", payload.Email)
 	require.Equal(t, "uid-123", payload.UID)
 	require.Equal(t, "buyer", payload.Role)
 	require.Equal(t, false, payload.IsActive)
@@ -29,7 +30,7 @@ func TestPasetoMaker_CreateAndVerify(t *testing.T) {
 
 func TestPasetoMaker_ExpiredToken(t *testing.T) {
 	maker, _ := auth.NewPasetoMaker(testPasetoKey, -1*time.Second)
-	token, _ := maker.CreateToken("alice", "uid-123", "buyer", false)
+	token, _ := maker.CreateToken("alice", "uid-123", "buyer", "alice@example.com", false)
 
 	_, err := maker.VerifyToken(token)
 	require.ErrorIs(t, err, auth.ErrInvalidToken)
@@ -50,18 +51,19 @@ func TestJWTMaker_CreateAndVerify(t *testing.T) {
 	maker, err := auth.NewJWTMaker("supersecretkeythatisatleast32chars!!", 15*time.Minute)
 	require.NoError(t, err)
 
-	token, err := maker.CreateToken("bob", "uid-456", "seller", false)
+	token, err := maker.CreateToken("bob", "uid-456", "seller", "bob@example.com", false)
 	require.NoError(t, err)
 
 	payload, err := maker.VerifyToken(token)
 	require.NoError(t, err)
 	require.Equal(t, "bob", payload.Username)
+	require.Equal(t, "bob@example.com", payload.Email)
 	require.Equal(t, "seller", payload.Role)
 }
 
 func TestJWTMaker_ExpiredToken(t *testing.T) {
 	maker, _ := auth.NewJWTMaker("supersecretkeythatisatleast32chars!!", -1*time.Second)
-	token, _ := maker.CreateToken("bob", "uid", "buyer", false)
+	token, _ := maker.CreateToken("bob", "uid", "buyer", "bob@example.com", false)
 	_, err := maker.VerifyToken(token)
 	require.ErrorIs(t, err, auth.ErrExpiredToken)
 }

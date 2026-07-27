@@ -1,0 +1,52 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/pkg/kafka"
+)
+
+// EventPublisher инкапсулирует продюсеров по топикам и даёт доменным
+// сервисам простой API для публикации событий, не завязанный на детали Kafka.
+type EventPublisher struct {
+	orderProducer       *kafka.Producer
+	transactionProducer *kafka.Producer
+}
+
+func NewEventPublisher(orderProducer, transactionProducer *kafka.Producer) *EventPublisher {
+	return &EventPublisher{
+		orderProducer:       orderProducer,
+		transactionProducer: transactionProducer,
+	}
+}
+
+func (p *EventPublisher) PublishOrderCreated(ctx context.Context, payload domain.OrderCreatedPayload) error {
+	env := domain.NewEnvelope(domain.OrderCreated, payload)
+	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
+}
+
+func (p *EventPublisher) PublishOrderStatusChanged(ctx context.Context, payload domain.OrderStatusChangedPayload) error {
+	env := domain.NewEnvelope(domain.OrderStatusChanged, payload)
+	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
+}
+
+func (p *EventPublisher) PublishTransactionCreated(ctx context.Context, payload domain.TransactionCreatedPayload) error {
+	env := domain.NewEnvelope(domain.TransactionCreated, payload)
+	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
+}
+
+func (p *EventPublisher) PublishBalanceUpdated(ctx context.Context, payload domain.BalanceUpdatedPayload) error {
+	env := domain.NewEnvelope(domain.BalanceUpdated, payload)
+	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
+}
+
+// Close закрывает оба продюсера независимо: ошибка закрытия одного
+// не должна помешать попытке закрыть второй (утечка соединения хуже, чем один лишний вызов).
+func (p *EventPublisher) Close() error {
+	orderErr := p.orderProducer.Close()
+	txErr := p.transactionProducer.Close()
+	return errors.Join(orderErr, txErr)
+}
