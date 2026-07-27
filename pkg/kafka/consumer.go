@@ -34,12 +34,6 @@ func NewConsumer(brokers []string, topic, groupID string, log *zap.Logger) *Cons
 	return &Consumer{reader: r, log: log}
 }
 
-var handlerRetry = util.RetryConfig{
-	MaxAttempts: 3,
-	BaseDelay:   200 * time.Millisecond,
-	MaxDelay:    2 * time.Second,
-}
-
 // Run блокирует выполнение и обрабатывает сообщения до отмены ctx.
 // Коммит офсета выполняется вручную после успешной обработки (at-least-once).
 func (c *Consumer) Run(ctx context.Context, handler Handler) error {
@@ -59,7 +53,11 @@ func (c *Consumer) Run(ctx context.Context, handler Handler) error {
 			zap.Int64("offset", msg.Offset),
 		)
 
-		handlerErr := util.WithRetry(ctx, handlerRetry, func() error {
+		handlerErr := util.WithRetry(ctx, util.RetryConfig{
+			MaxAttempts: 3,
+			BaseDelay:   200 * time.Millisecond,
+			MaxDelay:    2 * time.Second,
+		}, func() error {
 			return handler(ctx, msg)
 		})
 		if handlerErr != nil {
