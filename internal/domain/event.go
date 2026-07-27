@@ -61,7 +61,8 @@ type TransactionCreatedPayload struct {
 }
 
 type BalanceUpdatedPayload struct {
-	Email    string  `json:"email"`
-	Username string  `json:"username"`
-	Amount   float64 `json:"amount"`
+	Email      string  `json:"email"`
+	Username   string  `json:"username"`
+	Amount     float64 `json:"amount"`
+	NewBalance float64 `json:"new_balance"`
 }

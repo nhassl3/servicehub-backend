@@ -86,5 +86,5 @@ func (c *NotificationConsumer) handlerBalanceUpdated(ctx context.Context, env do
 	if err := util.DecodePayload(env.Payload, &payload); err != nil {
 		return err
 	}
-	return c.notifier.NotifyBalanceUpdate(ctx, payload.Amount, payload.Username, payload.Email)
+	return c.notifier.NotifyBalanceUpdate(ctx, payload.Amount, payload.NewBalance, payload.Username, payload.Email)
 }

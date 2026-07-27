@@ -53,9 +53,10 @@ func (s *BalanceService) Deposit(ctx context.Context, username string, amount fl
 			email = payload.Email
 		}
 		if err = s.eventPublisher.PublishBalanceUpdated(ctx, domain.BalanceUpdatedPayload{
-			Email:    email,
-			Username: username,
-			Amount:   balance.Amount,
+			Email:      email,
+			Username:   username,
+			Amount:     amount,
+			NewBalance: balance.Amount,
 		}); err != nil {
 			s.log.Warn("balance_service.Deposit: failed to publish balance updated event", zap.Error(err))
 		}

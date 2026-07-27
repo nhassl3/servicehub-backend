@@ -24,7 +24,8 @@ type anyTemplate struct {
 type balanceUpdateTemplate struct {
 	FooterMessage,
 	Username string
-	Amount float64
+	Amount,
+	NewBalance float64
 }
 
 type job struct {
@@ -187,8 +188,9 @@ func (m *SMTPMailer) NotifyAnyMessage(ctx context.Context, title, body, email st
 	return nil
 }
 
-func (m *SMTPMailer) NotifyBalanceUpdate(ctx context.Context, amount float64, username, email string) error {
-	body, err := Render(BalanceUpdate, balanceUpdateTemplate{Username: username, Amount: amount, FooterMessage: balanceUpdatedTemplateFooter})
+func (m *SMTPMailer) NotifyBalanceUpdate(ctx context.Context, amount, newBalance float64, username, email string) error {
+	body, err := Render(BalanceUpdate, balanceUpdateTemplate{
+		Username: username, Amount: amount, NewBalance: newBalance, FooterMessage: balanceUpdatedTemplateFooter})
 	if err != nil {
 		return fmt.Errorf("mailer.NotifyBalanceUpdate: failed to render balance update: %w", err)
 	}

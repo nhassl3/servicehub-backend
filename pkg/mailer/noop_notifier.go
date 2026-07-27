@@ -44,10 +44,11 @@ func (n *NoopNotifier) NotifyAnyMessage(_ context.Context, title, body, email st
 	return nil
 }
 
-func (n *NoopNotifier) NotifyBalanceUpdate(_ context.Context, amount float64, username, email string) error {
+func (n *NoopNotifier) NotifyBalanceUpdate(_ context.Context, amount, newBalance float64, username, email string) error {
 	n.log.Info("NEW BALANCE UPDATE",
 		zap.String("title", "Balance updated"),
 		zap.String("amount", fmt.Sprintf("%.2f", amount)),
+		zap.String("new_balance", fmt.Sprintf("%.2f", newBalance)),
 		zap.String("username", username),
 		zap.String("email", email),
 	)
