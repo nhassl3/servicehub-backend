@@ -147,7 +147,7 @@ func (r *ProductESRepo) BulkIndexProducts(ctx context.Context, products []*domai
 	return nil
 }
 
-func (r *ProductESRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+func (r *ProductESRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]*domain.Product, int64, error) {
 	body := buildSearchBody(params)
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
@@ -187,9 +187,9 @@ func (r *ProductESRepo) Search(ctx context.Context, params domain.SearchProducts
 		return nil, 0, fmt.Errorf("elasticsearch: decode response: %w", err)
 	}
 
-	products := make([]domain.Product, len(result.Hits.Hits))
+	products := make([]*domain.Product, len(result.Hits.Hits))
 	for i, h := range result.Hits.Hits {
-		products[i] = h.Source
+		products[i] = &h.Source
 	}
 
 	return products, result.Hits.Total.Value, nil

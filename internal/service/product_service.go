@@ -32,7 +32,7 @@ func NewProductService(
 	}
 }
 
-func (s *ProductService) ListProducts(ctx context.Context, params domain.ListProductsParams) ([]domain.Product, int64, error) {
+func (s *ProductService) ListProducts(ctx context.Context, params domain.ListProductsParams) ([]*domain.Product, int64, error) {
 	if params.Limit <= 0 {
 		params.Limit = 20
 	} else if params.Offset < 0 {
@@ -45,14 +45,33 @@ func (s *ProductService) GetProduct(ctx context.Context, id string) (*domain.Pro
 	return s.productRepo.GetByID(ctx, id)
 }
 
-func (s *ProductService) SearchProducts(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+func (s *ProductService) SearchProducts(ctx context.Context, params domain.SearchProductsParams) ([]*domain.Product, int64, error) {
 	if params.Limit <= 0 {
 		params.Limit = 20
 	}
 	if params.SortBy == "" {
 		params.SortBy = "relevance"
 	}
-	return s.searchRepo.Search(ctx, params)
+
+	products, total, err := s.searchRepo.Search(ctx, params)
+	if err != nil {
+		return nil, 0, fmt.Errorf("product_service.SearchProducts: failed to load products from Elasticsearch: %w", err)
+	}
+	if total != 0 {
+		s.log.Info("[SERVICE] LOAD PRODUCT DATA BY ELS FTS")
+		return products, total, nil
+	}
+
+	products, total, err = s.productRepo.Search(ctx, params)
+	if err != nil {
+		s.log.Info("[SERVICE] LOAD PRODUCT DATA BY PG FTS")
+		return nil, 0, fmt.Errorf("product_service.SearchProducts: failed to load products from PG: %w", err)
+	}
+	if total == 0 {
+		return []*domain.Product{}, 0, nil
+	}
+
+	return products, total, nil
 }
 
 func (s *ProductService) CreateProduct(ctx context.Context, username string, params domain.CreateProductParams) (*domain.Product, error) {
@@ -147,12 +166,7 @@ func (s *ProductService) ReindexAllProducts(ctx context.Context) error {
 			break
 		}
 
-		ptrs := make([]*domain.Product, len(products))
-		for i := range products {
-			ptrs[i] = &products[i]
-		}
-
-		if err := s.searchRepo.BulkIndexProducts(ctx, ptrs); err != nil {
+		if err := s.searchRepo.BulkIndexProducts(ctx, products); err != nil {
 			return fmt.Errorf("product_service.ReindexAll: bulk index: %w", err)
 		}
 
