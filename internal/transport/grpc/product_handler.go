@@ -54,7 +54,7 @@ func (h *ProductHandler) ListProducts(ctx context.Context, req *productv1.ListPr
 	}
 	proto := make([]*productv1.Product, len(products))
 	for i, p := range products {
-		proto[i] = ProtoProduct(&p)
+		proto[i] = ProtoProduct(p)
 	}
 	return &productv1.ListProductsResponse{Products: proto, Total: total}, nil
 }
@@ -78,7 +78,7 @@ func (h *ProductHandler) SearchProducts(ctx context.Context, req *productv1.Sear
 	}
 	proto := make([]*productv1.Product, len(products))
 	for i, p := range products {
-		proto[i] = ProtoProduct(&p)
+		proto[i] = ProtoProduct(p)
 	}
 	return &productv1.SearchProductsResponse{Products: proto, Total: total}, nil
 }
