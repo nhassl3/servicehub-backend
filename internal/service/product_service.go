@@ -64,12 +64,13 @@ func (s *ProductService) SearchProducts(ctx context.Context, params domain.Searc
 
 	products, total, err = s.productRepo.Search(ctx, params)
 	if err != nil {
-		s.log.Info("[SERVICE] LOAD PRODUCT DATA BY PG FTS")
 		return nil, 0, fmt.Errorf("product_service.SearchProducts: failed to load products from PG: %w", err)
 	}
 	if total == 0 {
 		return []*domain.Product{}, 0, nil
 	}
+
+	s.log.Info("[SERVICE] LOAD PRODUCT DATA BY PG FTS")
 
 	return products, total, nil
 }
