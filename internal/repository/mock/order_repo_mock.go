@@ -112,10 +112,10 @@ func (mr *MockOrderRepositoryMockRecorder) List(ctx, params interface{}) *gomock
 }
 
 // UpdateStatus mocks base method.
-func (m *MockOrderRepository) UpdateStatus(ctx context.Context, id, status string) (*domain.Order, error) {
+func (m *MockOrderRepository) UpdateStatus(ctx context.Context, id, status string) (*domain.UpdateOrderStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateStatus", ctx, id, status)
-	ret0, _ := ret[0].(*domain.Order)
+	ret0, _ := ret[0].(*domain.UpdateOrderStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
