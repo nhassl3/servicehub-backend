@@ -57,12 +57,7 @@ func main() {
 			break
 		}
 
-		ptrs := make([]*domain.Product, len(products))
-		for i := range products {
-			ptrs[i] = &products[i]
-		}
-
-		if err := esProductRepo.BulkIndexProducts(ctx, ptrs); err != nil {
+		if err := esProductRepo.BulkIndexProducts(ctx, products); err != nil {
 			log.Fatalf("bulk index: %s", err)
 		}
 
