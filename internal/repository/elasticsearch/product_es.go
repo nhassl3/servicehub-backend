@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
@@ -121,7 +123,7 @@ func (r *ProductESRepo) BulkIndexProducts(ctx context.Context, products []*domai
 		buf.Write(metaBytes)
 		buf.WriteByte('\n')
 
-		docBytes, err := json.Marshal(p)
+		docBytes, err := json.Marshal(*p)
 		if err != nil {
 			return fmt.Errorf("elasticsearch: bulk marshal doc: %w", err)
 		}
@@ -131,7 +133,10 @@ func (r *ProductESRepo) BulkIndexProducts(ctx context.Context, products []*domai
 
 	resp, err := r.es.Bulk(
 		&buf,
+		r.es.Bulk.WithErrorTrace(),
 		r.es.Bulk.WithContext(ctx),
+		r.es.Bulk.WithHuman(),
+		r.es.Bulk.WithPretty(),
 		r.es.Bulk.WithIndex(elsIndex),
 	)
 	if err != nil {
@@ -139,9 +144,18 @@ func (r *ProductESRepo) BulkIndexProducts(ctx context.Context, products []*domai
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("elasticsearch: bulk index: status %d: %s", resp.StatusCode, string(b))
+	var br BulkResponse
+	if err := json.NewDecoder(resp.Body).Decode(&br); err != nil {
+		return err
+	}
+
+	if br.Errors {
+		for _, item := range br.Items {
+			if item.Index.Status >= 300 {
+				log.Printf("bulk error: %+v", item.Index.Error)
+			}
+		}
+		return errors.New("bulk indexing failed")
 	}
 
 	return nil
@@ -222,8 +236,8 @@ func buildIndexMapping() map[string]interface{} {
 				"sales_count":   map[string]string{"type": "integer"},
 				"rating":        map[string]string{"type": "float"},
 				"reviews_count": map[string]string{"type": "integer"},
-				"created_at":    map[string]string{"type": "date", "format": "yyyy-MM-dd'T'HH:mm:ss'Z'"},
-				"updated_at":    map[string]string{"type": "date", "format": "yyyy-MM-dd'T'HH:mm:ss'Z'"},
+				"created_at":    map[string]string{"type": "date"},
+				"updated_at":    map[string]string{"type": "date"},
 				"title": map[string]interface{}{
 					"type":     "text",
 					"analyzer": "standard",
@@ -247,6 +261,18 @@ func buildIndexMapping() map[string]interface{} {
 			},
 		},
 	}
+}
+
+// ── Bulk response with error ─────────────────────────────────────────────────
+
+type BulkResponse struct {
+	Errors bool `json:"errors"`
+	Items  []struct {
+		Index struct {
+			Status int                    `json:"status"`
+			Error  map[string]interface{} `json:"error"`
+		} `json:"index"`
+	} `json:"items"`
 }
 
 // ── Search body builder ─────────────────────────────────────────────────
