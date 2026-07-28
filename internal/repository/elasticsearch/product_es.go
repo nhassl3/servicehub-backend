@@ -236,8 +236,8 @@ func buildIndexMapping() map[string]interface{} {
 				"sales_count":   map[string]string{"type": "integer"},
 				"rating":        map[string]string{"type": "float"},
 				"reviews_count": map[string]string{"type": "integer"},
-				"created_at":    map[string]string{"type": "date"},
-				"updated_at":    map[string]string{"type": "date"},
+				"created_at":    map[string]string{"type": "date", "format": "strict_date_optional_time||epoch_millis"},
+				"updated_at":    map[string]string{"type": "date", "format": "strict_date_optional_time||epoch_millis"},
 				"title": map[string]interface{}{
 					"type":     "text",
 					"analyzer": "standard",
