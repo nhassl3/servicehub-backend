@@ -24,13 +24,19 @@ redis:
 
 kafka:
   topics:
-    order_events: "order_events"
-    transaction_events: "transaction_events"
+    events:
+      - "order_events"
+      - "transaction_events"
+      - "product_events"
     notifications: "notifications"
     notifications_dlq: "notification_dlq"
   brokers:
     - "127.0.0.1:9092"
   group_id: "servicehub-backend"
+
+els:
+  hosts:
+    - "http://localhost:9200"
 
 auth:
   access_token_ttl: 15m

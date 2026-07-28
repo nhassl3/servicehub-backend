@@ -20,6 +20,7 @@ type Config struct {
 	MinIO       MinIOConfig
 	Kafka       KafkaConfig
 	SMTP        SMTPConfig
+	ELS         ElasticSearchConfig
 }
 
 type ServerConfig struct {
@@ -80,8 +81,7 @@ type KafkaConfig struct {
 }
 
 type TopicsConfig struct {
-	OrderEvents,
-	TransactionEvents,
+	Events []string
 	Notifications,
 	NotificationsDLQ string
 }
@@ -92,6 +92,12 @@ type SMTPConfig struct {
 	FromEmail string
 	Username  string
 	Password  string
+}
+
+type ElasticSearchConfig struct {
+	Hosts []string
+	Username,
+	Password string
 }
 
 // Load reads public configuration from a YAML file and secrets from an env file.
@@ -188,8 +194,7 @@ func Load(configFile, envFile string) (*Config, error) {
 
 	cfg.Kafka.Brokers = yv.GetStringSlice("kafka.brokers")
 	cfg.Kafka.GroupID = yv.GetString("kafka.group_id")
-	cfg.Kafka.Topics.OrderEvents = yv.GetString("kafka.topics.order_events")
-	cfg.Kafka.Topics.TransactionEvents = yv.GetString("kafka.topics.transaction_events")
+	cfg.Kafka.Topics.Events = yv.GetStringSlice("kafka.topics.events")
 	cfg.Kafka.Topics.Notifications = yv.GetString("kafka.topics.notifications")
 	cfg.Kafka.Topics.NotificationsDLQ = yv.GetString("kafka.topics.notifications_dlq")
 
@@ -198,6 +203,10 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.SMTP.FromEmail = ev.GetString("SMTP_FROM")
 	cfg.SMTP.Username = ev.GetString("SMTP_USERNAME")
 	cfg.SMTP.Password = ev.GetString("SMTP_Password")
+
+	cfg.ELS.Hosts = yv.GetStringSlice("els.hosts")
+	cfg.ELS.Username = ev.GetString("ELS_USERNAME")
+	cfg.ELS.Password = ev.GetString("ELS_PASSWORD")
 
 	cfg.Log.Level = yv.GetString("log.level")
 
