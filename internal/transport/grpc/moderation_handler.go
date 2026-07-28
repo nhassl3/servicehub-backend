@@ -164,7 +164,7 @@ func protoQueueProducts(rows []*domain.QueueRow) []*moderationv1.QueueProduct {
 			moderation = protoModeration(e.Moderation, e.AdminUsername)
 		}
 		res = append(res, &moderationv1.QueueProduct{
-			Product:    ProtoProduct(&e.Product),
+			Product:    ProtoProduct(e.Product),
 			Moderation: moderation,
 		})
 	}
