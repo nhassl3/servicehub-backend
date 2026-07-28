@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"time"
+
+	"github.com/nhassl3/servicehub-backend/internal/db"
 )
 
 type Product struct {
@@ -65,8 +67,8 @@ type UpdateProductParams struct {
 type ProductRepository interface {
 	Create(ctx context.Context, params CreateProductParams) (*Product, error)
 	GetByID(ctx context.Context, id string) (*Product, error)
-	List(ctx context.Context, params ListProductsParams) ([]Product, int64, error)
-	Search(ctx context.Context, params SearchProductsParams) ([]Product, int64, error)
+	List(ctx context.Context, params ListProductsParams) ([]*Product, int64, error)
+	Search(ctx context.Context, params SearchProductsParams) ([]*Product, int64, error)
 	Update(ctx context.Context, params UpdateProductParams) (*Product, error)
 	Delete(ctx context.Context, id string) error
 	IncrementSalesCount(ctx context.Context, id string, qty int) error
@@ -77,5 +79,46 @@ type ProductSearchRepository interface {
 	IndexProduct(ctx context.Context, product *Product) error
 	DeleteProductIndex(ctx context.Context, id string) error
 	BulkIndexProducts(ctx context.Context, products []*Product) error
-	Search(ctx context.Context, params SearchProductsParams) ([]Product, int64, error)
+	Search(ctx context.Context, params SearchProductsParams) ([]*Product, int64, error)
+}
+
+// ── Mapping ──────────────────────────────────────────────────────────────────
+
+// MapProduct maps raw product fields (common across all SQLC product row types)
+// to a domain.Product value.
+func MapProduct(row *db.Product) *Product {
+	if row == nil {
+		return nil
+	}
+	return &Product{
+		ID:           row.ID.String(),
+		SellerID:     row.SellerID.String(),
+		CategoryID:   int(row.CategoryID),
+		Title:        row.Title,
+		Description:  row.Description,
+		Price:        row.Price,
+		Tags:         row.Tags,
+		Status:       row.Status,
+		SalesCount:   int(row.SalesCount),
+		Rating:       row.Rating,
+		ReviewsCount: int(row.ReviewsCount),
+		CreatedAt:    row.CreatedAt.Time, // UTC
+		UpdatedAt:    row.UpdatedAt.Time, // UTC
+	}
+}
+
+// MapProducts converts db.Product to domain.Product struct use MapProduct for mapping product db struct
+func MapProducts(rows []db.Product) []*Product {
+	if rows == nil || len(rows) == 0 {
+		return nil
+	}
+	products := make([]*Product, 0, len(rows))
+	for _, row := range rows {
+		domainProduct := MapProduct(&row)
+		if domainProduct == nil {
+			continue
+		}
+		products = append(products, domainProduct)
+	}
+	return products
 }

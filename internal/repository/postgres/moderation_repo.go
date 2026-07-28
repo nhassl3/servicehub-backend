@@ -227,7 +227,7 @@ func mapQueueRows(rows []db.ListModerationItemsRow) []*domain.QueueRow {
 			moderation = mapModeration(&e.Moderation)
 		}
 		res = append(res, &domain.QueueRow{
-			Product:       mapProduct(&e.Product),
+			Product:       domain.MapProduct(&e.Product),
 			Moderation:    moderation,
 			AdminUsername: e.AdminUsername.String,
 		})
