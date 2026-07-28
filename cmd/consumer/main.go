@@ -2,15 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os/signal"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/nhassl3/servicehub-backend/internal/domain"
+	elsRepo "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
+	elsPkg "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
 
 	"github.com/nhassl3/servicehub-backend/cmd"
+	transportKafka "github.com/nhassl3/servicehub-backend/internal/transport/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	pkgkafka "github.com/nhassl3/servicehub-backend/pkg/kafka"
 )
@@ -36,14 +44,15 @@ func main() {
 	// Топики создаются явно ДО подписки консьюмеров — иначе при auto.create.topics.enable=true
 	// consumer group может попытаться присоединиться к топику, которого физически ещё нет
 	// (он создастся позже, лениво, при первой публикации из backend), и не восстановится сама.
-	topics := []pkgkafka.TopicSpec{
-		{Name: cfg.Kafka.Topics.OrderEvents, NumPartitions: 3, ReplicationFactor: 1},
-		{Name: cfg.Kafka.Topics.TransactionEvents, NumPartitions: 3, ReplicationFactor: 1},
+	topics := make([]kafka.TopicSpec, 0, len(cfg.Kafka.Topics.Events))
+	for _, e := range cfg.Kafka.Topics.Events {
+		topics = append(topics, kafka.TopicSpec{Name: e, NumPartitions: 3, ReplicationFactor: 1})
 	}
-	if err := pkgkafka.EnsureTopics(ctx, cfg.Kafka.Brokers, topics, log); err != nil {
+	if err := kafka.EnsureTopics(ctx, cfg.Kafka.Brokers, topics, log); err != nil {
 		log.Fatal("kafka: failed to ensure topics exist, exiting for restart", zap.Error(err))
 	}
 
+	// SMTP connect
 	var (
 		smtpClient mailer.Notifier
 		err        error
@@ -59,39 +68,65 @@ func main() {
 		}
 	}
 
+	// Elasticsearch connect
+	elsClient, err := elsPkg.New(ctx, cfg.ELS.Hosts, cfg.ELS.Username, cfg.ELS.Password)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer func(elsClient *elasticsearch.Client) {
+		_ = elsClient.Close(ctx)
+	}(elsClient)
+
+	elsRepository := elsRepo.NewProductESRepo(elsClient, log)
+
 	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
 	defer dlqProducer.Close()
 
-	orderConsumer := pkgkafka.NewConsumer(
-		cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, cfg.Kafka.GroupID+"-order-events", log,
-	).WithDLQ(dlqProducer)
-	txConsumer := pkgkafka.NewConsumer(
-		cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, cfg.Kafka.GroupID+"-transaction-events", log,
-	)
-	defer orderConsumer.Close()
-	defer txConsumer.Close()
+	consumers := make(map[domain.Topic]*pkgkafka.Consumer, len(cfg.Kafka.Topics.Events))
+	for _, c := range cfg.Kafka.Topics.Events {
+		var consumer *pkgkafka.Consumer
+		if slices.Contains(domain.DLQTopics, domain.Topic(c)) {
+			consumer = pkgkafka.NewConsumer(
+				cfg.Kafka.Brokers, c, fmt.Sprintf("%s-%s", cfg.Kafka.GroupID, c), log,
+			).WithDLQ(dlqProducer)
+		} else {
+			consumer = pkgkafka.NewConsumer(
+				cfg.Kafka.Brokers, c, fmt.Sprintf("%s-%s", cfg.Kafka.GroupID, c), log,
+			)
+		}
+		consumers[domain.Topic(c)] = consumer
+	}
 
-	orderNotifConsumer := kafka.NewNotificationConsumer(orderConsumer, smtpClient, log)
-	txNotifConsumer := kafka.NewNotificationConsumer(txConsumer, smtpClient, log)
+	handlers := make([]transportKafka.ConsumerHandler, 0, len(consumers))
+	for t, consumer := range consumers {
+		switch t {
+		case domain.TopicOrderEvent, domain.TopicTransactionEvent:
+			handlers = append(handlers, transportKafka.NewNotificationConsumer(consumer, smtpClient, log))
+		case domain.TopicProductEvent:
+			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
+		}
+	}
 
 	var wg sync.WaitGroup
-	wg.Add(2) // len(cfg.Kafka.Topic)
+	wg.Add(len(handlers))
 
-	go func() {
-		defer wg.Done()
-		if err := orderNotifConsumer.Run(ctx); err != nil {
-			log.Error("order notification consumer stopped", zap.Error(err))
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		if err := txNotifConsumer.Run(ctx); err != nil {
-			log.Error("transaction notification consumer stopped", zap.Error(err))
-		}
-	}()
+	for _, h := range handlers {
+		go func() {
+			defer wg.Done()
+			if err = h.Run(ctx); err != nil {
+				log.Error("kafka: consumer stopped", zap.Error(err))
+			}
+		}()
+	}
 
 	log.Info("kafka consumer service started", zap.String("env", cfg.Environment), zap.String("Mode", cfg.Log.Level))
 	wg.Wait()
+	var consumerErrors error
+	for _, consumer := range consumers {
+		consumerErrors = errors.Join(consumer.Close())
+	}
+	if consumerErrors != nil {
+		log.Fatal(consumerErrors.Error())
+	}
 	log.Info("kafka consumer service stopped gracefully")
 }

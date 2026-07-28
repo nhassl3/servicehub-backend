@@ -12,41 +12,56 @@ import (
 // EventPublisher инкапсулирует продюсеров по топикам и даёт доменным
 // сервисам простой API для публикации событий, не завязанный на детали Kafka.
 type EventPublisher struct {
-	orderProducer       *kafka.Producer
-	transactionProducer *kafka.Producer
+	eventKafkaProducers map[string]*kafka.Producer
 }
 
-func NewEventPublisher(orderProducer, transactionProducer *kafka.Producer) *EventPublisher {
+func NewEventPublisher(eventKafkaProducers map[string]*kafka.Producer) *EventPublisher {
 	return &EventPublisher{
-		orderProducer:       orderProducer,
-		transactionProducer: transactionProducer,
+		eventKafkaProducers: eventKafkaProducers,
 	}
 }
 
 func (p *EventPublisher) PublishOrderCreated(ctx context.Context, payload domain.OrderCreatedPayload) error {
 	env := domain.NewEnvelope(domain.OrderCreated, payload)
-	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
+	return p.publish(ctx, domain.TopicOrderEvent, fmt.Sprintf("order-%s", payload.OrderUID), env)
 }
 
 func (p *EventPublisher) PublishOrderStatusChanged(ctx context.Context, payload domain.OrderStatusChangedPayload) error {
 	env := domain.NewEnvelope(domain.OrderStatusChanged, payload)
-	return p.orderProducer.Publish(ctx, fmt.Sprintf("order-%s", payload.OrderUID), env)
+	return p.publish(ctx, domain.TopicOrderEvent, fmt.Sprintf("order-%s", payload.OrderUID), env)
 }
 
 func (p *EventPublisher) PublishTransactionCreated(ctx context.Context, payload domain.TransactionCreatedPayload) error {
 	env := domain.NewEnvelope(domain.TransactionCreated, payload)
-	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
+	return p.publish(ctx, domain.TopicTransactionEvent, fmt.Sprintf("user-%s", payload.Username), env)
 }
 
 func (p *EventPublisher) PublishBalanceUpdated(ctx context.Context, payload domain.BalanceUpdatedPayload) error {
 	env := domain.NewEnvelope(domain.BalanceUpdated, payload)
-	return p.transactionProducer.Publish(ctx, fmt.Sprintf("user-%s", payload.Username), env)
+	return p.publish(ctx, domain.TopicTransactionEvent, fmt.Sprintf("user-%s", payload.Username), env)
+}
+
+func (p *EventPublisher) PublishIndexedProduct(ctx context.Context, product *domain.Product) error {
+	env := domain.NewEnvelope(domain.IndexedProduct, product)
+	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("indexed-product-%s", product.ID), env)
+}
+
+func (p *EventPublisher) PublishDeletedProduct(ctx context.Context, id string) error {
+	env := domain.NewEnvelope(domain.DeletedProduct, id)
+	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("deleted-product-%s", id), env)
+}
+
+// publish public event in producer
+func (p *EventPublisher) publish(ctx context.Context, topic domain.Topic, key string, event interface{}) error {
+	return p.eventKafkaProducers[string(topic)].Publish(ctx, key, event)
 }
 
 // Close закрывает оба продюсера независимо: ошибка закрытия одного
 // не должна помешать попытке закрыть второй (утечка соединения хуже, чем один лишний вызов).
 func (p *EventPublisher) Close() error {
-	orderErr := p.orderProducer.Close()
-	txErr := p.transactionProducer.Close()
-	return errors.Join(orderErr, txErr)
+	var producerErrors error
+	for _, producer := range p.eventKafkaProducers {
+		producerErrors = errors.Join(producer.Close())
+	}
+	return producerErrors
 }

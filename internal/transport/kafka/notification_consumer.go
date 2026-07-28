@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	segmentio "github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
@@ -16,12 +17,12 @@ import (
 // NotificationConsumer подписывается на доменные события и превращает
 // их в уведомления пользователю (email/push/websocket — реализация подставляется через notifier).
 type NotificationConsumer struct {
-	consumer *Consumer
+	consumer *kafka.Consumer
 	notifier mailer.Notifier
 	log      *zap.Logger
 }
 
-func NewNotificationConsumer(consumer *Consumer, notifier mailer.Notifier, log *zap.Logger) *NotificationConsumer {
+func NewNotificationConsumer(consumer *kafka.Consumer, notifier mailer.Notifier, log *zap.Logger) *NotificationConsumer {
 	return &NotificationConsumer{consumer: consumer, notifier: notifier, log: log}
 }
 
