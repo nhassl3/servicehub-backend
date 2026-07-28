@@ -74,28 +74,12 @@ func (q *Queries) GetModeration(ctx context.Context, id uuid.UUID) (Moderation, 
 
 const listModerationItems = `-- name: ListModerationItems :many
 SELECT
-    p.id as product_id,
-    p.seller_id,
-    p.category_id,
-    p.title,
-    p.description,
-    p.price,
-    p.tags,
-    p.status,
-    p.sales_count,
-    p.rating,
-    p.reviews_count,
-    p.created_at as product_created_at,
-    p.updated_at as product_updated_at,
-    m.id as moderation_id,
-    m.admin_id as moderation_admin_id,
-    a.username as admin_username,
-    m.active as moderation_active,
-    m.created_at as moderation_created_at,
-    m.updated_at as moderation_updated_at
+    p.id, p.seller_id, p.category_id, p.title, p.description, p.price, p.tags, p.status, p.sales_count, p.rating, p.reviews_count, p.fts, p.created_at, p.updated_at,
+    a.username AS admin_username,
+    m.id, m.admin_id, m.product_id, m.active, m.created_at, m.updated_at, m.reason, m.status
 FROM products p
          LEFT JOIN moderation m ON p.id = m.product_id
-         LEFT JOIN admins   a ON a.id = m.admin_id
+         LEFT JOIN admins a ON a.id = m.admin_id
 WHERE
     ($1::uuid IS NULL AND p.status = 'draft')
    OR
@@ -111,25 +95,9 @@ type ListModerationItemsParams struct {
 }
 
 type ListModerationItemsRow struct {
-	ProductID           uuid.UUID          `json:"product_id"`
-	SellerID            uuid.UUID          `json:"seller_id"`
-	CategoryID          int32              `json:"category_id"`
-	Title               string             `json:"title"`
-	Description         string             `json:"description"`
-	Price               float64            `json:"price"`
-	Tags                []string           `json:"tags"`
-	Status              string             `json:"status"`
-	SalesCount          int32              `json:"sales_count"`
-	Rating              float64            `json:"rating"`
-	ReviewsCount        int32              `json:"reviews_count"`
-	ProductCreatedAt    pgtype.Timestamptz `json:"product_created_at"`
-	ProductUpdatedAt    pgtype.Timestamptz `json:"product_updated_at"`
-	ModerationID        pgtype.UUID        `json:"moderation_id"`
-	ModerationAdminID   pgtype.UUID        `json:"moderation_admin_id"`
-	AdminUsername       pgtype.Text        `json:"admin_username"`
-	ModerationActive    pgtype.Bool        `json:"moderation_active"`
-	ModerationCreatedAt pgtype.Timestamptz `json:"moderation_created_at"`
-	ModerationUpdatedAt pgtype.Timestamptz `json:"moderation_updated_at"`
+	Product       Product     `json:"product"`
+	AdminUsername pgtype.Text `json:"admin_username"`
+	Moderation    Moderation  `json:"moderation"`
 }
 
 func (q *Queries) ListModerationItems(ctx context.Context, arg ListModerationItemsParams) ([]ListModerationItemsRow, error) {
@@ -142,25 +110,29 @@ func (q *Queries) ListModerationItems(ctx context.Context, arg ListModerationIte
 	for rows.Next() {
 		var i ListModerationItemsRow
 		if err := rows.Scan(
-			&i.ProductID,
-			&i.SellerID,
-			&i.CategoryID,
-			&i.Title,
-			&i.Description,
-			&i.Price,
-			&i.Tags,
-			&i.Status,
-			&i.SalesCount,
-			&i.Rating,
-			&i.ReviewsCount,
-			&i.ProductCreatedAt,
-			&i.ProductUpdatedAt,
-			&i.ModerationID,
-			&i.ModerationAdminID,
+			&i.Product.ID,
+			&i.Product.SellerID,
+			&i.Product.CategoryID,
+			&i.Product.Title,
+			&i.Product.Description,
+			&i.Product.Price,
+			&i.Product.Tags,
+			&i.Product.Status,
+			&i.Product.SalesCount,
+			&i.Product.Rating,
+			&i.Product.ReviewsCount,
+			&i.Product.Fts,
+			&i.Product.CreatedAt,
+			&i.Product.UpdatedAt,
 			&i.AdminUsername,
-			&i.ModerationActive,
-			&i.ModerationCreatedAt,
-			&i.ModerationUpdatedAt,
+			&i.Moderation.ID,
+			&i.Moderation.AdminID,
+			&i.Moderation.ProductID,
+			&i.Moderation.Active,
+			&i.Moderation.CreatedAt,
+			&i.Moderation.UpdatedAt,
+			&i.Moderation.Reason,
+			&i.Moderation.Status,
 		); err != nil {
 			return nil, err
 		}

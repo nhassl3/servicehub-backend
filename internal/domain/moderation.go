@@ -21,7 +21,7 @@ type Moderation struct {
 // Moderation is nil when the product is in the queue but no admin has
 // claimed it yet (left join produced NULLs on the m.* columns).
 type QueueRow struct {
-	Product       Product
+	Product       *Product
 	Moderation    *Moderation
 	AdminUsername string
 }
