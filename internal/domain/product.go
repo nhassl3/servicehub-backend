@@ -6,19 +6,19 @@ import (
 )
 
 type Product struct {
-	ID           string    `db:"id"`
-	SellerID     string    `db:"seller_id"`
-	CategoryID   int       `db:"category_id"`
-	Title        string    `db:"title"`
-	Description  string    `db:"description"`
-	Price        float64   `db:"price"`
-	Tags         []string  `db:"tags"`
-	Status       string    `db:"status"`
-	SalesCount   int       `db:"sales_count"`
-	Rating       float64   `db:"rating"`
-	ReviewsCount int       `db:"reviews_count"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	ID           string    `json:"id"`
+	SellerID     string    `json:"seller_id"`
+	CategoryID   int       `json:"category_id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	Price        float64   `json:"price"`
+	Tags         []string  `json:"tags"`
+	Status       string    `json:"status"`
+	SalesCount   int       `json:"sales_count"`
+	Rating       float64   `json:"rating"`
+	ReviewsCount int       `json:"reviews_count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type ListProductsParams struct {
@@ -33,9 +33,14 @@ type ListProductsParams struct {
 }
 
 type SearchProductsParams struct {
-	Query  string
-	Limit  int32
-	Offset int32
+	Query      string
+	CategoryID *int
+	MinPrice   *float64
+	MaxPrice   *float64
+	Tags       []string
+	SortBy     string // relevance | "price_asc" | "price_desc" | "rating" | "date" | "sales"
+	Limit      int32
+	Offset     int32
 }
 
 type CreateProductParams struct {
@@ -66,4 +71,11 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id string) error
 	IncrementSalesCount(ctx context.Context, id string, qty int) error
 	UpdateRating(ctx context.Context, id string, newRating float64) error
+}
+
+type ProductSearchRepository interface {
+	IndexProduct(ctx context.Context, product *Product) error
+	DeleteProductIndex(ctx context.Context, id string) error
+	BulkIndexProducts(ctx context.Context, products []*Product) error
+	Search(ctx context.Context, params SearchProductsParams) ([]Product, int64, error)
 }
