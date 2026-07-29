@@ -5,19 +5,21 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nhassl3/servicehub-backend?style=flat-square" alt="License"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/actions"><img src="https://img.shields.io/github/actions/workflow/status/nhassl3/servicehub-backend/go.yaml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/badge/version-v0.2.0-2C8EBB?style=flat-square" alt="Version v0.2.0"></a>
+  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/badge/version-v0.3.0-2C8EBB?style=flat-square" alt="Version v0.3.0"></a>
   <a href="https://grpc.io"><img src="https://img.shields.io/badge/gRPC-gateway-244c5a?style=flat-square" alt="gRPC"></a>
   <a href="https://paseto.io"><img src="https://img.shields.io/badge/auth-PASETO%20v4-2C8EBB?style=flat-square" alt="PASETO v4"></a>
   <a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/PostgreSQL-18-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 18"></a>
   <a href="https://redis.io"><img src="https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis 7"></a>
   <a href="https://min.io"><img src="https://img.shields.io/badge/MinIO-Object%20Store-72CBE8?style=flat-square&logo=minio&logoColor=white" alt="MinIO"></a>
-  <a href="https://kafka.apache.org"><img src="https://img.shields.io/badge/Kafka-latest-231F20?style=flat-square&logo=apachekafka&logoColor=white" alt="Kafka"></a>
-  <a href="https://www.elastic.co/elasticsearch"><img src="https://img.shields.io/badge/Elasticsearch-9.3.8-005571?style=flat-square&logo=elasticsearch&logoColor=white" alt="Elasticsearch 9.3.8"></a>
-  <a href="https://www.elastic.co/kibana"><img src="https://img.shields.io/badge/Kibana-9.3.8-005571?style=flat-square&logo=kibana&logoColor=white" alt="Kibana 9.3.8"></a>
+  <a href="https://kafka.apache.org"><img src="https://img.shields.io/badge/Kafka-3.9-231F20?style=flat-square&logo=apachekafka&logoColor=white" alt="Kafka 3.9"></a>
+  <a href="https://www.elastic.co/elasticsearch"><img src="https://img.shields.io/badge/Elasticsearch-9.3-005571?style=flat-square&logo=elasticsearch&logoColor=white" alt="Elasticsearch 9.3"></a>
+  <a href="https://www.elastic.co/kibana"><img src="https://img.shields.io/badge/Kibana-9.3-005571?style=flat-square&logo=kibana&logoColor=white" alt="Kibana 9.3"></a>
   <a href="https://sqlc.dev"><img src="https://img.shields.io/badge/sqlc-generated-16253D?style=flat-square" alt="sqlc"></a>
   <a href="https://github.com/golang-migrate/migrate"><img src="https://img.shields.io/badge/migrate-golang--migrate-6479EB?style=flat-square" alt="golang-migrate"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
   <a href="https://claude.ai"><img src="https://img.shields.io/badge/Claude-ready-412991?style=flat-square" alt="Claude-ready"></a>
+  <a href="https://goreportcard.com/report/github.com/nhassl3/servicehub-backend"><img src="https://goreportcard.com/badge/github.com/nhassl3/servicehub-backend?style=flat-square" alt="Go Report Card"></a>
+  <a href="https://hub.docker.com/r/nhassl3/servicehub-backend"><img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"></a>
 </p>
 
 # ServiceHub Backend
@@ -26,15 +28,25 @@
 
 ServiceHub is a modern service marketplace platform inspired by the architecture of large-scale e-commerce systems. This repository contains the backend service, written in Go following Clean Architecture principles.
 
+### Changelog Highlights
+
+- **v0.1.0** — Initial release: gRPC + REST gateway, PostgreSQL, PASETO auth, sqlc
+- **v0.2.0** — Added Kafka for stream processing (async notifications, event-driven workflows)
+- **v0.3.0** — Added Elasticsearch + Kibana for full-text search and observability
+
 ---
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+|---|---|---|
 | Language | Go 1.25 |
 | Transport | gRPC + REST gateway (grpc-gateway) |
 | Database | PostgreSQL 18 (alpine) |
+| Cache | Redis 7 |
+| Object Storage | MinIO |
+| Search | Elasticsearch 9.3 |
+| Stream Processing | Kafka 3.9 |
 | Auth | PASETO v4 / JWT |
 | Password hashing | argon2id |
 | Query generation | sqlc |
