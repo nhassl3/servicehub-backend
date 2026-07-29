@@ -58,7 +58,6 @@ func (s *ProductService) SearchProducts(ctx context.Context, params domain.Searc
 		return nil, 0, fmt.Errorf("product_service.SearchProducts: failed to load products from Elasticsearch: %w", err)
 	}
 	if total != 0 {
-		s.log.Info("[SERVICE] LOAD PRODUCT DATA BY ELS FTS")
 		return products, total, nil
 	}
 
@@ -69,8 +68,6 @@ func (s *ProductService) SearchProducts(ctx context.Context, params domain.Searc
 	if total == 0 {
 		return []*domain.Product{}, 0, nil
 	}
-
-	s.log.Info("[SERVICE] LOAD PRODUCT DATA BY PG FTS")
 
 	return products, total, nil
 }
