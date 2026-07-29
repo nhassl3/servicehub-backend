@@ -10,28 +10,12 @@ WHERE (sqlc.narg('admin_id')::uuid IS NULL OR admin_id = sqlc.narg('admin_id')::
 
 -- name: ListModerationItems :many
 SELECT
-    p.id as product_id,
-    p.seller_id,
-    p.category_id,
-    p.title,
-    p.description,
-    p.price,
-    p.tags,
-    p.status,
-    p.sales_count,
-    p.rating,
-    p.reviews_count,
-    p.created_at as product_created_at,
-    p.updated_at as product_updated_at,
-    m.id as moderation_id,
-    m.admin_id as moderation_admin_id,
-    a.username as admin_username,
-    m.active as moderation_active,
-    m.created_at as moderation_created_at,
-    m.updated_at as moderation_updated_at
+    sqlc.embed(p),
+    a.username AS admin_username,
+    sqlc.embed(m)
 FROM products p
          LEFT JOIN moderation m ON p.id = m.product_id
-         LEFT JOIN admins   a ON a.id = m.admin_id
+         LEFT JOIN admins a ON a.id = m.admin_id
 WHERE
     (sqlc.narg('admin_id')::uuid IS NULL AND p.status = 'draft')
    OR

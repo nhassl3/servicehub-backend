@@ -1,5 +1,5 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
-.els-docker
+.els-docker els-docker-stop els-reindex-build runb-els-reindex
 
 .DEFAULT_GOAL := build
 
@@ -19,6 +19,7 @@ BINARY_NAME=servicehub
 BUILD_DIR=./bin
 CMD_PATH=./cmd/servicehub
 CONSUMER_PATH=./cmd/consumer
+ES_REINDEX_PATH=./cmd/es-reindex
 ENVIRONMENT=local
 
 # Migrations
@@ -177,8 +178,21 @@ get-contracts:
 
 ##  ─── Elasticsearch (FTS) ──────────────────────────────────────────────────────
 els-docker:
-	@docker run -d --name servicehub-elasticsearch-local-9.3.8 \
+	@docker run -d --name servicehub-elasticsearch-local \
 	-p 9200:9200 \
 	-e "discovery.type=single-node" \
 	-e "xpack.security.enabled=false" \
 	elasticsearch:9.3.8
+	@echo "Elasticsearch started on http://localhost:9200"
+
+els-docker-stop:
+	@docker stop servicehub-elasticsearch-local && docker rm servicehub-elasticsearch-local
+	@echo "Elasticsearch stopped"
+
+els-reindex-build:
+	go build -o $(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH) $(ES_REINDEX_PATH)
+	@chmod +x $(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH)
+	@echo "Successfully built es-reindex"
+
+runb-els-reindex:
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH)

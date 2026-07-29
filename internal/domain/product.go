@@ -3,22 +3,24 @@ package domain
 import (
 	"context"
 	"time"
+
+	"github.com/nhassl3/servicehub-backend/internal/db"
 )
 
 type Product struct {
-	ID           string    `db:"id"`
-	SellerID     string    `db:"seller_id"`
-	CategoryID   int       `db:"category_id"`
-	Title        string    `db:"title"`
-	Description  string    `db:"description"`
-	Price        float64   `db:"price"`
-	Tags         []string  `db:"tags"`
-	Status       string    `db:"status"`
-	SalesCount   int       `db:"sales_count"`
-	Rating       float64   `db:"rating"`
-	ReviewsCount int       `db:"reviews_count"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	ID           string    `json:"id"`
+	SellerID     string    `json:"seller_id"`
+	CategoryID   int       `json:"category_id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	Price        float64   `json:"price"`
+	Tags         []string  `json:"tags"`
+	Status       string    `json:"status"`
+	SalesCount   int       `json:"sales_count"`
+	Rating       float64   `json:"rating"`
+	ReviewsCount int       `json:"reviews_count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type ListProductsParams struct {
@@ -33,9 +35,14 @@ type ListProductsParams struct {
 }
 
 type SearchProductsParams struct {
-	Query  string
-	Limit  int32
-	Offset int32
+	Query      string
+	CategoryID *int
+	MinPrice   *float64
+	MaxPrice   *float64
+	Tags       []string
+	SortBy     string // relevance | "price_asc" | "price_desc" | "rating" | "date" | "sales"
+	Limit      int32
+	Offset     int32
 }
 
 type CreateProductParams struct {
@@ -60,10 +67,58 @@ type UpdateProductParams struct {
 type ProductRepository interface {
 	Create(ctx context.Context, params CreateProductParams) (*Product, error)
 	GetByID(ctx context.Context, id string) (*Product, error)
-	List(ctx context.Context, params ListProductsParams) ([]Product, int64, error)
-	Search(ctx context.Context, params SearchProductsParams) ([]Product, int64, error)
+	List(ctx context.Context, params ListProductsParams) ([]*Product, int64, error)
+	Search(ctx context.Context, params SearchProductsParams) ([]*Product, int64, error)
 	Update(ctx context.Context, params UpdateProductParams) (*Product, error)
 	Delete(ctx context.Context, id string) error
 	IncrementSalesCount(ctx context.Context, id string, qty int) error
 	UpdateRating(ctx context.Context, id string, newRating float64) error
+}
+
+type ProductSearchRepository interface {
+	IndexProduct(ctx context.Context, product *Product) error
+	DeleteProductIndex(ctx context.Context, id string) error
+	BulkIndexProducts(ctx context.Context, products []*Product) error
+	Search(ctx context.Context, params SearchProductsParams) ([]*Product, int64, error)
+}
+
+// ── Mapping ──────────────────────────────────────────────────────────────────
+
+// MapProduct maps raw product fields (common across all SQLC product row types)
+// to a domain.Product value.
+func MapProduct(row *db.Product) *Product {
+	if row == nil {
+		return nil
+	}
+	return &Product{
+		ID:           row.ID.String(),
+		SellerID:     row.SellerID.String(),
+		CategoryID:   int(row.CategoryID),
+		Title:        row.Title,
+		Description:  row.Description,
+		Price:        row.Price,
+		Tags:         row.Tags,
+		Status:       row.Status,
+		SalesCount:   int(row.SalesCount),
+		Rating:       row.Rating,
+		ReviewsCount: int(row.ReviewsCount),
+		CreatedAt:    row.CreatedAt.Time, // UTC
+		UpdatedAt:    row.UpdatedAt.Time, // UTC
+	}
+}
+
+// MapProducts converts db.Product to domain.Product struct use MapProduct for mapping product db struct
+func MapProducts(rows []db.Product) []*Product {
+	if rows == nil || len(rows) == 0 {
+		return nil
+	}
+	products := make([]*Product, 0, len(rows))
+	for _, row := range rows {
+		domainProduct := MapProduct(&row)
+		if domainProduct == nil {
+			continue
+		}
+		products = append(products, domainProduct)
+	}
+	return products
 }

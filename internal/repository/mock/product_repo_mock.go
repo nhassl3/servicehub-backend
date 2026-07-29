@@ -153,3 +153,84 @@ func (mr *MockProductRepositoryMockRecorder) UpdateRating(ctx, id, newRating int
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRating", reflect.TypeOf((*MockProductRepository)(nil).UpdateRating), ctx, id, newRating)
 }
+
+// MockProductSearchRepository is a mock of ProductSearchRepository interface.
+type MockProductSearchRepository struct {
+	ctrl     *gomock.Controller
+	recorder *MockProductSearchRepositoryMockRecorder
+}
+
+// MockProductSearchRepositoryMockRecorder is the mock recorder for MockProductSearchRepository.
+type MockProductSearchRepositoryMockRecorder struct {
+	mock *MockProductSearchRepository
+}
+
+// NewMockProductSearchRepository creates a new mock instance.
+func NewMockProductSearchRepository(ctrl *gomock.Controller) *MockProductSearchRepository {
+	mock := &MockProductSearchRepository{ctrl: ctrl}
+	mock.recorder = &MockProductSearchRepositoryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProductSearchRepository) EXPECT() *MockProductSearchRepositoryMockRecorder {
+	return m.recorder
+}
+
+// BulkIndexProducts mocks base method.
+func (m *MockProductSearchRepository) BulkIndexProducts(ctx context.Context, products []*domain.Product) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BulkIndexProducts", ctx, products)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BulkIndexProducts indicates an expected call of BulkIndexProducts.
+func (mr *MockProductSearchRepositoryMockRecorder) BulkIndexProducts(ctx, products interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkIndexProducts", reflect.TypeOf((*MockProductSearchRepository)(nil).BulkIndexProducts), ctx, products)
+}
+
+// DeleteProductIndex mocks base method.
+func (m *MockProductSearchRepository) DeleteProductIndex(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProductIndex", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProductIndex indicates an expected call of DeleteProductIndex.
+func (mr *MockProductSearchRepositoryMockRecorder) DeleteProductIndex(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProductIndex", reflect.TypeOf((*MockProductSearchRepository)(nil).DeleteProductIndex), ctx, id)
+}
+
+// IndexProduct mocks base method.
+func (m *MockProductSearchRepository) IndexProduct(ctx context.Context, product *domain.Product) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IndexProduct", ctx, product)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IndexProduct indicates an expected call of IndexProduct.
+func (mr *MockProductSearchRepositoryMockRecorder) IndexProduct(ctx, product interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexProduct", reflect.TypeOf((*MockProductSearchRepository)(nil).IndexProduct), ctx, product)
+}
+
+// Search mocks base method.
+func (m *MockProductSearchRepository) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Search", ctx, params)
+	ret0, _ := ret[0].([]domain.Product)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Search indicates an expected call of Search.
+func (mr *MockProductSearchRepositoryMockRecorder) Search(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Search", reflect.TypeOf((*MockProductSearchRepository)(nil).Search), ctx, params)
+}

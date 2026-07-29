@@ -13,12 +13,14 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/nhassl3/servicehub-backend/internal/config"
 	"github.com/nhassl3/servicehub-backend/internal/db"
+	repoES "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/internal/service"
 	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	pkgES "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"github.com/nhassl3/servicehub-backend/pkg/postgres"
@@ -80,21 +82,24 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	// Топики создаются явно ДО подписки консьюмеров — иначе при auto.create.topics.enable=true
 	// consumer group может попытаться присоединиться к топику, которого физически ещё нет
 	// (он создастся позже, лениво, при первой публикации из backend), и не восстановится сама.
-	topics := []kafka.TopicSpec{
-		{Name: cfg.Kafka.Topics.OrderEvents, NumPartitions: 3, ReplicationFactor: 1},
-		{Name: cfg.Kafka.Topics.TransactionEvents, NumPartitions: 3, ReplicationFactor: 1},
+	topics := make([]kafka.TopicSpec, 0, len(cfg.Kafka.Topics.Events))
+	for _, e := range cfg.Kafka.Topics.Events {
+		topics = append(topics, kafka.TopicSpec{Name: e, NumPartitions: 3, ReplicationFactor: 1})
 	}
 	if err = kafka.EnsureTopics(ctx, cfg.Kafka.Brokers, topics, log); err != nil {
 		log.Fatal("kafka: failed to ensure topics exist, exiting for restart", zap.Error(err))
 	}
 
-	producers := make([]*kafka.Producer, 0, 3)
-	kafkaOrderProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.OrderEvents, log)
-	kafkaTransactionProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.TransactionEvents, log)
-	kafkaNotificationsProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log)
-	producers = append(producers, kafkaOrderProducer, kafkaTransactionProducer, kafkaNotificationsProducer)
+	producers := make([]*kafka.Producer, 0, len(cfg.Kafka.Topics.Events)+1)
+	eventProducers := make(map[string]*kafka.Producer, len(cfg.Kafka.Topics.Events))
+	for _, p := range cfg.Kafka.Topics.Events {
+		kafkaProducer := kafka.NewProducer(cfg.Kafka.Brokers, p, log)
+		eventProducers[p] = kafkaProducer
+		producers = append(producers, kafkaProducer)
+	}
+	producers = append(producers, kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log))
 
-	eventPublisher := serviceKafka.NewEventPublisher(kafkaOrderProducer, kafkaTransactionProducer)
+	eventPublisher := serviceKafka.NewEventPublisher(eventProducers)
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
@@ -110,6 +115,14 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		return fmt.Errorf("minio.NewMinIO: failed to initialize minio client: %w", err)
 	}
 	log.Info("connected to MinIO")
+
+	// ─── Elasticsearch ─────────────────────────────────────────────────────────
+	esClient, err := pkgES.New(ctx, cfg.ELS.Hosts, cfg.ELS.Username, cfg.ELS.Password)
+	if err != nil {
+		return fmt.Errorf("app: connect elasticsearch: %w", err)
+	}
+	defer func() { _ = esClient.Close(ctx) }()
+	log.Info("connected to Elasticsearch")
 
 	// ─── Token managers ───────────────────────────────────────────────────────
 	accessMaker, err := auth.NewPasetoMaker(cfg.Auth.PasetoKey, cfg.Auth.AccessTokenTTL)
@@ -149,6 +162,10 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	adminRepo := repoPostgres.NewAdminRepo(store)
 	moderationRepo := repoPostgres.NewModerationRepo(store)
 	notificationRepo := repoPostgres.NewNotificationRepository(store)
+	esProductRepo := repoES.NewProductESRepo(esClient, log) // elasticsearch
+	if err := esProductRepo.EnsureIndex(ctx); err != nil {
+		return fmt.Errorf("app: ensure elasticsearch index: %w", err)
+	}
 
 	// ─── Services ─────────────────────────────────────────────────────────────
 	svcs := &transportGRPC.Services{
@@ -156,7 +173,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient),
 		User:         service.NewUserService(userRepo, minIOClient, userRedis),
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
-		Product:      service.NewProductService(productRepo, sellerRepo),
+		Product:      service.NewProductService(productRepo, esProductRepo, sellerRepo, eventPublisher, log),
 		Cart:         service.NewCartService(cartRepo),
 		Order:        service.NewOrderService(orderRepo, eventPublisher, userRedis, log),
 		Review:       service.NewReviewService(reviewRepo),

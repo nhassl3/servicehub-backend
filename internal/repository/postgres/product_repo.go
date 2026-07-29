@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/nhassl3/servicehub-backend/internal/db"
@@ -35,7 +34,7 @@ func (r *ProductRepo) Create(ctx context.Context, params domain.CreateProductPar
 	if err != nil {
 		return nil, fmt.Errorf("product_repo.Create: %w", err)
 	}
-	return mapProduct(&row), nil
+	return domain.MapProduct(&row), nil
 }
 
 func (r *ProductRepo) GetByID(ctx context.Context, id string) (*domain.Product, error) {
@@ -50,10 +49,10 @@ func (r *ProductRepo) GetByID(ctx context.Context, id string) (*domain.Product, 
 		}
 		return nil, fmt.Errorf("product_repo.GetByID: %w", err)
 	}
-	return mapProduct(&row), nil
+	return domain.MapProduct(&row), nil
 }
 
-func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams) ([]domain.Product, int64, error) {
+func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams) ([]*domain.Product, int64, error) {
 	status := params.Status
 	if status == "" {
 		status = "active"
@@ -71,6 +70,10 @@ func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams
 		return nil, 0, fmt.Errorf("product_repo.List count: %w", err)
 	}
 
+	if total == 0 {
+		return []*domain.Product{}, 0, nil
+	}
+
 	rows, err := r.store.ListProducts(ctx, db.ListProductsParams{
 		SellerID:   countParams.SellerID,
 		CategoryID: countParams.CategoryID,
@@ -84,17 +87,22 @@ func (r *ProductRepo) List(ctx context.Context, params domain.ListProductsParams
 		return nil, 0, fmt.Errorf("product_repo.List: %w", err)
 	}
 
-	products := make([]domain.Product, len(rows))
-	for i, row := range rows {
-		products[i] = *mapProduct(&row)
+	domainProducts := domain.MapProducts(rows)
+	if domainProducts == nil || len(domainProducts) == 0 {
+		return []*domain.Product{}, 0, nil
 	}
-	return products, total, nil
+
+	return domainProducts, total, nil
 }
 
-func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsParams) ([]*domain.Product, int64, error) {
 	total, err := r.store.CountSearchProducts(ctx, params.Query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("product_repo.Search count: %w", err)
+	}
+
+	if total == 0 {
+		return []*domain.Product{}, 0, nil
 	}
 
 	rows, err := r.store.SearchProducts(ctx, db.SearchProductsParams{
@@ -106,11 +114,12 @@ func (r *ProductRepo) Search(ctx context.Context, params domain.SearchProductsPa
 		return nil, 0, fmt.Errorf("product_repo.Search: %w", err)
 	}
 
-	products := make([]domain.Product, len(rows))
-	for i, row := range rows {
-		products[i] = *mapProduct(&row)
+	domainProducts := domain.MapProducts(rows)
+	if domainProducts == nil || len(domainProducts) == 0 {
+		return []*domain.Product{}, 0, nil
 	}
-	return products, total, nil
+
+	return domainProducts, total, nil
 }
 
 func (r *ProductRepo) Update(ctx context.Context, params domain.UpdateProductParams) (*domain.Product, error) {
@@ -160,7 +169,7 @@ func (r *ProductRepo) Update(ctx context.Context, params domain.UpdateProductPar
 	}); err != nil {
 		return nil, fmt.Errorf("product_repo.Update: failed to execute transaction %w", err)
 	}
-	return mapProduct(&row), nil
+	return domain.MapProduct(&row), nil
 }
 
 func (r *ProductRepo) Delete(ctx context.Context, id string) error {
@@ -194,26 +203,4 @@ func (r *ProductRepo) UpdateRating(ctx context.Context, id string, newRating flo
 		ID:     uid,
 		Rating: newRating,
 	})
-}
-
-// ── Mapping ──────────────────────────────────────────────────────────────────
-
-// mapProduct maps raw product fields (common across all SQLC product row types)
-// to a domain.Product value.
-func mapProduct(row *db.Product) *domain.Product {
-	return &domain.Product{
-		ID:           row.ID.String(),
-		SellerID:     row.SellerID.String(),
-		CategoryID:   int(row.CategoryID),
-		Title:        row.Title,
-		Description:  row.Description,
-		Price:        row.Price,
-		Tags:         row.Tags,
-		Status:       row.Status,
-		SalesCount:   int(row.SalesCount),
-		Rating:       row.Rating,
-		ReviewsCount: int(row.ReviewsCount),
-		CreatedAt:    pgTimeTZ(row.CreatedAt, time.UTC),
-		UpdatedAt:    pgTimeTZ(row.UpdatedAt, time.UTC),
-	}
 }

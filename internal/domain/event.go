@@ -5,13 +5,30 @@ import (
 	"time"
 )
 
+type Topic string
+
+const (
+	TopicOrderEvent       Topic = "order_events"
+	TopicProductEvent     Topic = "product_events"
+	TopicTransactionEvent Topic = "transaction_events"
+)
+
+var (
+	DLQTopics = []Topic{
+		TopicOrderEvent,
+	}
+)
+
 type Type int8
 
 const (
-	OrderCreated       Type = 1 // order.created
-	OrderStatusChanged Type = 2 // order.changed
-	TransactionCreated Type = 4 // transaction.created
-	BalanceUpdated     Type = 8 // balance.updated
+	_                  Type = iota << 1
+	OrderCreated            // order.created
+	OrderStatusChanged      // order.changed
+	TransactionCreated      // transaction.created
+	BalanceUpdated          // balance.updated
+	IndexedProduct          // index.prouct.update_create
+	DeletedProduct          // index.prouct.delete
 )
 
 type EventPublisher interface {
@@ -19,6 +36,8 @@ type EventPublisher interface {
 	PublishOrderStatusChanged(ctx context.Context, payload OrderStatusChangedPayload) error
 	PublishTransactionCreated(ctx context.Context, payload TransactionCreatedPayload) error
 	PublishBalanceUpdated(ctx context.Context, payload BalanceUpdatedPayload) error
+	PublishIndexedProduct(ctx context.Context, product *Product) error
+	PublishDeletedProduct(ctx context.Context, id string) error
 	Close() error
 }
 
