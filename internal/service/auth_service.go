@@ -222,6 +222,10 @@ func (s *AuthService) RequestVerifyEmail(ctx context.Context, email string) (str
 }
 
 func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email string) (string, error) {
+	if ok := s.userRedis.CodeExists(ctx, entryKey, email); ok {
+		return "", domain.ErrCodeAlreadyExists
+	}
+
 	var code string
 	for range 5 {
 		code = GenerateResetPasswordCode()

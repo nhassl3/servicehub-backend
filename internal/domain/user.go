@@ -165,6 +165,7 @@ type UserRedis interface {
 	DelProfile(ctx context.Context, username string) error
 	DelSession(ctx context.Context, username string) error
 	Code(ctx context.Context, enterKeyCode string, operationId string) (*ResetPasswordState, error)
+	CodeExists(ctx context.Context, entryKeyCode, email string) bool
 	SetCode(ctx context.Context, enterKeyCode, operationId string, code *ResetPasswordState) error
 	Verified(ctx context.Context, entryCode, token string) (string, error)
 	SetVerified(ctx context.Context, entryCode, token, email string) error

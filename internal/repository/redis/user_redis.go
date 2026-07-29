@@ -14,6 +14,7 @@ const (
 	profilePrefix   = "profile:"
 	authBlockPrefix = "auth:block:"
 	codePrefix      = "code:"
+	codeLockPrefix  = "code:lock:"
 	verifiedPrefix  = "verified::"
 
 	ResetPasswordEnterKey = "reset_password:"
@@ -121,8 +122,15 @@ func (u *UserRedis) Code(ctx context.Context, enterKeyCode, operationId string) 
 	return &code, nil
 }
 
+func (u *UserRedis) CodeExists(ctx context.Context, entryKeyCode, email string) bool {
+	return u.client.Exists(ctx, codeLockPrefix+entryKeyCode+email).Val() == 1
+}
+
 func (u *UserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.ResetPasswordState) error {
-	return u.client.Set(ctx, codePrefix+enterKeyCode+operationId, code, u.codeTTL).Err()
+	if err := u.client.Set(ctx, codePrefix+enterKeyCode+operationId, code, u.codeTTL).Err(); err != nil {
+		return err
+	}
+	return u.client.Set(ctx, codeLockPrefix+enterKeyCode+code.Email, true, u.codeTTL).Err()
 }
 
 func (u *UserRedis) Verified(ctx context.Context, entryCode, token string) (string, error) {
