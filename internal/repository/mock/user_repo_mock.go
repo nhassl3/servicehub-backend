@@ -283,6 +283,20 @@ func (mr *MockUserRedisMockRecorder) Code(ctx, enterKeyCode, operationId interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Code", reflect.TypeOf((*MockUserRedis)(nil).Code), ctx, enterKeyCode, operationId)
 }
 
+// CodeExists mocks base method.
+func (m *MockUserRedis) CodeExists(ctx context.Context, entryKeyCode, email string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CodeExists", ctx, entryKeyCode, email)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// CodeExists indicates an expected call of CodeExists.
+func (mr *MockUserRedisMockRecorder) CodeExists(ctx, entryKeyCode, email interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CodeExists", reflect.TypeOf((*MockUserRedis)(nil).CodeExists), ctx, entryKeyCode, email)
+}
+
 // DelCode mocks base method.
 func (m *MockUserRedis) DelCode(ctx context.Context, enterKeyCode, operationId string) error {
 	m.ctrl.T.Helper()

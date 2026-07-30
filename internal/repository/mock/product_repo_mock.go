@@ -94,10 +94,10 @@ func (mr *MockProductRepositoryMockRecorder) IncrementSalesCount(ctx, id, qty in
 }
 
 // List mocks base method.
-func (m *MockProductRepository) List(ctx context.Context, params domain.ListProductsParams) ([]domain.Product, int64, error) {
+func (m *MockProductRepository) List(ctx context.Context, params domain.ListProductsParams) ([]*domain.Product, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, params)
-	ret0, _ := ret[0].([]domain.Product)
+	ret0, _ := ret[0].([]*domain.Product)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -110,10 +110,10 @@ func (mr *MockProductRepositoryMockRecorder) List(ctx, params interface{}) *gomo
 }
 
 // Search mocks base method.
-func (m *MockProductRepository) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+func (m *MockProductRepository) Search(ctx context.Context, params domain.SearchProductsParams) ([]*domain.Product, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Search", ctx, params)
-	ret0, _ := ret[0].([]domain.Product)
+	ret0, _ := ret[0].([]*domain.Product)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -220,10 +220,10 @@ func (mr *MockProductSearchRepositoryMockRecorder) IndexProduct(ctx, product int
 }
 
 // Search mocks base method.
-func (m *MockProductSearchRepository) Search(ctx context.Context, params domain.SearchProductsParams) ([]domain.Product, int64, error) {
+func (m *MockProductSearchRepository) Search(ctx context.Context, params domain.SearchProductsParams) ([]*domain.Product, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Search", ctx, params)
-	ret0, _ := ret[0].([]domain.Product)
+	ret0, _ := ret[0].([]*domain.Product)
 	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
