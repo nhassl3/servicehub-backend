@@ -110,6 +110,10 @@ func (m *mockUserRedis) DelSession(_ context.Context, _ string) error {
 	return nil
 }
 
+func (m *mockUserRedis) CodeExists(_ context.Context, _, _ string) bool {
+	return false
+}
+
 func (m *mockUserRedis) Code(_ context.Context, _, _ string) (*domain.ResetPasswordState, error) {
 	return nil, domain.ErrRedisNotFound
 }
@@ -247,7 +251,7 @@ func (m *mockUserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmai
 	}
 	return nil, domain.ErrNotFound
 }
-
+	
 func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, params)
