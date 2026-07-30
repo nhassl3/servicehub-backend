@@ -39,14 +39,14 @@ ServiceHub is a modern service marketplace platform inspired by the architecture
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|---|
-| Language | Go 1.25 |
+|:---:|:-------:|
+| Language | Go 1.26 |
 | Transport | gRPC + REST gateway (grpc-gateway) |
 | Database | PostgreSQL 18 (alpine) |
 | Cache | Redis 7 |
 | Object Storage | MinIO |
-| Search | Elasticsearch 9.3 |
-| Stream Processing | Kafka 3.9 |
+| Search | Elasticsearch 9.3.8 |
+| Stream Processing | Kafka:latest |
 | Auth | PASETO v4 / JWT |
 | Password hashing | argon2id |
 | Query generation | sqlc |
