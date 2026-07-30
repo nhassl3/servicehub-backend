@@ -18,8 +18,8 @@ func (s *WishlistService) GetWishlist(ctx context.Context, username string) ([]d
 	return s.repo.GetItems(ctx, username)
 }
 
-func (s *WishlistService) AddItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
-	return s.repo.AddItem(ctx, username, productID)
+func (s *WishlistService) ToggleWishlistItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
+	return s.repo.ToggleWishlistItem(ctx, username, productID)
 }
 
 func (s *WishlistService) RemoveItem(ctx context.Context, username, productID string) error {

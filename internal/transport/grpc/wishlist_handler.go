@@ -51,16 +51,16 @@ func (h *WishlistHandler) InWishlist(ctx context.Context, req *wishlistv1.InWish
 	return &wishlistv1.InWishlistResponse{InWishlist: ok}, nil
 }
 
-func (h *WishlistHandler) AddItem(ctx context.Context, req *wishlistv1.AddItemRequest) (*wishlistv1.AddItemResponse, error) {
+func (h *WishlistHandler) ToggleWishlistItem(ctx context.Context, req *wishlistv1.ToggleWishlistItemRequest) (*wishlistv1.ToggleWishlistItemResponse, error) {
 	username, err := mustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
-	item, err := h.svc.AddItem(ctx, username, req.ProductId)
+	item, err := h.svc.ToggleWishlistItem(ctx, username, req.GetProductId())
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	return &wishlistv1.AddItemResponse{Item: protoWishlistItem(item)}, nil
+	return &wishlistv1.ToggleWishlistItemResponse{Item: protoWishlistItem(item)}, nil
 }
 
 func (h *WishlistHandler) RemoveItem(ctx context.Context, req *wishlistv1.RemoveItemRequest) (*wishlistv1.RemoveItemResponse, error) {
@@ -81,5 +81,6 @@ func protoWishlistItem(wi *domain.WishlistItem) *wishlistv1.WishlistItem {
 		Id:        wi.ID,
 		ProductId: wi.ProductID,
 		CreatedAt: safeTimestamp(wi.CreatedAt),
+		Added:     wi.Added,
 	}
 }

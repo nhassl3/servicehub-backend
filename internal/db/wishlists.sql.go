@@ -9,31 +9,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
-
-const addWishlistItem = `-- name: AddWishlistItem :one
-INSERT INTO wishlists (username, product_id)
-VALUES ($1, $2)
-ON CONFLICT (username, product_id) DO NOTHING
-RETURNING id, username, product_id, created_at
-`
-
-type AddWishlistItemParams struct {
-	Username  string    `json:"username"`
-	ProductID uuid.UUID `json:"product_id"`
-}
-
-func (q *Queries) AddWishlistItem(ctx context.Context, arg AddWishlistItemParams) (Wishlist, error) {
-	row := q.db.QueryRow(ctx, addWishlistItem, arg.Username, arg.ProductID)
-	var i Wishlist
-	err := row.Scan(
-		&i.ID,
-		&i.Username,
-		&i.ProductID,
-		&i.CreatedAt,
-	)
-	return i, err
-}
 
 const getWishlistItems = `-- name: GetWishlistItems :many
 SELECT id, username, product_id, created_at
@@ -83,6 +60,50 @@ func (q *Queries) RemoveWishlistItem(ctx context.Context, arg RemoveWishlistItem
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const toggleWishlistItem = `-- name: ToggleWishlistItem :one
+WITH deleted AS (
+DELETE FROM wishlists dw
+WHERE dw.username = $1 AND dw.product_id = $2
+    RETURNING id, username, product_id, created_at
+), inserted AS (
+INSERT INTO wishlists as iw (iw.username, iw.product_id)
+SELECT $1, $2
+WHERE NOT EXISTS (SELECT 1 FROM deleted)
+    RETURNING id, username, product_id, created_at
+    )
+SELECT id, username, product_id, created_at, TRUE AS added
+FROM inserted
+UNION ALL
+SELECT id, username, product_id, created_at, FALSE AS added
+FROM deleted
+`
+
+type ToggleWishlistItemParams struct {
+	Username  string    `json:"username"`
+	ProductID uuid.UUID `json:"product_id"`
+}
+
+type ToggleWishlistItemRow struct {
+	ID        int64              `json:"id"`
+	Username  string             `json:"username"`
+	ProductID uuid.UUID          `json:"product_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Added     bool               `json:"added"`
+}
+
+func (q *Queries) ToggleWishlistItem(ctx context.Context, arg ToggleWishlistItemParams) (ToggleWishlistItemRow, error) {
+	row := q.db.QueryRow(ctx, toggleWishlistItem, arg.Username, arg.ProductID)
+	var i ToggleWishlistItemRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.ProductID,
+		&i.CreatedAt,
+		&i.Added,
+	)
+	return i, err
 }
 
 const wishlistItemExists = `-- name: WishlistItemExists :one
