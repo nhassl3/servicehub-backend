@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	aidanwoods.dev/go-paseto v1.6.0
+	github.com/elastic/go-elasticsearch/v9 v9.4.2
 	github.com/go-passwd/validator v0.0.0-20250407044832-c284a2f4d990
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -12,7 +13,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/minio/minio-go/v7 v7.0.99
-	github.com/nhassl3/servicehub-contracts v0.1.41-0.20260630084331-0c85a42b2d77
+	github.com/nhassl3/servicehub-contracts v0.1.41-0.20260730102910-a7f1234e0e8f
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/segmentio/kafka-go v0.4.51
 	github.com/spf13/viper v1.21.0
@@ -31,7 +32,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.9.0 // indirect
-	github.com/elastic/go-elasticsearch/v9 v9.4.2 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect

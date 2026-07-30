@@ -34,12 +34,12 @@ func (r *WishlistRepo) GetItems(ctx context.Context, username string) ([]domain.
 	return items, nil
 }
 
-func (r *WishlistRepo) AddItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
+func (r *WishlistRepo) ToggleWishlistItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
 	uid, err := parseUUID(productID)
 	if err != nil {
 		return nil, domain.ErrNotFound
 	}
-	row, err := r.store.AddWishlistItem(ctx, db.AddWishlistItemParams{
+	row, err := r.store.ToggleWishlistItem(ctx, db.ToggleWishlistItemParams{
 		Username:  username,
 		ProductID: uid,
 	})
@@ -51,6 +51,7 @@ func (r *WishlistRepo) AddItem(ctx context.Context, username, productID string) 
 		Username:  row.Username,
 		ProductID: row.ProductID.String(),
 		CreatedAt: pgTimeTZ(row.CreatedAt, time.UTC),
+		Added:     row.Added,
 	}, nil
 }
 

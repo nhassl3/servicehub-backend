@@ -12,7 +12,6 @@ import (
 
 type Querier interface {
 	AddToBalance(ctx context.Context, arg AddToBalanceParams) (Balance, error)
-	AddWishlistItem(ctx context.Context, arg AddWishlistItemParams) (Wishlist, error)
 	AdminExistsByUsername(ctx context.Context, username string) (bool, error)
 	// clean up redis lock storage for next methods (Approve, Reject)
 	Approve(ctx context.Context, id uuid.UUID) error
@@ -81,6 +80,7 @@ type Querier interface {
 	SearchProducts(ctx context.Context, arg SearchProductsParams) ([]Product, error)
 	SellerExistsByUsername(ctx context.Context, username string) (bool, error)
 	SetUserRole(ctx context.Context, arg SetUserRoleParams) (User, error)
+	ToggleWishlistItem(ctx context.Context, arg ToggleWishlistItemParams) (ToggleWishlistItemRow, error)
 	Total(ctx context.Context, arg TotalParams) (int64, error)
 	UpdateAdmin(ctx context.Context, arg UpdateAdminParams) (Admin, error)
 	UpdateCartItemQty(ctx context.Context, arg UpdateCartItemQtyParams) (CartItem, error)
