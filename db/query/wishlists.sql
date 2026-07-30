@@ -10,7 +10,7 @@ DELETE FROM wishlists dw
 WHERE dw.username = $1 AND dw.product_id = $2
     RETURNING id, username, product_id, created_at
 ), inserted AS (
-INSERT INTO wishlists as iw (iw.username, iw.product_id)
+INSERT INTO wishlists (username, product_id)
 SELECT $1, $2
 WHERE NOT EXISTS (SELECT 1 FROM deleted)
     RETURNING id, username, product_id, created_at
