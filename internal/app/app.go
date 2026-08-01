@@ -20,6 +20,7 @@ import (
 	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/pkg/clickhouse"
 	pkgES "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
@@ -100,6 +101,23 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	producers = append(producers, kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log))
 
 	eventPublisher := serviceKafka.NewEventPublisher(eventProducers)
+
+	// ─── Clickhouse ───────────────────────────────────────────────────────────
+	conn, err := clickhouse.Connect(ctx,
+		cfg.Clickhouse.Hosts,
+		cfg.Clickhouse.Username,
+		cfg.Clickhouse.Database,
+		cfg.Clickhouse.Password,
+		cfg.Clickhouse.ClientInfo.Product,
+		cfg.Clickhouse.ClientInfo.Version,
+		cfg.Clickhouse.TLS,
+	)
+	if err != nil {
+		return fmt.Errorf("app: connect clickhouse: %w", err)
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
