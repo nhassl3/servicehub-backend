@@ -1,5 +1,5 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
-.els-docker els-docker-stop els-reindex-build runb-els-reindex
+.els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker
 
 .DEFAULT_GOAL := build
 
@@ -196,3 +196,6 @@ els-reindex-build:
 
 runb-els-reindex:
 	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH)
+
+clickhouse-docker:
+	@docker run -d --name servicehub-clickhouse-local --ulimit nofile=262144:262144 clickhouse/clickhouse-server
