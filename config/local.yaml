@@ -38,6 +38,15 @@ els:
   hosts:
     - "http://localhost:9200"
 
+clickhouse:
+  hosts:
+    - "localhost:9000"
+    - "localhost:9440" # if using tls
+  client:
+    product: "example-clickhouse-servicehub"
+    version: "0.1.0"
+  tls: false
+
 auth:
   access_token_ttl: 15m
   refresh_token_ttl: 168h
