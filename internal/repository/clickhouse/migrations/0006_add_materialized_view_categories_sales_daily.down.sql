@@ -1,0 +1,1 @@
+DROP VIEW IF EXISTS analytics.mv_categories_sales_daily;

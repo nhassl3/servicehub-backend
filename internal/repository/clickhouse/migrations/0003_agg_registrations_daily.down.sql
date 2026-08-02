@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS analytics.agg_registrations_daily;
