@@ -11,6 +11,7 @@ const (
 	TopicOrderEvent       Topic = "order_events"
 	TopicProductEvent     Topic = "product_events"
 	TopicTransactionEvent Topic = "transaction_events"
+	TopicAnalyticsEvent   Topic = "analytics_events"
 )
 
 var (
