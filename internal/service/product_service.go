@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"go.uber.org/zap"
@@ -110,6 +111,22 @@ func (s *ProductService) UpdateProduct(ctx context.Context, username string, par
 	p, err := s.productRepo.Update(ctx, params)
 	if err != nil {
 		return nil, err
+	}
+
+	if existing.Status != p.Status {
+		if err = s.eventPublisher.PublishProductStatusChanged(ctx, domain.ProductStatusChangedPayload{
+			ID:           p.ID,
+			SellerID:     p.SellerID,
+			CategoryID:   p.CategoryID,
+			Title:        p.Title,
+			Status:       p.Status,
+			Rating:       p.Rating,
+			SalesCount:   p.SalesCount,
+			ReviewsCount: p.ReviewsCount,
+			OccurredAt:   time.Now(),
+		}); err != nil {
+			s.log.Warn("(Kafka) analytics: failed to publish product status change", zap.Error(err))
+		}
 	}
 
 	{
