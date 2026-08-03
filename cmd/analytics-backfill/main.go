@@ -10,7 +10,6 @@ import (
 	repoCH "github.com/nhassl3/servicehub-backend/internal/repository/clickhouse"
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	pkgCH "github.com/nhassl3/servicehub-backend/pkg/clickhouse"
-	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 )
 
 // main backfills the current catalog state into ClickHouse as business facts.
@@ -24,8 +23,7 @@ func main() {
 	ctx := context.Background()
 	cfg := cmd.MustLoadConfig()
 
-	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
-	pool, err := postgres.New(ctx, dsn)
+	pool, err := db.NewPool(ctx, cfg.DB)
 	if err != nil {
 		log.Fatalf("postgres: %s", err)
 	}
@@ -48,7 +46,7 @@ func main() {
 	}
 	defer func() { _ = conn.Close() }()
 
-	if err := repoCH.EnsureSchema(cfg.Clickhouse.Username, cfg.Clickhouse.Password, cfg.Clickhouse.Database, cfg.Clickhouse.Hosts[0], "internal/repository/clickhouse/migrations"); err != nil {
+	if err := repoCH.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
 		log.Fatalf("clickhouse ensure schema: %s", err)
 	}
 	repo := repoCH.NewAnalyticsRepo(conn)
