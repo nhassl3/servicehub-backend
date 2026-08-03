@@ -1,5 +1,5 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
-.els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker
+els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb
 
 .DEFAULT_GOAL := build
 
@@ -197,5 +197,45 @@ els-reindex-build:
 runb-els-reindex:
 	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH)
 
+##  ─── Clickhouse (OLAP) ──────────────────────────────────────────────────────
+
 clickhouse-docker:
-	@docker run -d --name servicehub-clickhouse-local --ulimit nofile=262144:262144 clickhouse/clickhouse-server
+	@docker run -d \
+ 	--name servicehub-clickhouse-local \
+ 	-e CLICKHOUSE_USER=$(CLICKHOUSE_USER) \
+ 	-e CLICKHOUSE_PASSWORD=$(CLICKHOUSE_PASSWORD) \
+ 	-e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+ 	-p 8123:8123 # HTTP PORT \
+ 	-p 9000:9000 # PORT FOR CLIENT \
+ 	--ulimit nofile=262144:262144 \
+ 	clickhouse/clickhouse-server
+
+clickhouse-open:
+	@docker exec -it servicehub-clickhouse-local \
+	clickhouse-client \
+	-u $(CLICKHOUSE_USER) \
+	--password $(CLICKHOUSE_PASSWORD) \
+	--database $(CLICKHOUSE_DB)
+
+clickhouse-createdb:
+	@docker exec -it servicehub-clickhouse-local \
+	clickhouse-client \
+	-u $(CLICKHOUSE_USER) \
+	--password $(CLICKHOUSE_PASSWORD) \
+	-q "CREATE DATABASE IF NOT EXISTS $(CLICKHOUSE_DB);"
+
+clickhouse: clickhouse-docker
+
+cli-ch:
+	@docker exec -it servicehub-clickhouse-local clickhouse-client
+
+backfill-build:
+	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+	go build \
+	-ldflags="-w -s" \
+	-o $(BUILD_DIR)/$(BINARY_NAME)-ch-backfill-$(GOOS)-$(GOARCH) \h
+	./cmd/analytics-backfill
+	@echo "Successfully built ch-backfill"
+
+runb-backfill:
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-ch-backfill-$(GOOS)-$(GOARCH)
