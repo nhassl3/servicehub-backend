@@ -2,7 +2,7 @@ package clickhouse
 
 import (
 	"errors"
-	"log"
+	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/clickhouse"
@@ -18,15 +18,15 @@ func EnsureSchema(cfg config.ClickhouseConfig, path string) error {
 
 	m, err := migrate.New("file://"+path, dbURL)
 	if err != nil {
-		log.Fatalf("Migration initialization failed: %v", err)
+		return fmt.Errorf("failed to load golang-migrate: %w", err)
 	}
+	defer func(m *migrate.Migrate) {
+		_, _ = m.Close()
+	}(m) //nolint:errcheck
 
-	// Apply all up migrations
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		log.Fatalf("Failed to run migrations: %v", err)
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
-
-	log.Println("Migrations applied successfully!")
 
 	return nil
 }
