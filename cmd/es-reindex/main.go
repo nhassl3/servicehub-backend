@@ -10,7 +10,6 @@ import (
 	repoES "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	pkgES "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
-	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 )
 
 // main re-index already prepared data from database. This bin collects info about titles, descriptions from rows in
@@ -19,9 +18,11 @@ func main() {
 	ctx := context.Background()
 	cfg := cmd.MustLoadConfig()
 	logger := cmd.MustLoadLogger(cfg.Log.Level)
+	defer func() {
+		_ = logger.Sync()
+	}()
 
-	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
-	pool, err := postgres.New(ctx, dsn)
+	pool, err := db.NewPool(ctx, cfg.DB)
 	if err != nil {
 		log.Fatalf("postgres: %s", err)
 	}
