@@ -26,6 +26,7 @@ kafka:
       - "order_events"
       - "transaction_events"
       - "product_events"
+      - "analytics_events"
     notifications: "notifications"
     notifications_dlq: "notification_dlq"
   brokers:
