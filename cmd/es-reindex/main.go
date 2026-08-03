@@ -13,11 +13,12 @@ import (
 	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 )
 
+// main re-index already prepared data from database. This bin collects info about titles, descriptions from rows in
+// product table. This needed for FTS (full-text searching) - elasticsearch
 func main() {
 	ctx := context.Background()
 	cfg := cmd.MustLoadConfig()
 	logger := cmd.MustLoadLogger(cfg.Log.Level)
-	defer func() { _ = logger.Sync() }()
 
 	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
 	pool, err := postgres.New(ctx, dsn)
