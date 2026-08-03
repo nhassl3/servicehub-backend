@@ -29,12 +29,11 @@ import (
 	"go.uber.org/zap"
 )
 
-const ()
-
 // Run bootstraps and starts the application.
 func Run(cfg *config.Config, log *zap.Logger) error {
-	// ─── Database ─────────────────────────────────────────────────────────────
 	ctx := context.Background()
+
+	// ─── Database ─────────────────────────────────────────────────────────────
 	pool, err := db.NewPool(ctx, cfg.DB)
 	if err != nil {
 		return err
@@ -45,12 +44,13 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	// ─── Migrations ───────────────────────────────────────────────────────────
 	if cfg.Environment == "local" {
 		if err := repoPostgres.EnsureSchema(cfg.DB, cfg.Migrations.PostgresPath); err != nil {
-			return fmt.Errorf("app: run migrations: %w", err)
+			return fmt.Errorf("app: ensure postgres schema: %w", err)
 		}
 		if err := repoClickhouse.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
 			return fmt.Errorf("app: ensure clickhouse schema: %w", err)
 		}
 	}
+	log.Info("Successfully applied all migration (Clickhouse and Postgres)")
 
 	// ─── SQLC Store ─────────────────────────────────────────────────────────
 	store := db.NewStore(pool)
