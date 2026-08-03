@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS analytics.agg_moderations_daily (
-    day            Date('UTC'),
+    day            DateTime('UTC'),
     admin_id       String,
     admin_username String,
     cnt            UInt64

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS analytics.agg_categories_sales_daily (
-                                                                    day         Date('UTC'),
+                                                                    day         DateTime('UTC'),
     category_id UInt32,
     qty         UInt64,
     total       Float64
