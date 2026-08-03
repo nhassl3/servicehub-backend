@@ -20,6 +20,7 @@ BUILD_DIR=./bin
 CMD_PATH=./cmd/servicehub
 CONSUMER_PATH=./cmd/consumer
 ES_REINDEX_PATH=./cmd/es-reindex
+BACKFILL_PATH=./cmd/analytics-backfill
 ENVIRONMENT=local
 
 # Migrations
@@ -205,8 +206,8 @@ clickhouse-docker:
  	-e CLICKHOUSE_USER=$(CLICKHOUSE_USER) \
  	-e CLICKHOUSE_PASSWORD=$(CLICKHOUSE_PASSWORD) \
  	-e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
- 	-p 8123:8123 # HTTP PORT \
- 	-p 9000:9000 # PORT FOR CLIENT \
+ 	-p 18123:8123 \
+ 	-p 19000:9000 \
  	--ulimit nofile=262144:262144 \
  	clickhouse/clickhouse-server
 
@@ -233,9 +234,9 @@ backfill-build:
 	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
 	go build \
 	-ldflags="-w -s" \
-	-o $(BUILD_DIR)/$(BINARY_NAME)-ch-backfill-$(GOOS)-$(GOARCH) \h
-	./cmd/analytics-backfill
-	@echo "Successfully built ch-backfill"
+	-o $(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH) \
+	$(BACKFILL_PATH)
+	@echo "Successfully built"
 
 runb-backfill:
-	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-ch-backfill-$(GOOS)-$(GOARCH)
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH)
