@@ -98,13 +98,18 @@ func main() {
 	defer func() {
 		_ = chConn.Close()
 	}()
-	if err := repoCH.EnsureSchema(cfg.Clickhouse.Username, cfg.Clickhouse.Password, cfg.Clickhouse.Database, cfg.Clickhouse.Hosts[0], "/internal/repository/clickhouse/migrations/"); err != nil {
-		log.Fatal("clickhouse: ensure schema failed", zap.Error(err))
+	if cfg.Log.Level == "local" {
+		if err := repoCH.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
+			log.Fatal("clickhouse: ensure schema failed", zap.Error(err))
+		}
 	}
+
 	analyticsRepo := repoCH.NewAnalyticsRepo(chConn)
 
 	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
-	defer dlqProducer.Close()
+	defer func() {
+		_ = dlqProducer.Close()
+	}()
 
 	consumers := make(map[domain.Topic]*pkgkafka.Consumer, len(cfg.Kafka.Topics.Events))
 	for _, c := range cfg.Kafka.Topics.Events {
@@ -122,21 +127,15 @@ func main() {
 	}
 
 	handlers := make([]transportKafka.ConsumerHandler, 0, len(consumers))
-	var analyticsConsumers []*pkgkafka.Consumer
 	for t, consumer := range consumers {
 		switch t {
 		case domain.TopicOrderEvent, domain.TopicTransactionEvent:
 			handlers = append(handlers, transportKafka.NewNotificationConsumer(consumer, smtpClient, log))
 		case domain.TopicProductEvent:
 			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
+		case domain.TopicAnalyticsEvent:
+			handlers = append(handlers, transportKafka.NewAnalyticsConsumer(consumer, analyticsRepo, log))
 		}
-		// Analytics consumer subscribes to all topics with its own group so it
-		// does not compete with the notification/product consumers.
-		analyticsConsumer := pkgkafka.NewConsumer(
-			cfg.Kafka.Brokers, string(t), fmt.Sprintf("%s-%s-analytics", cfg.Kafka.GroupID, t), log,
-		)
-		analyticsConsumers = append(analyticsConsumers, analyticsConsumer)
-		handlers = append(handlers, transportKafka.NewAnalyticsConsumer(analyticsConsumer, analyticsRepo, log))
 	}
 
 	var wg sync.WaitGroup
@@ -155,9 +154,6 @@ func main() {
 	wg.Wait()
 	var consumerErrors error
 	for _, consumer := range consumers {
-		consumerErrors = errors.Join(consumer.Close())
-	}
-	for _, consumer := range analyticsConsumers {
 		consumerErrors = errors.Join(consumer.Close())
 	}
 	if consumerErrors != nil {
