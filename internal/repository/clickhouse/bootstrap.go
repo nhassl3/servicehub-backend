@@ -1,36 +1,32 @@
 package clickhouse
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"path/filepath"
+	"errors"
+	"log"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/clickhouse"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/nhassl3/servicehub-backend/internal/config"
+	"github.com/nhassl3/servicehub-backend/pkg/clickhouse"
 )
 
 // EnsureSchema applies idempotent DDL (database + fact table + aggregate
 // materialized views). It is safe to call on every startup.
-func EnsureSchema(ctx context.Context, conn driver.Conn) error {
-	entries, err := os.ReadDir("internal/repository/clickhouse/migrations")
+func EnsureSchema(cfg config.ClickhouseConfig, path string) error {
+	dbURL := clickhouse.DSN(cfg.Username, cfg.Password, cfg.Hosts[0], cfg.Database)
+
+	m, err := migrate.New("file://"+path, dbURL)
 	if err != nil {
-		return err
+		log.Fatalf("Migration initialization failed: %v", err)
 	}
 
-	for _, e := range entries {
-		sql, err := os.ReadFile(filepath.Join("internal/clickhouse/migrations", e.Name()))
-		if err != nil {
-			return err
-		}
+	// Apply all up migrations
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
-		if err := conn.Exec(ctx, string(sql)); err != nil {
-			return err
-		}
-	}
-	for _, stmt := range statements {
-		if err := conn.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("clickhouse.EnsureSchema: %w", err)
-		}
-	}
+	log.Println("Migrations applied successfully!")
+
 	return nil
 }
