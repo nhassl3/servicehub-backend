@@ -18,6 +18,12 @@ func Connect(
 	username, database, password, product, version string,
 	tlsEnable bool,
 ) (driver.Conn, error) {
+	var tlsConfig *tls.Config
+	if tlsEnable {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: hosts,
 		Auth: clickhouse.Auth{
@@ -34,9 +40,7 @@ func Connect(
 			},
 		},
 		Logger: slog.New(slog.NewJSONHandler(os.Stdout, nil)), // new slog logger with JSON handler
-		TLS: &tls.Config{
-			InsecureSkipVerify: !tlsEnable,
-		},
+		TLS:    tlsConfig,
 	})
 	if err != nil {
 		return nil, err
@@ -50,4 +54,11 @@ func Connect(
 	}
 
 	return conn, nil
+}
+
+func DSN(username, password, host, database string) string {
+	return fmt.Sprintf(
+		"clickhouse://%s:%s@%s/%s?x-multi-statement=true&x-migrations-table-engine=MergeTree",
+		username, password, host, database,
+	)
 }
