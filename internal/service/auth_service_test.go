@@ -11,6 +11,7 @@ import (
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 // ─── Mock TokenBlacklist ──────────────────────────────────────────────────────
@@ -251,7 +252,7 @@ func (m *mockUserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmai
 	}
 	return nil, domain.ErrNotFound
 }
-	
+
 func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, params)
@@ -265,8 +266,46 @@ func newAuthService(repo domain.UserRepository) *service.AuthService {
 	tm := &mockTokenManager{}
 	bl := newMockBlacklist()
 	redis := &mockUserRedis{}
-	return service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{})
+	return service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{}, noopPublisher{}, zap.NewNop())
 }
+
+// noopPublisher is a trivial EventPublisher stub so existing auth tests don't
+// need a gomock controller.
+type noopPublisher struct{}
+
+func (noopPublisher) PublishOrderCreated(context.Context, domain.OrderCreatedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishOrderStatusChanged(context.Context, domain.OrderStatusChangedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishTransactionCreated(context.Context, domain.TransactionCreatedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishBalanceUpdated(context.Context, domain.BalanceUpdatedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishIndexedProduct(context.Context, *domain.Product) error { return nil }
+func (noopPublisher) PublishDeletedProduct(context.Context, string) error          { return nil }
+func (noopPublisher) PublishUserRegistered(context.Context, domain.UserRegisteredPayload) error {
+	return nil
+}
+func (noopPublisher) PublishProductStatusChanged(context.Context, domain.ProductStatusChangedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishProductRatingChanged(context.Context, domain.ProductRatingChangedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishModerationApproved(context.Context, domain.ModerationApprovedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishModerationRejected(context.Context, domain.ModerationRejectedPayload) error {
+	return nil
+}
+func (noopPublisher) PublishOrderItemCreated(context.Context, domain.OrderItemCreatedPayload) error {
+	return nil
+}
+func (noopPublisher) Close() error { return nil }
 
 func TestAuthService_Register_OK(t *testing.T) {
 	repo := &mockUserRepo{}
@@ -378,7 +417,7 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	tm := &mockTokenManager{verifyErr: auth.ErrInvalidToken}
 	bl := newMockBlacklist()
 	redis := &mockUserRedis{}
-	svc := service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{})
+	svc := service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{}, noopPublisher{}, zap.NewNop())
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)

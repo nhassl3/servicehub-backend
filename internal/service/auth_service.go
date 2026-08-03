@@ -14,6 +14,7 @@ import (
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/hash"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -24,6 +25,8 @@ type AuthService struct {
 	refreshManager auth.TokenManager
 	blacklist      auth.TokenBlacklist
 	smtpClient     mailer.Notifier
+	eventPublisher domain.EventPublisher
+	log            *zap.Logger
 }
 
 func NewAuthService(
@@ -31,6 +34,8 @@ func NewAuthService(
 	tokenManager, refreshManager auth.TokenManager,
 	blacklist auth.TokenBlacklist,
 	smtpClient mailer.Notifier,
+	eventPublisher domain.EventPublisher,
+	log *zap.Logger,
 ) *AuthService {
 	return &AuthService{
 		userRepo:       userRepo,
@@ -39,6 +44,8 @@ func NewAuthService(
 		refreshManager: refreshManager,
 		blacklist:      blacklist,
 		smtpClient:     smtpClient,
+		eventPublisher: eventPublisher,
+		log:            log,
 	}
 }
 
@@ -91,6 +98,15 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
+	}
+
+	// Analytics fact: log the registration (best-effort, PG is the source of truth).
+	if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
+		UID:       user.UID,
+		Username:  user.Username,
+		CreatedAt: user.CreatedAt,
+	}); err != nil {
+		s.log.Warn("(Kafka) analytics: failed to publish user.registered", zap.Error(err))
 	}
 
 	tokens, err := s.createTokensAndSession(ctx, user, input.Username)
