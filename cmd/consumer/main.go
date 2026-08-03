@@ -17,6 +17,9 @@ import (
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
 
+	repoCH "github.com/nhassl3/servicehub-backend/internal/repository/clickhouse"
+	pkgCH "github.com/nhassl3/servicehub-backend/pkg/clickhouse"
+
 	"github.com/nhassl3/servicehub-backend/cmd"
 	transportKafka "github.com/nhassl3/servicehub-backend/internal/transport/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
@@ -79,6 +82,27 @@ func main() {
 
 	elsRepository := elsRepo.NewProductESRepo(elsClient, log)
 
+	// ClickHouse connect — analytics consumer writes OLAP facts here.
+	chConn, err := pkgCH.Connect(ctx,
+		cfg.Clickhouse.Hosts,
+		cfg.Clickhouse.Username,
+		cfg.Clickhouse.Database,
+		cfg.Clickhouse.Password,
+		cfg.Clickhouse.ClientInfo.Product,
+		cfg.Clickhouse.ClientInfo.Version,
+		cfg.Clickhouse.TLS,
+	)
+	if err != nil {
+		log.Fatal("clickhouse: connect failed", zap.Error(err))
+	}
+	defer func() {
+		_ = chConn.Close()
+	}()
+	if err := repoCH.EnsureSchema(cfg.Clickhouse.Username, cfg.Clickhouse.Password, cfg.Clickhouse.Database, cfg.Clickhouse.Hosts[0], "/internal/repository/clickhouse/migrations/"); err != nil {
+		log.Fatal("clickhouse: ensure schema failed", zap.Error(err))
+	}
+	analyticsRepo := repoCH.NewAnalyticsRepo(chConn)
+
 	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
 	defer dlqProducer.Close()
 
@@ -98,6 +122,7 @@ func main() {
 	}
 
 	handlers := make([]transportKafka.ConsumerHandler, 0, len(consumers))
+	var analyticsConsumers []*pkgkafka.Consumer
 	for t, consumer := range consumers {
 		switch t {
 		case domain.TopicOrderEvent, domain.TopicTransactionEvent:
@@ -105,6 +130,13 @@ func main() {
 		case domain.TopicProductEvent:
 			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
 		}
+		// Analytics consumer subscribes to all topics with its own group so it
+		// does not compete with the notification/product consumers.
+		analyticsConsumer := pkgkafka.NewConsumer(
+			cfg.Kafka.Brokers, string(t), fmt.Sprintf("%s-%s-analytics", cfg.Kafka.GroupID, t), log,
+		)
+		analyticsConsumers = append(analyticsConsumers, analyticsConsumer)
+		handlers = append(handlers, transportKafka.NewAnalyticsConsumer(analyticsConsumer, analyticsRepo, log))
 	}
 
 	var wg sync.WaitGroup
@@ -123,6 +155,9 @@ func main() {
 	wg.Wait()
 	var consumerErrors error
 	for _, consumer := range consumers {
+		consumerErrors = errors.Join(consumer.Close())
+	}
+	for _, consumer := range analyticsConsumers {
 		consumerErrors = errors.Join(consumer.Close())
 	}
 	if consumerErrors != nil {
