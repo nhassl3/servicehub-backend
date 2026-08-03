@@ -40,7 +40,7 @@ els:
 
 clickhouse:
   hosts:
-    - "localhost:9000"
+    - "localhost:19000"
   client:
     product: "example-clickhouse-servicehub"
     version: "0.1.0"

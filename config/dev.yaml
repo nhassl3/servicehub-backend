@@ -38,7 +38,7 @@ els:
 
 clickhouse:
   hosts:
-    - "clickhouse:9000"
+    - "clickhouse:19000"
     - "clickhouse:9440" # if using TLS
   client:
     product: "servicehub-clickhouse"
