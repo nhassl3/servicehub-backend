@@ -4,6 +4,7 @@ go 1.26.1
 
 require (
 	aidanwoods.dev/go-paseto v1.6.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.47.0
 	github.com/elastic/go-elasticsearch/v9 v9.4.2
 	github.com/go-passwd/validator v0.0.0-20250407044832-c284a2f4d990
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -28,7 +29,6 @@ require (
 require (
 	aidanwoods.dev/go-result v0.3.1 // indirect
 	github.com/ClickHouse/ch-go v0.73.0 // indirect
-	github.com/ClickHouse/clickhouse-go/v2 v2.47.0 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
