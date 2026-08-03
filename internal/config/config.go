@@ -22,6 +22,7 @@ type Config struct {
 	SMTP        SMTPConfig
 	ELS         ElasticSearchConfig
 	Clickhouse  ClickhouseConfig
+	Migrations  MigrationsConfig
 }
 
 type ServerConfig struct {
@@ -30,8 +31,8 @@ type ServerConfig struct {
 }
 
 type DBConfig struct {
-	Host  string
-	Port  int
+	Host string
+	Port int
 	User, // secret — from .env
 	Password, // secret — from .env
 	Name, // secret — from .env
@@ -113,6 +114,11 @@ type ClickhouseConfig struct {
 type ClientInfo struct {
 	Product,
 	Version string
+}
+
+type MigrationsConfig struct {
+	PostgresPath,
+	ClickhousePath string
 }
 
 // Load reads public configuration from a YAML file and secrets from an env file.
@@ -226,12 +232,15 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.ELS.Password = ev.GetString("ELS_PASSWORD")
 
 	cfg.Clickhouse.Hosts = yv.GetStringSlice("clickhouse.hosts")
-	cfg.Clickhouse.Username = ev.GetString("CLICKHOUSE_USERNAME")
-	cfg.Clickhouse.Database = ev.GetString("CLICKHOUSE_DATABASE")
+	cfg.Clickhouse.Username = ev.GetString("CLICKHOUSE_USER")
+	cfg.Clickhouse.Database = ev.GetString("CLICKHOUSE_DB")
 	cfg.Clickhouse.Password = ev.GetString("CLICKHOUSE_PASSWORD")
 	cfg.Clickhouse.ClientInfo.Product = yv.GetString("clickhouse.clinet.product")
 	cfg.Clickhouse.ClientInfo.Version = yv.GetString("clickhouse.clinet.version")
 	cfg.Clickhouse.TLS = yv.GetBool("clickhouse.tls")
+
+	cfg.Migrations.PostgresPath = yv.GetString("migrations.postgres_path")
+	cfg.Migrations.ClickhousePath = yv.GetString("migrations.clickhouse_path")
 
 	cfg.Log.Level = yv.GetString("log.level")
 

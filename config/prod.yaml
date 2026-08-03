@@ -62,3 +62,7 @@ log:
 smtp:
   host: "smtp.yandex.ru"
   port: 465
+
+migrations:
+  postgres_path: "internal/repository/postgres/migrations/"
+  clickhouse_path: "internal/repository/clickhouse/migrations/"

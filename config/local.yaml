@@ -41,7 +41,6 @@ els:
 clickhouse:
   hosts:
     - "localhost:9000"
-    - "localhost:9440" # if using tls
   client:
     product: "example-clickhouse-servicehub"
     version: "0.1.0"
@@ -62,3 +61,7 @@ log:
 smtp:
   host: "smtp.yandex.ru"
   port: 587
+
+migrations:
+  postgres_path: "internal/repository/postgres/migrations/"
+  clickhouse_path: "internal/repository/clickhouse/migrations/"
