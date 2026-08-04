@@ -5,12 +5,24 @@ import (
 	"time"
 )
 
+// EventType types for analytics
+type EventType string
+
+const (
+	UserRegisteredEventType       EventType = "user_registered"
+	ProductStatusChangedEventType EventType = "product_status_changed"
+	ProductRatingChangedEventType EventType = "product_rating_changed"
+	ModerationApprovedEventType   EventType = "moderation.approved"
+	ModerationRejectedEventType   EventType = "moderation.rejected"
+	OrderItemCreatedEventType     EventType = "order_item_created"
+)
+
 // AnalyticsEvent is a single normalized row written to the ClickHouse
 // fact table (analytics.events). Postgres remains the source of truth;
 // these rows are denormalized OLAP facts consumed from Kafka events.
 type AnalyticsEvent struct {
 	OccurredAt    time.Time
-	EventType     string // 'user_registered' | 'product_status_changed' | ...
+	EventType     EventType // 'user_registered' | 'product_status_changed' | ...
 	ProductID     string
 	CategoryID    int
 	Title         string

@@ -31,7 +31,7 @@ func (r *AnalyticsRepo) InsertEvents(ctx context.Context, events []domain.Analyt
 	for _, e := range events {
 		if err := batch.Append(
 			e.OccurredAt,
-			e.EventType,
+			string(e.EventType), // EventType -> string
 			e.ProductID,
 			e.SellerID,
 			e.AdminID,
@@ -79,15 +79,15 @@ func (r *AnalyticsRepo) GetAdminStatistics(ctx context.Context, params domain.Ad
 }
 
 func (r *AnalyticsRepo) loadProducts(ctx context.Context, out *domain.ProductStatusStats, params domain.AdminStatisticsParams) error {
-	rows, err := r.conn.Query(ctx, `
+	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT status, count()
 		FROM (
 			SELECT product_id, argMax(status, occurred_at) AS status
 			FROM analytics.events
-			WHERE event_type = 'product_status_changed' AND occurred_at >= ? AND occurred_at <= ?
+			WHERE event_type = '%s' AND occurred_at >= ? AND occurred_at <= ?
 			GROUP BY product_id
 		)
-		GROUP BY status`,
+		GROUP BY status`, domain.ProductStatusChangedEventType),
 		params.From, params.To)
 	if err != nil {
 		return fmt.Errorf("analytics loadProducts: %w", err)
@@ -112,7 +112,7 @@ func (r *AnalyticsRepo) loadProducts(ctx context.Context, out *domain.ProductSta
 }
 
 func (r *AnalyticsRepo) loadTopProducts(ctx context.Context, top *[]domain.TopProduct, params domain.AdminStatisticsParams) error {
-	rows, err := r.conn.Query(ctx, `
+	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT product_id,
 		       argMax(title, occurred_at) AS title,
 		       argMax(category_id, occurred_at) AS category_id,
@@ -120,11 +120,11 @@ func (r *AnalyticsRepo) loadTopProducts(ctx context.Context, top *[]domain.TopPr
 		       argMax(sales_count, occurred_at) AS sales_count,
 		       argMax(reviews_count, occurred_at) AS reviews_count
 		FROM analytics.events
-		WHERE event_type IN ('product_status_changed','product_rating_changed')
+		WHERE event_type IN ('%s', '%s')
 		  AND occurred_at >= ? AND occurred_at <= ?
 		GROUP BY product_id
 		ORDER BY rating DESC
-		LIMIT 20`,
+		LIMIT 20`, domain.ProductStatusChangedEventType, domain.ProductRatingChangedEventType),
 		params.From, params.To)
 	if err != nil {
 		return fmt.Errorf("analytics loadTopProducts: %w", err)
@@ -145,14 +145,14 @@ func (r *AnalyticsRepo) loadTopProducts(ctx context.Context, top *[]domain.TopPr
 }
 
 func (r *AnalyticsRepo) loadTopCategories(ctx context.Context, cats *[]domain.CategorySales, params domain.AdminStatisticsParams) error {
-	rows, err := r.conn.Query(ctx, `
+	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT category_id, sum(quantity) AS sales, sum(total) AS total
 		FROM analytics.events
-		WHERE event_type = 'order_item_created'
+		WHERE event_type = '%s'
 		  AND occurred_at >= ? AND occurred_at <= ?
 		GROUP BY category_id
 		ORDER BY total DESC
-		LIMIT 10`,
+		LIMIT 10`, domain.OrderItemCreatedEventType),
 		params.From, params.To)
 	if err != nil {
 		return fmt.Errorf("analytics loadTopCategories: %w", err)
@@ -184,9 +184,9 @@ func (r *AnalyticsRepo) loadRegistrations(ctx context.Context, regs *[]domain.Re
 	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT %s AS bucket, count() AS cnt
 		FROM analytics.events
-		WHERE event_type = 'user_registered' AND occurred_at >= ? AND occurred_at <= ?
+		WHERE event_type = '%s' AND occurred_at >= ? AND occurred_at <= ?
 		GROUP BY bucket
-		ORDER BY bucket`, expr), params.From, params.To)
+		ORDER BY bucket`, expr, domain.UserRegisteredEventType), params.From, params.To)
 	if err != nil {
 		return fmt.Errorf("analytics loadRegistrations: %w", err)
 	}
@@ -208,10 +208,10 @@ func (r *AnalyticsRepo) loadModerations(ctx context.Context, mods *[]domain.Mode
 	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT %s AS bucket, admin_id, admin_username, count() AS cnt
 		FROM analytics.events
-		WHERE event_type IN ('moderation.approved','moderation.rejected')
+		WHERE event_type IN ('%s','%s')
 		  AND occurred_at >= ? AND occurred_at <= ?
 		GROUP BY bucket, admin_id, admin_username
-		ORDER BY bucket, admin_id`, expr), params.From, params.To)
+		ORDER BY bucket, admin_id`, expr, domain.ModerationApprovedEventType, domain.ModerationRejectedEventType), params.From, params.To)
 	if err != nil {
 		return fmt.Errorf("analytics loadModerations: %w", err)
 	}

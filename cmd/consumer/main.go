@@ -151,6 +151,7 @@ func main() {
 	}
 
 	log.Info("kafka consumer service started", zap.String("env", cfg.Environment), zap.String("Mode", cfg.Log.Level))
+	log.Info("───────────────────────────────────────────────────────────────────────────────────────────────────")
 	wg.Wait()
 	var consumerErrors error
 	for _, consumer := range consumers {

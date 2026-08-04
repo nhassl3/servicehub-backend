@@ -102,21 +102,6 @@ func (h *AdminHandler) IncreaseTotalModerates(ctx context.Context, req *adminv1.
 	})
 }
 
-// ── Proto mapper ─────────────────────────────────────────────────────────────
-
-func protoAdmin(s *domain.Admin) *adminv1.AdminProfile {
-	return &adminv1.AdminProfile{
-		Id:              s.ID,
-		Username:        s.Username,
-		DisplayName:     s.DisplayName,
-		LevelRights:     s.LevelRights,
-		TotalModeration: s.TotalModerates,
-		AvatarUrl:       s.AvatarURL,
-		CreatedAt:       safeTimestamp(s.CreatedAt),
-		UpdatedAt:       safeTimestamp(s.UpdatedAt),
-	}
-}
-
 func (h *AdminHandler) GetAdminStatistics(ctx context.Context, req *adminv1.GetAdminStatisticsRequest) (*adminv1.GetAdminStatisticsResponse, error) {
 	username, err := mustUsername(ctx)
 	if err != nil {
@@ -151,8 +136,23 @@ func (h *AdminHandler) GetAdminStatistics(ctx context.Context, req *adminv1.GetA
 		TopProducts:   protoTopProducts(stats.TopProducts),
 		TopCategories: protoTopCategories(stats.TopCategories),
 		Registrations: protoRegistrations(stats.Registrations),
-		Moderates:     protoModerations(stats.Moderations),
+		Moderates:     protoModerates(stats.Moderations),
 	}, nil
+}
+
+// ── Proto mapper ─────────────────────────────────────────────────────────────
+
+func protoAdmin(s *domain.Admin) *adminv1.AdminProfile {
+	return &adminv1.AdminProfile{
+		Id:              s.ID,
+		Username:        s.Username,
+		DisplayName:     s.DisplayName,
+		LevelRights:     s.LevelRights,
+		TotalModeration: s.TotalModerates,
+		AvatarUrl:       s.AvatarURL,
+		CreatedAt:       safeTimestamp(s.CreatedAt),
+		UpdatedAt:       safeTimestamp(s.UpdatedAt),
+	}
 }
 
 func protoTopProducts(top []domain.TopProduct) []*adminv1.TopProduct {
@@ -195,7 +195,7 @@ func protoRegistrations(pts []domain.RegistrationPoint) []*adminv1.RegistrationP
 	return res
 }
 
-func protoModerations(pts []domain.ModerationPoint) []*adminv1.ModeratePoint {
+func protoModerates(pts []domain.ModerationPoint) []*adminv1.ModeratePoint {
 	res := make([]*adminv1.ModeratePoint, 0, len(pts))
 	for _, p := range pts {
 		res = append(res, &adminv1.ModeratePoint{

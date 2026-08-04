@@ -41,16 +41,15 @@ func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) e
 		c.log.Debug("analytics-consumer: skipping unknown event type", zap.Int8("type", int8(env.Type)))
 		return nil
 	}
-	if event.EventType == "" {
-		// known type but bad payload — keep the consumer alive, drop the message.
-		return nil
-	}
 
 	// ClickHouse writes are best-effort: retry briefly, then drop. Analytics
 	// loss is acceptable — Postgres remains the source of truth.
-	_ = util.WithRetry(ctx, util.DefaultCloseRetry, func() error {
+	if err := util.WithRetry(ctx, util.DefaultCloseRetry, func() error {
 		return c.repo.InsertEvents(ctx, []domain.AnalyticsEvent{event})
-	})
+	}); err != nil {
+		c.log.Debug("analytics-consumer: failed to insert events", zap.Error(err))
+	}
+
 	return nil
 }
 
@@ -66,7 +65,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt: p.CreatedAt,
-			EventType:  "user_registered",
+			EventType:  domain.UserRegisteredEventType,
 		}, true
 
 	case domain.ProductStatusChanged:
@@ -76,7 +75,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt:   p.OccurredAt,
-			EventType:    "product_status_changed",
+			EventType:    domain.ProductStatusChangedEventType,
 			ProductID:    p.ID,
 			SellerID:     p.SellerID,
 			CategoryID:   p.CategoryID,
@@ -94,7 +93,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt:   p.OccurredAt,
-			EventType:    "product_rating_changed",
+			EventType:    domain.ProductRatingChangedEventType,
 			ProductID:    p.ID,
 			CategoryID:   p.CategoryID,
 			Title:        p.Title,
@@ -109,7 +108,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt:    p.OccurredAt,
-			EventType:     "moderation.approved",
+			EventType:     domain.ModerationApprovedEventType,
 			ProductID:     p.ProductID,
 			CategoryID:    p.CategoryID,
 			AdminID:       p.AdminID,
@@ -123,7 +122,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt:    p.OccurredAt,
-			EventType:     "moderation.rejected",
+			EventType:     domain.ModerationRejectedEventType,
 			ProductID:     p.ProductID,
 			CategoryID:    p.CategoryID,
 			AdminID:       p.AdminID,
@@ -138,7 +137,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 		}
 		return domain.AnalyticsEvent{
 			OccurredAt: p.OccurredAt,
-			EventType:  "order_item_created",
+			EventType:  domain.OrderItemCreatedEventType,
 			ProductID:  p.ProductID,
 			CategoryID: p.CategoryID,
 			SellerID:   p.SellerID,
@@ -146,7 +145,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 			Quantity:   p.Qty,
 			Total:      p.Total,
 		}, true
+	default:
+		return domain.AnalyticsEvent{}, false
 	}
-
-	return domain.AnalyticsEvent{}, false
 }

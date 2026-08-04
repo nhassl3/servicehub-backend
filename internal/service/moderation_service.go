@@ -190,7 +190,7 @@ func (s *ModerationService) finalize(ctx context.Context, productID, username, s
 }
 
 // PublishModerationOutcome emits the analytics events for a finalize decision:
-// the product status change plus the approve/reject moderation fact. All of
+// the product status change plus the approval/reject moderation fact. All of
 // these writes are best-effort (Postgres is the source of truth).
 func (s *ModerationService) PublishModerationOutcome(ctx context.Context, product *domain.Product, status, productID, username string) {
 	adminID, err := s.resolveAdminID(ctx, username)
@@ -198,7 +198,6 @@ func (s *ModerationService) PublishModerationOutcome(ctx context.Context, produc
 		s.log.Warn("moderation_service: failed to resolve admin for analytics event", zap.Error(err))
 		return
 	}
-	adminUsername := username
 	occurredAt := time.Now()
 
 	if err := s.eventPublisher.PublishProductStatusChanged(ctx, domain.ProductStatusChangedPayload{
@@ -220,7 +219,7 @@ func (s *ModerationService) PublishModerationOutcome(ctx context.Context, produc
 			ProductID:     productID,
 			CategoryID:    product.CategoryID,
 			AdminID:       adminID,
-			AdminUsername: adminUsername,
+			AdminUsername: username,
 			OccurredAt:    occurredAt,
 		}); err != nil {
 			s.log.Warn("(Kafka) analytics: failed to publish moderation.approved", zap.Error(err))
@@ -231,7 +230,7 @@ func (s *ModerationService) PublishModerationOutcome(ctx context.Context, produc
 		ProductID:     productID,
 		CategoryID:    product.CategoryID,
 		AdminID:       adminID,
-		AdminUsername: adminUsername,
+		AdminUsername: username,
 		OccurredAt:    occurredAt,
 	}); err != nil {
 		s.log.Warn("(Kafka) analytics: failed to publish moderation.rejected", zap.Error(err))

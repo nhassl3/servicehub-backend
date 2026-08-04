@@ -51,34 +51,36 @@ func (p *EventPublisher) PublishDeletedProduct(ctx context.Context, id string) e
 	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("deleted-product-%s", id), env)
 }
 
+// Analytics events:
+
 func (p *EventPublisher) PublishUserRegistered(ctx context.Context, payload domain.UserRegisteredPayload) error {
 	env := domain.NewEnvelope(domain.UserRegistered, payload)
-	return p.publish(ctx, domain.TopicTransactionEvent, fmt.Sprintf("user-%s", payload.Username), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("user-%s", payload.Username), env)
 }
 
 func (p *EventPublisher) PublishProductStatusChanged(ctx context.Context, payload domain.ProductStatusChangedPayload) error {
 	env := domain.NewEnvelope(domain.ProductStatusChanged, payload)
-	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("product-%s", payload.ID), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("product-%s", payload.ID), env)
 }
 
 func (p *EventPublisher) PublishProductRatingChanged(ctx context.Context, payload domain.ProductRatingChangedPayload) error {
 	env := domain.NewEnvelope(domain.ProductRatingChanged, payload)
-	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("product-%s", payload.ID), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("product-%s", payload.ID), env)
 }
 
 func (p *EventPublisher) PublishModerationApproved(ctx context.Context, payload domain.ModerationApprovedPayload) error {
 	env := domain.NewEnvelope(domain.ModerationApproved, payload)
-	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("product-%s", payload.ProductID), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("product-%s", payload.ProductID), env)
 }
 
 func (p *EventPublisher) PublishModerationRejected(ctx context.Context, payload domain.ModerationRejectedPayload) error {
 	env := domain.NewEnvelope(domain.ModerationRejected, payload)
-	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("product-%s", payload.ProductID), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("product-%s", payload.ProductID), env)
 }
 
 func (p *EventPublisher) PublishOrderItemCreated(ctx context.Context, payload domain.OrderItemCreatedPayload) error {
 	env := domain.NewEnvelope(domain.OrderItemCreated, payload)
-	return p.publish(ctx, domain.TopicOrderEvent, fmt.Sprintf("order-%s", payload.OrderID), env)
+	return p.publish(ctx, domain.TopicAnalyticsEvent, fmt.Sprintf("order-%s", payload.OrderID), env)
 }
 
 // publish public event in producer
