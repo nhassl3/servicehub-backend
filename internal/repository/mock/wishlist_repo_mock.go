@@ -35,21 +35,6 @@ func (m *MockWishlistRepository) EXPECT() *MockWishlistRepositoryMockRecorder {
 	return m.recorder
 }
 
-// AddItem mocks base method.
-func (m *MockWishlistRepository) AddItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddItem", ctx, username, productID)
-	ret0, _ := ret[0].(*domain.WishlistItem)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AddItem indicates an expected call of AddItem.
-func (mr *MockWishlistRepositoryMockRecorder) AddItem(ctx, username, productID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddItem", reflect.TypeOf((*MockWishlistRepository)(nil).AddItem), ctx, username, productID)
-}
-
 // Exists mocks base method.
 func (m *MockWishlistRepository) Exists(ctx context.Context, username, productID string) (bool, error) {
 	m.ctrl.T.Helper()
@@ -92,4 +77,19 @@ func (m *MockWishlistRepository) RemoveItem(ctx context.Context, username, produ
 func (mr *MockWishlistRepositoryMockRecorder) RemoveItem(ctx, username, productID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveItem", reflect.TypeOf((*MockWishlistRepository)(nil).RemoveItem), ctx, username, productID)
+}
+
+// ToggleWishlistItem mocks base method.
+func (m *MockWishlistRepository) ToggleWishlistItem(ctx context.Context, username, productID string) (*domain.WishlistItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ToggleWishlistItem", ctx, username, productID)
+	ret0, _ := ret[0].(*domain.WishlistItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ToggleWishlistItem indicates an expected call of ToggleWishlistItem.
+func (mr *MockWishlistRepositoryMockRecorder) ToggleWishlistItem(ctx, username, productID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToggleWishlistItem", reflect.TypeOf((*MockWishlistRepository)(nil).ToggleWishlistItem), ctx, username, productID)
 }

@@ -21,6 +21,8 @@ type Config struct {
 	Kafka       KafkaConfig
 	SMTP        SMTPConfig
 	ELS         ElasticSearchConfig
+	Clickhouse  ClickhouseConfig
+	Migrations  MigrationsConfig
 }
 
 type ServerConfig struct {
@@ -29,8 +31,8 @@ type ServerConfig struct {
 }
 
 type DBConfig struct {
-	Host  string
-	Port  int
+	Host string
+	Port int
 	User, // secret — from .env
 	Password, // secret — from .env
 	Name, // secret — from .env
@@ -100,6 +102,25 @@ type ElasticSearchConfig struct {
 	Password string
 }
 
+type ClickhouseConfig struct {
+	Hosts []string
+	Username,
+	Database,
+	Password string
+	ClientInfo ClientInfo
+	TLS        bool
+}
+
+type ClientInfo struct {
+	Product,
+	Version string
+}
+
+type MigrationsConfig struct {
+	PostgresPath,
+	ClickhousePath string
+}
+
 // Load reads public configuration from a YAML file and secrets from an env file.
 //
 //	configFile — path to the YAML file, e.g. "config/local.yaml"
@@ -128,6 +149,8 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetDefault("minio.use_ssl", "true")
 	yv.SetDefault("smtp.host", "smtp.yandex.ru")
 	yv.SetDefault("smtp.port", 587)
+	yv.SetDefault("clickhoues.client.product", "example-clickhouse-servicehub")
+	yv.SetDefault("clickhoues.client.version", "v0.1.0d")
 
 	if err := yv.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("config: read yaml %q: %w", configFile, err)
@@ -207,6 +230,17 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.ELS.Hosts = yv.GetStringSlice("els.hosts")
 	cfg.ELS.Username = ev.GetString("ELS_USERNAME")
 	cfg.ELS.Password = ev.GetString("ELS_PASSWORD")
+
+	cfg.Clickhouse.Hosts = yv.GetStringSlice("clickhouse.hosts")
+	cfg.Clickhouse.Username = ev.GetString("CLICKHOUSE_USER")
+	cfg.Clickhouse.Database = ev.GetString("CLICKHOUSE_DB")
+	cfg.Clickhouse.Password = ev.GetString("CLICKHOUSE_PASSWORD")
+	cfg.Clickhouse.ClientInfo.Product = yv.GetString("clickhouse.clinet.product")
+	cfg.Clickhouse.ClientInfo.Version = yv.GetString("clickhouse.clinet.version")
+	cfg.Clickhouse.TLS = yv.GetBool("clickhouse.tls")
+
+	cfg.Migrations.PostgresPath = yv.GetString("migrations.postgres_path")
+	cfg.Migrations.ClickhousePath = yv.GetString("migrations.clickhouse_path")
 
 	cfg.Log.Level = yv.GetString("log.level")
 

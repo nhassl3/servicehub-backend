@@ -43,6 +43,7 @@ COPY --from=builder /go/bin/migrate ./migrate
 
 # Copy configuration files (DO NOT include .env - it should be provided at runtime)
 COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/internal/repository/clickhouse/migrations internal/repository/clickhouse/migrations/
 COPY --from=builder /app/config/prod.yaml config/prod.yaml
 COPY --from=builder /app/config/local.yaml config/local.yaml
 COPY --from=builder /app/config/dev.yaml config/dev.yaml

@@ -28,6 +28,7 @@ kafka:
       - "order_events"
       - "transaction_events"
       - "product_events"
+      - "analytics_events"
     notifications: "notifications"
     notifications_dlq: "notification_dlq"
   brokers:
@@ -37,6 +38,15 @@ kafka:
 els:
   hosts:
     - "http://elasticsearch:9200"
+
+clickhouse:
+  hosts:
+    - "clickhouse:19000"
+    - "clickhouse:9440" # if using tls
+  client:
+    product: "servicehub-clickhouse"
+    version: "0.1.0"
+  tls: true
 
 auth:
   access_token_ttl: 15m
@@ -53,3 +63,7 @@ log:
 smtp:
   host: "smtp.yandex.ru"
   port: 465
+
+migrations:
+  postgres_path: "internal/repository/postgres/migrations/"
+  clickhouse_path: "internal/repository/clickhouse/migrations/"

@@ -223,8 +223,15 @@ func mapQueueRows(rows []db.ListModerationItemsRow) []*domain.QueueRow {
 	res := make([]*domain.QueueRow, 0, len(rows))
 	for _, e := range rows {
 		var moderation *domain.Moderation
-		if e.Moderation.ID.String() != "" {
-			moderation = mapModeration(&e.Moderation)
+		if e.ModerationID.Valid {
+			moderation = &domain.Moderation{
+				ID:        uuidStringFromPg(e.ModerationID),
+				ProductID: uuidStringFromPg(e.ModerationProductID),
+				AdminID:   uuidStringFromPg(e.ModerationAdminID),
+				Active:    e.ModerationActive.Bool,
+				CreatedAt: pgTimeTZ(e.ModerationCreatedAt, time.UTC),
+				UpdatedAt: pgTimeTZ(e.ModerationUpdatedAt, time.UTC),
+			}
 		}
 		res = append(res, &domain.QueueRow{
 			Product:       domain.MapProduct(&e.Product),

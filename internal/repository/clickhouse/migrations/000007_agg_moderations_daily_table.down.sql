@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS analytics.agg_moderations_daily;

@@ -6,6 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nhassl3/servicehub-backend/internal/config"
+	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 )
 
 // Store combines the SQLC Queries with a connection pool, adding support
@@ -65,4 +67,15 @@ func (s *Store) BeginTx(ctx context.Context) (*Queries, pgx.Tx, error) {
 		return nil, nil, err
 	}
 	return s.WithTx(tx), tx, nil
+}
+
+// NewPool create pool of connections for postgres database.
+// DO NOT FORGET TO CLOSE THIS POOL IN DEGER FUNCTION.
+func NewPool(ctx context.Context, DB config.DBConfig) (*pgxpool.Pool, error) {
+	dsn := postgres.DSN(DB.Host, DB.Port, DB.User, DB.Password, DB.Name, DB.SSLMode)
+	pool, err := postgres.New(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: %w", err)
+	}
+	return pool, nil
 }

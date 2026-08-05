@@ -52,6 +52,7 @@ type Services struct {
 	Balance      *service.BalanceService
 	Moderation   *service.ModerationService
 	Notification *service.NotificationService
+	Analytics    *service.AnalyticsService
 }
 
 // Handlers holds all gRPC handler implementations.
@@ -107,7 +108,7 @@ func NewServer(services *Services, tokenManager auth.TokenManager, log *zap.Logg
 	)
 
 	handlers := &Handlers{
-		Admin:        NewAdminHandler(services.Admin),
+		Admin:        NewAdminHandler(services.Admin, services.Analytics),
 		Auth:         NewAuthHandler(services.Auth, tokenManager),
 		User:         NewUserHandler(services.User),
 		Category:     NewCategoryHandler(services.Category),

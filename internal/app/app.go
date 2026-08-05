@@ -8,11 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/nhassl3/servicehub-backend/internal/config"
 	"github.com/nhassl3/servicehub-backend/internal/db"
+	repoClickhouse "github.com/nhassl3/servicehub-backend/internal/repository/clickhouse"
 	repoES "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
 	repoPostgres "github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
@@ -20,10 +20,10 @@ import (
 	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	"github.com/nhassl3/servicehub-backend/pkg/clickhouse"
 	pkgES "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
-	"github.com/nhassl3/servicehub-backend/pkg/postgres"
 	pkgRedis "github.com/nhassl3/servicehub-backend/pkg/redis"
 	minio "github.com/nhassl3/servicehub-backend/pkg/storage"
 	"go.uber.org/zap"
@@ -31,23 +31,26 @@ import (
 
 // Run bootstraps and starts the application.
 func Run(cfg *config.Config, log *zap.Logger) error {
-	// ─── Database ─────────────────────────────────────────────────────────────
 	ctx := context.Background()
-	dsn := postgres.DSN(cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.Name, cfg.DB.SSLMode)
 
-	pool, err := postgres.New(ctx, dsn)
+	// ─── Database ─────────────────────────────────────────────────────────────
+	pool, err := db.NewPool(ctx, cfg.DB)
 	if err != nil {
-		return fmt.Errorf("app: connect postgres: %w", err)
+		return err
 	}
 	defer pool.Close()
 	log.Info("connected to PostgresSQL")
 
 	// ─── Migrations ───────────────────────────────────────────────────────────
 	if cfg.Environment == "local" {
-		if err := runMigrations(dsn, log); err != nil {
-			return fmt.Errorf("app: run migrations: %w", err)
+		if err := repoPostgres.EnsureSchema(cfg.DB, cfg.Migrations.PostgresPath); err != nil {
+			return fmt.Errorf("app: ensure postgres schema: %w", err)
+		}
+		if err := repoClickhouse.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
+			return fmt.Errorf("app: ensure clickhouse schema: %w", err)
 		}
 	}
+	log.Info("Successfully applied all migration (Clickhouse and Postgres)")
 
 	// ─── SQLC Store ─────────────────────────────────────────────────────────
 	store := db.NewStore(pool)
@@ -100,6 +103,24 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	producers = append(producers, kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.Notifications, log))
 
 	eventPublisher := serviceKafka.NewEventPublisher(eventProducers)
+
+	// ─── Clickhouse ───────────────────────────────────────────────────────────
+	conn, err := clickhouse.Connect(ctx,
+		cfg.Clickhouse.Hosts,
+		cfg.Clickhouse.Username,
+		cfg.Clickhouse.Database,
+		cfg.Clickhouse.Password,
+		cfg.Clickhouse.ClientInfo.Product,
+		cfg.Clickhouse.ClientInfo.Version,
+		cfg.Clickhouse.TLS,
+	)
+	if err != nil {
+		return fmt.Errorf("app: connect clickhouse: %w", err)
+	}
+	defer func() {
+		_ = conn.Close()
+	}()
+	log.Info("connected to ClickHouse")
 
 	// ─── MinIO ────────────────────────────────────────────────────────────────
 	minIOClient, err := minio.NewMinIO(
@@ -166,22 +187,24 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	if err := esProductRepo.EnsureIndex(ctx); err != nil {
 		return fmt.Errorf("app: ensure elasticsearch index: %w", err)
 	}
+	analyticsRepo := repoClickhouse.NewAnalyticsRepo(conn)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
 	svcs := &transportGRPC.Services{
 		Admin:        service.NewAdminService(adminRepo, minIOClient, adminRedis),
-		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient),
+		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient, eventPublisher, log),
 		User:         service.NewUserService(userRepo, minIOClient, userRedis),
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:      service.NewProductService(productRepo, esProductRepo, sellerRepo, eventPublisher, log),
 		Cart:         service.NewCartService(cartRepo),
-		Order:        service.NewOrderService(orderRepo, eventPublisher, userRedis, log),
-		Review:       service.NewReviewService(reviewRepo),
+		Order:        service.NewOrderService(orderRepo, productRepo, eventPublisher, userRedis, log),
+		Review:       service.NewReviewService(reviewRepo, productRepo, eventPublisher, log),
 		Wishlist:     service.NewWishlistService(wishlistRepo),
-		Seller:       service.NewSellerService(sellerRepo, minIOClient),
+		Seller:       service.NewSellerService(sellerRepo, minIOClient, userRedis),
 		Balance:      service.NewBalanceService(balanceRepo, eventPublisher, userRedis, log),
-		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis),
+		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis, eventPublisher, log),
 		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo),
+		Analytics:    service.NewAnalyticsService(analyticsRepo, adminRepo, adminRedis),
 	}
 
 	// ─── gRPC Server ──────────────────────────────────────────────────────────
@@ -233,21 +256,4 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		grpcServer.Shutdown(shutdownCtx)
 		return nil
 	}
-}
-
-func runMigrations(dsn string, log *zap.Logger) error {
-	m, err := migrate.New("file://migrations", dsn)
-	if err != nil {
-		return fmt.Errorf("create migrate: %w", err)
-	}
-	defer func(m *migrate.Migrate) {
-		_, _ = m.Close()
-	}(m) //nolint:errcheck
-
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("migrate up: %w", err)
-	}
-
-	log.Info("migrations applied")
-	return nil
 }

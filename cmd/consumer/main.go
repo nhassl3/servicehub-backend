@@ -17,6 +17,9 @@ import (
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
 
+	repoCH "github.com/nhassl3/servicehub-backend/internal/repository/clickhouse"
+	pkgCH "github.com/nhassl3/servicehub-backend/pkg/clickhouse"
+
 	"github.com/nhassl3/servicehub-backend/cmd"
 	transportKafka "github.com/nhassl3/servicehub-backend/internal/transport/kafka"
 	"github.com/nhassl3/servicehub-backend/pkg/kafka"
@@ -79,8 +82,34 @@ func main() {
 
 	elsRepository := elsRepo.NewProductESRepo(elsClient, log)
 
+	// ClickHouse connect — analytics consumer writes OLAP facts here.
+	chConn, err := pkgCH.Connect(ctx,
+		cfg.Clickhouse.Hosts,
+		cfg.Clickhouse.Username,
+		cfg.Clickhouse.Database,
+		cfg.Clickhouse.Password,
+		cfg.Clickhouse.ClientInfo.Product,
+		cfg.Clickhouse.ClientInfo.Version,
+		cfg.Clickhouse.TLS,
+	)
+	if err != nil {
+		log.Fatal("clickhouse: connect failed", zap.Error(err))
+	}
+	defer func() {
+		_ = chConn.Close()
+	}()
+	if cfg.Log.Level == "local" {
+		if err := repoCH.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
+			log.Fatal("clickhouse: ensure schema failed", zap.Error(err))
+		}
+	}
+
+	analyticsRepo := repoCH.NewAnalyticsRepo(chConn)
+
 	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
-	defer dlqProducer.Close()
+	defer func() {
+		_ = dlqProducer.Close()
+	}()
 
 	consumers := make(map[domain.Topic]*pkgkafka.Consumer, len(cfg.Kafka.Topics.Events))
 	for _, c := range cfg.Kafka.Topics.Events {
@@ -104,6 +133,8 @@ func main() {
 			handlers = append(handlers, transportKafka.NewNotificationConsumer(consumer, smtpClient, log))
 		case domain.TopicProductEvent:
 			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
+		case domain.TopicAnalyticsEvent:
+			handlers = append(handlers, transportKafka.NewAnalyticsConsumer(consumer, analyticsRepo, log))
 		}
 	}
 
@@ -120,6 +151,7 @@ func main() {
 	}
 
 	log.Info("kafka consumer service started", zap.String("env", cfg.Environment), zap.String("Mode", cfg.Log.Level))
+	log.Info("───────────────────────────────────────────────────────────────────────────────────────────────────")
 	wg.Wait()
 	var consumerErrors error
 	for _, consumer := range consumers {

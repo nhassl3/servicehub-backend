@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"go.uber.org/zap"
 )
 
 // ModerationService implements the admin-panel moderation workflow:
@@ -17,6 +19,8 @@ type ModerationService struct {
 	productRepo    domain.ProductRepository
 	lock           domain.ModerationLockRedis
 	adminRedis     domain.AdminRedis
+	eventPublisher domain.EventPublisher
+	log            *zap.Logger
 }
 
 func NewModerationService(
@@ -25,6 +29,8 @@ func NewModerationService(
 	productRepo domain.ProductRepository,
 	lock domain.ModerationLockRedis,
 	adminRedis domain.AdminRedis,
+	eventPublisher domain.EventPublisher,
+	log *zap.Logger,
 ) *ModerationService {
 	return &ModerationService{
 		moderationRepo: moderationRepo,
@@ -32,6 +38,8 @@ func NewModerationService(
 		productRepo:    productRepo,
 		lock:           lock,
 		adminRedis:     adminRedis,
+		eventPublisher: eventPublisher,
+		log:            log,
 	}
 }
 
@@ -175,7 +183,58 @@ func (s *ModerationService) finalize(ctx context.Context, productID, username, s
 		// Counter is best-effort — don't roll back the moderation decision.
 		_ = err
 	}
+
+	s.PublishModerationOutcome(ctx, product, status, productID, username)
+
 	return product, nil
+}
+
+// PublishModerationOutcome emits the analytics events for a finalize decision:
+// the product status change plus the approval/reject moderation fact. All of
+// these writes are best-effort (Postgres is the source of truth).
+func (s *ModerationService) PublishModerationOutcome(ctx context.Context, product *domain.Product, status, productID, username string) {
+	adminID, err := s.resolveAdminID(ctx, username)
+	if err != nil {
+		s.log.Warn("moderation_service: failed to resolve admin for analytics event", zap.Error(err))
+		return
+	}
+	occurredAt := time.Now()
+
+	if err := s.eventPublisher.PublishProductStatusChanged(ctx, domain.ProductStatusChangedPayload{
+		ID:           product.ID,
+		SellerID:     product.SellerID,
+		CategoryID:   product.CategoryID,
+		Title:        product.Title,
+		Status:       product.Status,
+		Rating:       product.Rating,
+		SalesCount:   product.SalesCount,
+		ReviewsCount: product.ReviewsCount,
+		OccurredAt:   occurredAt,
+	}); err != nil {
+		s.log.Warn("(Kafka) analytics: failed to publish product status change", zap.Error(err))
+	}
+
+	if status == "active" {
+		if err := s.eventPublisher.PublishModerationApproved(ctx, domain.ModerationApprovedPayload{
+			ProductID:     productID,
+			CategoryID:    product.CategoryID,
+			AdminID:       adminID,
+			AdminUsername: username,
+			OccurredAt:    occurredAt,
+		}); err != nil {
+			s.log.Warn("(Kafka) analytics: failed to publish moderation.approved", zap.Error(err))
+		}
+		return
+	}
+	if err := s.eventPublisher.PublishModerationRejected(ctx, domain.ModerationRejectedPayload{
+		ProductID:     productID,
+		CategoryID:    product.CategoryID,
+		AdminID:       adminID,
+		AdminUsername: username,
+		OccurredAt:    occurredAt,
+	}); err != nil {
+		s.log.Warn("(Kafka) analytics: failed to publish moderation.rejected", zap.Error(err))
+	}
 }
 
 // Stats aggregates the dashboard counters for the calling admin.

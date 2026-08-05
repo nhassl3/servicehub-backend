@@ -12,7 +12,14 @@ WHERE (sqlc.narg('admin_id')::uuid IS NULL OR admin_id = sqlc.narg('admin_id')::
 SELECT
     sqlc.embed(p),
     a.username AS admin_username,
-    sqlc.embed(m)
+    m.id AS moderation_id,
+    m.admin_id AS moderation_admin_id,
+    m.product_id AS moderation_product_id,
+    m.active AS moderation_active,
+    m.created_at AS moderation_created_at,
+    m.updated_at AS moderation_updated_at,
+    m.reason AS moderation_reason,
+    m.status AS moderation_status
 FROM products p
          LEFT JOIN moderation m ON p.id = m.product_id
          LEFT JOIN admins a ON a.id = m.admin_id

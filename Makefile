@@ -1,5 +1,6 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
-.els-docker els-docker-stop els-reindex-build runb-els-reindex
+els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb \
+clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force
 
 .DEFAULT_GOAL := build
 
@@ -14,18 +15,24 @@ DB_HOST     ?= localhost
 DB_PORT     ?= 5432
 DB_SSL_MODE ?= disable
 
+CLICKHOUSE_HOST ?= localhost
+CLICKHOUSE_PORT ?= 19000
+
 # Binary
 BINARY_NAME=servicehub
 BUILD_DIR=./bin
 CMD_PATH=./cmd/servicehub
 CONSUMER_PATH=./cmd/consumer
 ES_REINDEX_PATH=./cmd/es-reindex
+BACKFILL_PATH=./cmd/analytics-backfill
 ENVIRONMENT=local
 
 # Migrations
 MIGRATE_BIN=$(shell which migrate 2>/dev/null || echo "migrate")
-MIGRATE_PATH=file://migrations
+POSTGRES_MIGRATE_PATH=internal/repository/postgres/migrations/
+CLICKHOUSE_MIGRATE_PATH=internal/repository/clickhouse/migrations/
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL_MODE)
+CLICKHOUSE_URL=clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)/$(CLICKHOUSE_DB)?x-multi-statement=true&x-migrations-table-engine=MergeTree
 
 # SQLC
 SQLC_BIN=$(shell which sqlc 2>/dev/null || echo "sqlc")
@@ -100,19 +107,19 @@ postgres:
 ## ─── Migrations ──────────────────────────────────────────────────────────────
 
 migrate-up:
-	@$(MIGRATE_BIN) -path migrations -database "$(DB_URL)" -verbose up
+	@$(MIGRATE_BIN) -path $(POSTGRES_MIGRATE_PATH) -database "$(DB_URL)" -verbose up
 
 migrate-down:
-	@$(MIGRATE_BIN) -path migrations -database "$(DB_URL)" -verbose down 1
+	@$(MIGRATE_BIN) -path $(POSTGRES_MIGRATE_PATH) -database "$(DB_URL)" -verbose down 1
 
 migrate-down-all:
-	@$(MIGRATE_BIN) -path migrations -database "$(DB_URL)" -verbose down
+	@$(MIGRATE_BIN) -path  $(POSTGRES_MIGRATE_PATH) -database "$(DB_URL)" -verbose down
 
 migrate-force:
-	@$(MIGRATE_BIN) -path migrations -database "$(DB_URL)" force $(V)
+	@$(MIGRATE_BIN) -path $(POSTGRES_MIGRATE_PATH) migrations -database "$(DB_URL)" force $(V)
 
 migrate-create:
-	@$(MIGRATE_BIN) create -ext sql -dir migrations -seq $(NAME)
+	@$(MIGRATE_BIN) create -ext sql -dir $(POSTGRES_MIGRATE_PATH) -seq $(NAME)
 
 ## ─── Docker ──────────────────────────────────────────────────────────────────
 
@@ -196,3 +203,63 @@ els-reindex-build:
 
 runb-els-reindex:
 	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-els-reindex-$(GOOS)-$(GOARCH)
+
+##  ─── Clickhouse (OLAP) ──────────────────────────────────────────────────────
+
+clickhouse-docker:
+	@docker run -d \
+ 	--name servicehub-clickhouse-local \
+ 	-e CLICKHOUSE_USER=$(CLICKHOUSE_USER) \
+ 	-e CLICKHOUSE_PASSWORD=$(CLICKHOUSE_PASSWORD) \
+ 	-e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+ 	-p 18123:8123 \
+ 	-p 19000:9000 \
+ 	--ulimit nofile=262144:262144 \
+ 	clickhouse/clickhouse-server
+
+clickhouse-open:
+	@docker exec -it servicehub-clickhouse-local \
+	clickhouse-client \
+	-u $(CLICKHOUSE_USER) \
+	--password $(CLICKHOUSE_PASSWORD) \
+	--database $(CLICKHOUSE_DB)
+
+clickhouse-createdb:
+	@docker exec -it servicehub-clickhouse-local \
+	clickhouse-client \
+	-u $(CLICKHOUSE_USER) \
+	--password $(CLICKHOUSE_PASSWORD) \
+	-q "CREATE DATABASE IF NOT EXISTS $(CLICKHOUSE_DB);"
+
+clickhouse: clickhouse-docker
+
+cli-ch:
+	@docker exec -it servicehub-clickhouse-local clickhouse-client
+
+backfill-build:
+	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+	go build \
+	-ldflags="-w -s" \
+	-o $(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH) \
+	$(BACKFILL_PATH)
+	@echo "Successfully built"
+
+runb-backfill:
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH)
+
+##  ─── Clickhouse (OLAP) Migrate ───────────────────────────────────────────────────
+
+clickhouse-up:
+	@$(MIGRATE_BIN) -path $(CLICKHOUSE_MIGRATE_PATH) -database "$(CLICKHOUSE_URL)" -verbose up
+
+clickhouse-down:
+	@$(MIGRATE_BIN) -path $(CLICKHOUSE_MIGRATE_PATH) -database "$(CLICKHOUSE_URL)" -verbose down 1
+
+clickhouse-down-all:
+	@$(MIGRATE_BIN) -path  $(CLICKHOUSE_MIGRATE_PATH) -database "$(CLICKHOUSE_URL)" -verbose down
+
+clickhouse-force:
+	@$(MIGRATE_BIN) -path $(CLICKHOUSE_MIGRATE_PATH) migrations -database "$(CLICKHOUSE_URL)" force $(V)
+
+clickhouse-create:
+	@$(MIGRATE_BIN) create -ext sql -dir $(CLICKHOUSE_MIGRATE_PATH) -seq $(NAME)
