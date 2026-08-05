@@ -19,8 +19,9 @@ func NewSellerRepo(store *db.Store) *SellerRepo {
 	return &SellerRepo{store: store}
 }
 
-func (r *SellerRepo) Create(ctx context.Context, params domain.CreateSellerParams) (*domain.Seller, error) {
+func (r *SellerRepo) Create(ctx context.Context, params domain.CreateSellerParams) (*domain.Seller, *domain.User, error) {
 	var seller *domain.Seller
+	var user *domain.User
 
 	err := r.store.ExecTx(ctx, func(q *db.Queries) error {
 		row, err := q.CreateSeller(ctx, db.CreateSellerParams{
@@ -33,16 +34,21 @@ func (r *SellerRepo) Create(ctx context.Context, params domain.CreateSellerParam
 		}
 		seller = mapSeller(row)
 
-		_, err = q.SetUserRole(ctx, db.SetUserRoleParams{
+		rowU, err := q.SetUserRole(ctx, db.SetUserRoleParams{
 			Username: params.Username,
 			Role:     "seller",
 		})
-		return err
+		if err != nil {
+			return fmt.Errorf("seller_repo.Create: failed to set role to new seller")
+		}
+		user = mapUser(rowU)
+
+		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("seller_repo.Create: %w", err)
+		return nil, nil, fmt.Errorf("seller_repo.Create: %w", err)
 	}
-	return seller, nil
+	return seller, user, nil
 }
 
 func (r *SellerRepo) GetSeller(ctx context.Context, params domain.GetSellerProfileParams) (*domain.Seller, error) {
