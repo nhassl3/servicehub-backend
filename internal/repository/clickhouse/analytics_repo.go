@@ -72,7 +72,7 @@ func (r *AnalyticsRepo) GetAdminStatistics(ctx context.Context, params domain.Ad
 	if err := r.loadRegistrations(ctx, &stats.Registrations, params); err != nil {
 		return nil, err
 	}
-	if err := r.loadModerations(ctx, &stats.Moderations, params); err != nil {
+	if err := r.loadModerates(ctx, &stats.Moderations, params); err != nil {
 		return nil, err
 	}
 	return stats, nil
@@ -132,7 +132,7 @@ func (r *AnalyticsRepo) loadTopProducts(ctx context.Context, top *[]domain.TopPr
 	defer rows.Close()
 	for rows.Next() {
 		var p domain.TopProduct
-		var cat, sales, reviews uint64
+		var cat, sales, reviews uint32
 		if err := rows.Scan(&p.ID, &p.Title, &cat, &p.Rating, &sales, &reviews); err != nil {
 			return fmt.Errorf("analytics loadTopProducts scan: %w", err)
 		}
@@ -160,7 +160,8 @@ func (r *AnalyticsRepo) loadTopCategories(ctx context.Context, cats *[]domain.Ca
 	defer rows.Close()
 	for rows.Next() {
 		var c domain.CategorySales
-		var cat, sales uint64
+		var cat uint32
+		var sales uint64
 		if err := rows.Scan(&cat, &sales, &c.Total); err != nil {
 			return fmt.Errorf("analytics loadTopCategories scan: %w", err)
 		}
@@ -193,7 +194,7 @@ func (r *AnalyticsRepo) loadRegistrations(ctx context.Context, regs *[]domain.Re
 	defer rows.Close()
 	for rows.Next() {
 		var rp domain.RegistrationPoint
-		var cnt uint64
+		var cnt uint32
 		if err := rows.Scan(&rp.Bucket, &cnt); err != nil {
 			return fmt.Errorf("analytics loadRegistrations scan: %w", err)
 		}
@@ -203,7 +204,7 @@ func (r *AnalyticsRepo) loadRegistrations(ctx context.Context, regs *[]domain.Re
 	return rows.Err()
 }
 
-func (r *AnalyticsRepo) loadModerations(ctx context.Context, mods *[]domain.ModerationPoint, params domain.AdminStatisticsParams) error {
+func (r *AnalyticsRepo) loadModerates(ctx context.Context, mods *[]domain.ModerationPoint, params domain.AdminStatisticsParams) error {
 	expr := bucketExpr(params.Granularity)
 	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT %s AS bucket, admin_id, admin_username, count() AS cnt
