@@ -11,13 +11,15 @@ import (
 
 type SellerService struct {
 	sellerRepo  domain.SellerRepository
+	userRedis   domain.UserRedis
 	fileStorage domain.PhotoStorage
 }
 
-func NewSellerService(sellerRepo domain.SellerRepository, fileStorage domain.PhotoStorage) *SellerService {
+func NewSellerService(sellerRepo domain.SellerRepository, fileStorage domain.PhotoStorage, userRedis domain.UserRedis) *SellerService {
 	return &SellerService{
 		sellerRepo:  sellerRepo,
 		fileStorage: fileStorage,
+		userRedis:   userRedis,
 	}
 }
 
@@ -29,7 +31,12 @@ func (s *SellerService) CreateSeller(ctx context.Context, params domain.CreateSe
 	if exists {
 		return nil, domain.ErrAlreadyExists
 	}
-	return s.sellerRepo.Create(ctx, params)
+	seller, user, err := s.sellerRepo.Create(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("seller_service.CreateSeller: failed to create seller with given parameters: %w", err)
+	}
+	_ = s.userRedis.SetProfile(ctx, user)
+	return seller, nil
 }
 
 func (s *SellerService) GetSellerProfile(ctx context.Context, params domain.GetSellerProfileParams) (*domain.Seller, error) {
