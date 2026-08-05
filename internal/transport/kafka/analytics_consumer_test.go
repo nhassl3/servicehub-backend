@@ -48,7 +48,7 @@ func TestAnalyticsConsumer_mapEvent_OrderItemCreated(t *testing.T) {
 	})
 	event, ok := c.mapEvent(env)
 	require.True(t, ok)
-	require.Equal(t, "order_item_created", event.EventType)
+	require.Equal(t, domain.OrderItemCreatedEventType, event.EventType)
 	require.Equal(t, "prod-1", event.ProductID)
 	require.Equal(t, 7, event.CategoryID)
 	require.Equal(t, 2, event.Quantity)
