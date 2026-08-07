@@ -12,6 +12,7 @@ bin
 dist
 build
 doc
+pprof
 
 coverage
 *.out
