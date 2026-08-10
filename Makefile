@@ -258,7 +258,7 @@ clickhouse-down-all:
 	@$(MIGRATE_BIN) -path  $(CLICKHOUSE_MIGRATE_PATH) -database "$(CLICKHOUSE_URL)" -verbose down
 
 clickhouse-force:
-	@$(MIGRATE_BIN) -path $(CLICKHOUSE_MIGRATE_PATH) migrations -database "$(CLICKHOUSE_URL)" force $(V)
+	@$(MIGRATE_BIN) -path $(CLICKHOUSE_MIGRATE_PATH) -database "$(CLICKHOUSE_URL)" force $(V)
 
 clickhouse-create:
 	@$(MIGRATE_BIN) create -ext sql -dir $(CLICKHOUSE_MIGRATE_PATH) -seq $(NAME)
