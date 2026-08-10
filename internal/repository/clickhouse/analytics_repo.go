@@ -194,7 +194,7 @@ func (r *AnalyticsRepo) loadRegistrations(ctx context.Context, regs *[]domain.Re
 	defer rows.Close()
 	for rows.Next() {
 		var rp domain.RegistrationPoint
-		var cnt uint32
+		var cnt uint64
 		if err := rows.Scan(&rp.Bucket, &cnt); err != nil {
 			return fmt.Errorf("analytics loadRegistrations scan: %w", err)
 		}
