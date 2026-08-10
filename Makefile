@@ -26,13 +26,12 @@ CONSUMER_PATH=./cmd/consumer
 ES_REINDEX_PATH=./cmd/es-reindex
 BACKFILL_PATH=./cmd/analytics-backfill
 ENVIRONMENT=local
-
 # Migrations
 MIGRATE_BIN=$(shell which migrate 2>/dev/null || echo "migrate")
 POSTGRES_MIGRATE_PATH=internal/repository/postgres/migrations/
 CLICKHOUSE_MIGRATE_PATH=internal/repository/clickhouse/migrations/
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL_MODE)
-CLICKHOUSE_URL=clickhouse://$(CLICKHOUSE_USER):$(CLICKHOUSE_PASSWORD)@$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)/$(CLICKHOUSE_DB)?x-multi-statement=true&x-migrations-table-engine=MergeTree
+CLICKHOUSE_URL=clickhouse://$(CLICKHOUSE_HOST):$(CLICKHOUSE_PORT)?username=$(CLICKHOUSE_USER)&password=$(CLICKHOUSE_PASSWORD)&database=$(CLICKHOUSE_DB)&x-multi-statement=true&x-migrations-table-engine=MergeTree
 
 # SQLC
 SQLC_BIN=$(shell which sqlc 2>/dev/null || echo "sqlc")
