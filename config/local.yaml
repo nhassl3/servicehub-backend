@@ -16,7 +16,7 @@ redis:
   ttl:
     user: 15m
     categories: 1h
-    auth_block: 5m
+    auth_block: 5s
     product: 5m
     admin: 15m
     claim: 20m
