@@ -15,11 +15,12 @@ import (
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
 
-func newAnalyticsConsumer(t *testing.T) (*AnalyticsConsumer, *mockrepo.MockAnalyticsRepository) {
+func newAnalyticsConsumer(t *testing.T) (*AnalyticsConsumer, *mockrepo.MockAnalyticsRepository, *mockrepo.MockCategoriesRedis) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	repo := mockrepo.NewMockAnalyticsRepository(ctrl)
-	return NewAnalyticsConsumer(nil, repo, zap.NewNop()), repo
+	categories := mockrepo.NewMockCategoriesRedis(ctrl)
+	return NewAnalyticsConsumer(nil, repo, categories, zap.NewNop()), repo, categories
 }
 
 func envelopeMsg(t *testing.T, env domain.Envelope) *kafka.Message {
@@ -30,13 +31,13 @@ func envelopeMsg(t *testing.T, env domain.Envelope) *kafka.Message {
 }
 
 func TestAnalyticsConsumer_mapEvent_UnknownType(t *testing.T) {
-	c, _ := newAnalyticsConsumer(t)
+	c, _, _ := newAnalyticsConsumer(t)
 	_, ok := c.mapEvent(domain.Envelope{Type: domain.OrderCreated})
 	require.False(t, ok)
 }
 
 func TestAnalyticsConsumer_mapEvent_OrderItemCreated(t *testing.T) {
-	c, _ := newAnalyticsConsumer(t)
+	c, _, _ := newAnalyticsConsumer(t)
 	env := domain.NewEnvelope(domain.OrderItemCreated, domain.OrderItemCreatedPayload{
 		OrderID:    "ord-1",
 		ProductID:  "prod-1",
@@ -55,7 +56,7 @@ func TestAnalyticsConsumer_mapEvent_OrderItemCreated(t *testing.T) {
 }
 
 func TestAnalyticsConsumerHandle_SkipsUnknownType(t *testing.T) {
-	c, repo := newAnalyticsConsumer(t)
+	c, repo, _ := newAnalyticsConsumer(t)
 	ctx := context.Background()
 	repo.EXPECT().InsertEvents(ctx, gomock.Any()).Times(0)
 
@@ -65,8 +66,11 @@ func TestAnalyticsConsumerHandle_SkipsUnknownType(t *testing.T) {
 }
 
 func TestAnalyticsConsumerHandle_InsertsOrderItem(t *testing.T) {
-	c, repo := newAnalyticsConsumer(t)
+	c, repo, categories := newAnalyticsConsumer(t)
 	ctx := context.Background()
+	categories.EXPECT().Categories(ctx).Return(&domain.ListCategories{
+		{ID: 3, Name: "Design"},
+	}, nil).Times(1)
 	repo.EXPECT().InsertEvents(ctx, gomock.Any()).Return(nil)
 
 	env := domain.NewEnvelope(domain.OrderItemCreated, domain.OrderItemCreatedPayload{
