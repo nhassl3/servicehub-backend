@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/nhassl3/servicehub-backend/cmd"
 	"github.com/nhassl3/servicehub-backend/internal/db"
@@ -12,6 +13,8 @@ import (
 	pkgCH "github.com/nhassl3/servicehub-backend/pkg/clickhouse"
 )
 
+const batchSize = 32
+
 // main backfills the current catalog state into ClickHouse as business facts.
 // Postgres remains the source of truth; this only seeds the analytics
 // dashboards (otherwise they start empty until new events arrive).
@@ -20,7 +23,8 @@ import (
 // products table. Order/moderation/registration history is out of scope — those
 // events only exist once the analytics pipeline goes live.
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
 	cfg := cmd.MustLoadConfig()
 
 	pool, err := db.NewPool(ctx, cfg.DB)
@@ -31,6 +35,12 @@ func main() {
 
 	store := db.NewStore(pool)
 	productRepo := repoPostgres.NewProductRepo(store)
+	categoryRepo := repoPostgres.NewCategoryRepo(store)
+
+	categories, err := categoryRepo.List(ctx)
+	if err != nil {
+		log.Fatalf("category_repo: %w", err)
+	}
 
 	conn, err := pkgCH.Connect(ctx,
 		cfg.Clickhouse.Hosts,
@@ -51,12 +61,17 @@ func main() {
 	}
 	repo := repoCH.NewAnalyticsRepo(conn)
 
-	const batchSize = 32
+	backfillByStatus(ctx, productRepo, categories, repo, "active")
+	backfillByStatus(ctx, productRepo, categories, repo, "inactive")
+	backfillByStatus(ctx, productRepo, categories, repo, "draft")
+}
+
+func backfillByStatus(ctx context.Context, productRepo domain.ProductRepository, categories *domain.ListCategories, repo domain.AnalyticsRepository, status string) {
 	var offset int32
 	var totalProducts int
-
 	for {
 		products, _, err := productRepo.List(ctx, domain.ListProductsParams{
+			Status: status,
 			Limit:  batchSize,
 			Offset: offset,
 		})
@@ -67,8 +82,13 @@ func main() {
 			break
 		}
 
-		events := make([]domain.AnalyticsEvent, 0, len(products)*2)
+		events := make([]domain.AnalyticsEvent, 0, len(products))
 		for _, p := range products {
+			var categoryName string
+			category := categories.GetCategoryById(p.CategoryID)
+			if category != nil {
+				categoryName = category.Name
+			}
 			events = append(events,
 				domain.AnalyticsEvent{
 					OccurredAt:   p.CreatedAt,
@@ -76,6 +96,7 @@ func main() {
 					ProductID:    p.ID,
 					SellerID:     p.SellerID,
 					CategoryID:   p.CategoryID,
+					CategoryName: categoryName,
 					Title:        p.Title,
 					Status:       p.Status,
 					Rating:       p.Rating,
@@ -94,5 +115,5 @@ func main() {
 		log.Printf("backfilled %d products (offset %d)", len(products), offset)
 		offset += batchSize
 	}
-	log.Printf("done: %d products backfilled", totalProducts)
+	log.Printf("done: %d products backfilled with status %s", totalProducts, status)
 }
