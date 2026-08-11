@@ -37,6 +37,7 @@ func (r *AnalyticsRepo) InsertEvents(ctx context.Context, events []domain.Analyt
 			e.AdminID,
 			e.AdminUsername,
 			uint32(e.CategoryID),
+			e.CategoryName,
 			e.Title,
 			e.Status,
 			e.Rating,
@@ -72,7 +73,7 @@ func (r *AnalyticsRepo) GetAdminStatistics(ctx context.Context, params domain.Ad
 	if err := r.loadRegistrations(ctx, &stats.Registrations, params); err != nil {
 		return nil, err
 	}
-	if err := r.loadModerates(ctx, &stats.Moderations, params); err != nil {
+	if err := r.loadModerates(ctx, &stats.Moderates, params); err != nil {
 		return nil, err
 	}
 	return stats, nil
@@ -146,11 +147,11 @@ func (r *AnalyticsRepo) loadTopProducts(ctx context.Context, top *[]domain.TopPr
 
 func (r *AnalyticsRepo) loadTopCategories(ctx context.Context, cats *[]domain.CategorySales, params domain.AdminStatisticsParams) error {
 	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
-		SELECT category_id, sum(quantity) AS sales, sum(total) AS total
+		SELECT category_id, category_name, sum(quantity) AS sales, sum(total) AS total
 		FROM analytics.events
 		WHERE event_type = '%s'
 		  AND occurred_at >= ? AND occurred_at <= ?
-		GROUP BY category_id
+		GROUP BY category_id, category_name
 		ORDER BY total DESC
 		LIMIT 10`, domain.OrderItemCreatedEventType),
 		params.From, params.To)
@@ -162,7 +163,7 @@ func (r *AnalyticsRepo) loadTopCategories(ctx context.Context, cats *[]domain.Ca
 		var c domain.CategorySales
 		var cat uint32
 		var sales uint64
-		if err := rows.Scan(&cat, &sales, &c.Total); err != nil {
+		if err := rows.Scan(&cat, &c.CategoryName, &sales, &c.Total); err != nil {
 			return fmt.Errorf("analytics loadTopCategories scan: %w", err)
 		}
 		c.CategoryID = int(cat)
@@ -204,7 +205,7 @@ func (r *AnalyticsRepo) loadRegistrations(ctx context.Context, regs *[]domain.Re
 	return rows.Err()
 }
 
-func (r *AnalyticsRepo) loadModerates(ctx context.Context, mods *[]domain.ModerationPoint, params domain.AdminStatisticsParams) error {
+func (r *AnalyticsRepo) loadModerates(ctx context.Context, mods *[]domain.ModeratePoint, params domain.AdminStatisticsParams) error {
 	expr := bucketExpr(params.Granularity)
 	rows, err := r.conn.Query(ctx, fmt.Sprintf(`
 		SELECT %s AS bucket, admin_id, admin_username, count() AS cnt
@@ -218,7 +219,7 @@ func (r *AnalyticsRepo) loadModerates(ctx context.Context, mods *[]domain.Modera
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var mp domain.ModerationPoint
+		var mp domain.ModeratePoint
 		var cnt uint64
 		if err := rows.Scan(&mp.Bucket, &mp.AdminID, &mp.AdminUsername, &cnt); err != nil {
 			return fmt.Errorf("analytics loadModerations scan: %w", err)
