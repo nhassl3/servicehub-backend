@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS analytics.events (
     admin_id       String,
     admin_username String,
     category_id    UInt32,
+    category_name String,
     title          String,
     status         LowCardinality(String),
     rating         Float64,
