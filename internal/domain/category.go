@@ -13,7 +13,7 @@ type Category struct {
 	IconURL     string `db:"icon_url"`
 }
 
-// ListCategories this type needed for redis marshalling and unmarshalling
+// ListCategories this type needed for redis marshaling and unmarshalling
 // it implements slice of categories ([]Category) - Category
 type ListCategories []Category
 
@@ -36,6 +36,15 @@ func (c *ListCategories) UnmarshalBinary(data []byte) error {
 	}
 	if c == nil || len(*c) == 0 {
 		return ErrRedisNotFound
+	}
+	return nil
+}
+
+func (c *ListCategories) GetCategoryById(id int) *Category {
+	for _, category := range *c {
+		if category.ID == id {
+			return &category
+		}
 	}
 	return nil
 }
