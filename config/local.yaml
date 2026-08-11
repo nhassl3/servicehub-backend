@@ -3,6 +3,7 @@ environment: local
 server:
   grpc_port: ":50051"
   http_port: ":8082"
+  pprof_port: ":6060"
 
 db:
   host: localhost
@@ -15,7 +16,7 @@ redis:
   ttl:
     user: 15m
     categories: 1h
-    auth_block: 5m
+    auth_block: 5s
     product: 5m
     admin: 15m
     claim: 20m

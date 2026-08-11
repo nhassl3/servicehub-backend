@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"github.com/nhassl3/servicehub-backend/internal/service"
 	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
 	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
+	transportHTTP "github.com/nhassl3/servicehub-backend/internal/transport/http"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/clickhouse"
 	pkgES "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
@@ -232,6 +234,19 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		zap.String("http_port", cfg.Server.HTTPPort),
 		zap.String("env", cfg.Environment),
 	)
+
+	// ─── pprof (local/dev only) ───────────────────────────────────────────────
+	// Runtime profiling endpoint bound to 127.0.0.1. Never exposed in prod:
+	// the server goroutine is not spawned at all for non-local environments.
+	if cfg.Environment == "local" || cfg.Environment == "dev" {
+		pprofServer := transportHTTP.NewPprofServer(cfg.Server.PPROFPort)
+		go func() {
+			log.Info("pprof server listening", zap.String("addr", pprofServer.Addr))
+			if err := pprofServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("pprof server failed", zap.Error(err))
+			}
+		}()
+	}
 
 	// ─── Graceful shutdown ────────────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)

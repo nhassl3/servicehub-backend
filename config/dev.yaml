@@ -3,6 +3,7 @@ environment: dev
 server:
   grpc_port: ":50051"
   http_port: ":8082"
+  pprof_port: ":6060"
 
 db:
   host: localhost

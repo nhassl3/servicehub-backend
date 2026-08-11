@@ -37,7 +37,7 @@ func (h *AdminHandler) CreateAdmin(ctx context.Context, req *adminv1.CreateAdmin
 	admin, err := h.svc.CreateAdmin(ctx, domain.CreateAdminParams{
 		Username:    username,
 		DisplayName: req.GetDisplayName(),
-		LevelRights: int32(req.GetLevelRights()),
+		LevelRights: req.GetLevelRights(),
 	})
 	if err != nil {
 		return nil, domainErr(err)
@@ -136,7 +136,7 @@ func (h *AdminHandler) GetAdminStatistics(ctx context.Context, req *adminv1.GetA
 		TopProducts:   protoTopProducts(stats.TopProducts),
 		TopCategories: protoTopCategories(stats.TopCategories),
 		Registrations: protoRegistrations(stats.Registrations),
-		Moderates:     protoModerates(stats.Moderations),
+		Moderates:     protoModerates(stats.Moderates),
 	}, nil
 }
 
@@ -177,7 +177,7 @@ func protoTopCategories(cats []domain.CategorySales) []*adminv1.CategorySales {
 	for _, c := range cats {
 		res = append(res, &adminv1.CategorySales{
 			CategoryId: int32(c.CategoryID),
-			Name:       c.Name,
+			Name:       c.CategoryName,
 			SalesCount: int32(c.SalesCount),
 		})
 	}
@@ -195,7 +195,7 @@ func protoRegistrations(pts []domain.RegistrationPoint) []*adminv1.RegistrationP
 	return res
 }
 
-func protoModerates(pts []domain.ModerationPoint) []*adminv1.ModeratePoint {
+func protoModerates(pts []domain.ModeratePoint) []*adminv1.ModeratePoint {
 	res := make([]*adminv1.ModeratePoint, 0, len(pts))
 	for _, p := range pts {
 		res = append(res, &adminv1.ModeratePoint{

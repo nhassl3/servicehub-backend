@@ -12,6 +12,12 @@ TT.txt
 redis-config/redis.conf
 redis-config/users.acl
 go.work
-go.work.sum
+go.work.sumo Elasticsearch"}
+{"level":"info","ts":"2026-08-07T21:32:52.892+0300","caller":"app/app.go:232","msg":"ServiceHub started","grpc_port":":50051","http_port":":8082","env":"local"}
+{"level":"info","ts":"2026-08-07T21:32:52.892+0300","caller":"app/app.go:244","msg":"pprof server listening","addr":"127.0.0.1:6060"}
+{"level":"info","ts":"2026-08-07T21:32:52.893+0300","caller":"grpc/server.go:157","msg":"gRPC server listening","addr":":50051"}
+{"level":"info","ts":"2026-08-07T21:32:52.893+0300","caller":"grpc/server.go:208","msg":"HTTP gateway listening","addr":":8082"}
+
 AGENTS.md
 .claude/
+pprof/

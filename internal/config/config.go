@@ -27,12 +27,13 @@ type Config struct {
 
 type ServerConfig struct {
 	GRPCPort,
-	HTTPPort string
+	HTTPPort,
+	PPROFPort string
 }
 
 type DBConfig struct {
-	Host string
-	Port int
+	Host  string
+	Port  int
 	User, // secret — from .env
 	Password, // secret — from .env
 	Name, // secret — from .env
@@ -131,6 +132,7 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetConfigFile(configFile)
 	yv.SetDefault("server.grpc_port", ":9090")
 	yv.SetDefault("server.http_port", ":8080")
+	yv.SetDefault("server.pprof_port", ":6060")
 	yv.SetDefault("db.port", 5432)
 	yv.SetDefault("db.ssl_mode", "disable")
 	yv.SetDefault("auth.access_token_ttl", "15m")
@@ -182,6 +184,7 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Environment = yv.GetString("environment")
 	cfg.Server.GRPCPort = yv.GetString("server.grpc_port")
 	cfg.Server.HTTPPort = yv.GetString("server.http_port")
+	cfg.Server.PPROFPort = yv.GetString("server.pprof_port")
 
 	cfg.DB.Host = yv.GetString("db.host")
 	cfg.DB.Port = yv.GetInt("db.port")
