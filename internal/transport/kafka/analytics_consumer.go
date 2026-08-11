@@ -16,13 +16,19 @@ import (
 // event types are ignored (mirrors NotificationConsumer). ClickHouse is not a
 // source of truth — a failure here never blocks the write path, only logs.
 type AnalyticsConsumer struct {
-	consumer *kafka.Consumer
-	repo     domain.AnalyticsRepository
-	log      *zap.Logger
+	consumer        *kafka.Consumer
+	repo            domain.AnalyticsRepository
+	categoriesRedis domain.CategoriesRedis
+	log             *zap.Logger
 }
 
-func NewAnalyticsConsumer(consumer *kafka.Consumer, repo domain.AnalyticsRepository, log *zap.Logger) *AnalyticsConsumer {
-	return &AnalyticsConsumer{consumer: consumer, repo: repo, log: log}
+func NewAnalyticsConsumer(
+	consumer *kafka.Consumer,
+	repo domain.AnalyticsRepository,
+	categoriesRedis domain.CategoriesRedis,
+	log *zap.Logger,
+) *AnalyticsConsumer {
+	return &AnalyticsConsumer{consumer: consumer, repo: repo, categoriesRedis: categoriesRedis, log: log}
 }
 
 func (c *AnalyticsConsumer) Run(ctx context.Context) error {
@@ -42,6 +48,10 @@ func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) e
 		return nil
 	}
 
+	if event.CategoryID > 0 {
+		event.CategoryName = c.getCategoryName(ctx, event.CategoryID)
+	}
+
 	// ClickHouse writes are best-effort: retry briefly, then drop. Analytics
 	// loss is acceptable — Postgres remains the source of truth.
 	if err := util.WithRetry(ctx, util.DefaultCloseRetry, func() error {
@@ -51,6 +61,23 @@ func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) e
 	}
 
 	return nil
+}
+
+// getCategoryName returns category name by category id given from producer in decoded and mapped payload.
+// WARN: always update categories redis storage cache when updates categories in main repository - database
+// because it's get category by id and given new id not store in redis if not commited changes to redis storage.
+func (c *AnalyticsConsumer) getCategoryName(ctx context.Context, categoryID int) string {
+	categories, err := c.categoriesRedis.Categories(ctx)
+	if err != nil {
+		c.log.Warn("analytics-consumer: failed to get categories", zap.Error(err))
+		return ""
+	}
+	category := categories.GetCategoryById(categoryID)
+	if category == nil {
+		c.log.Warn("analytics-consumer: failed to get category by ID", zap.Int("ID", categoryID))
+		return ""
+	}
+	return category.Name
 }
 
 // mapEvent converts an envelope into a normalized AnalyticsEvent. ok=false for
@@ -140,6 +167,7 @@ func (c *AnalyticsConsumer) mapEvent(env domain.Envelope) (domain.AnalyticsEvent
 			EventType:  domain.OrderItemCreatedEventType,
 			ProductID:  p.ProductID,
 			CategoryID: p.CategoryID,
+			Title:      p.Title,
 			SellerID:   p.SellerID,
 			OrderID:    p.OrderID,
 			Quantity:   p.Qty,
