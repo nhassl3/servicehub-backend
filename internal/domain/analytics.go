@@ -25,6 +25,7 @@ type AnalyticsEvent struct {
 	EventType     EventType // 'user_registered' | 'product_status_changed' | ...
 	ProductID     string
 	CategoryID    int
+	CategoryName  string
 	Title         string
 	SellerID      string
 	AdminID       string
@@ -52,7 +53,7 @@ type AdminStatistics struct {
 	TopProducts   []TopProduct
 	TopCategories []CategorySales
 	Registrations []RegistrationPoint
-	Moderations   []ModerationPoint
+	Moderates     []ModeratePoint
 }
 
 // ProductStatusStats counts products grouped by their current moderation
@@ -75,10 +76,10 @@ type TopProduct struct {
 
 // CategorySales aggregates sales (quantity) by category within the period.
 type CategorySales struct {
-	CategoryID int
-	Name       string
-	SalesCount int
-	Total      float64
+	CategoryID   int
+	CategoryName string
+	SalesCount   int
+	Total        float64
 }
 
 // RegistrationPoint buckets user registrations by day/hour.
@@ -87,8 +88,8 @@ type RegistrationPoint struct {
 	Count  int
 }
 
-// ModerationPoint buckets moderation actions by day/hour, split by admin.
-type ModerationPoint struct {
+// ModeratePoint buckets moderation actions by day/hour, split by admin.
+type ModeratePoint struct {
 	Bucket        time.Time
 	Count         int
 	AdminID       string
