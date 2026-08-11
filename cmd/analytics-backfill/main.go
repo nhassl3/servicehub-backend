@@ -39,7 +39,7 @@ func main() {
 
 	categories, err := categoryRepo.List(ctx)
 	if err != nil {
-		log.Fatalf("category_repo: %w", err)
+		log.Fatalf("category_repo: %s", err.Error())
 	}
 
 	conn, err := pkgCH.Connect(ctx,
