@@ -13,8 +13,10 @@ import (
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	elsRepo "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
+	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	elsPkg "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
+	pkgRedis "github.com/nhassl3/servicehub-backend/pkg/redis"
 	"go.uber.org/zap"
 
 	repoCH "github.com/nhassl3/servicehub-backend/internal/repository/clickhouse"
@@ -106,6 +108,17 @@ func main() {
 
 	analyticsRepo := repoCH.NewAnalyticsRepo(chConn)
 
+	// Redis connect
+	redisProductsClient, err := pkgRedis.New(ctx, cfg.Redis.Addr, cfg.Redis.Username, cfg.Redis.Password, cfg.Redis.DB+1)
+	if err != nil {
+		log.Fatal("app: connect redis products: " + err.Error())
+	}
+	defer func() { _ = redisProductsClient.Close() }()
+	log.Info("connected to RedisProducts")
+
+	// RedisProducts store categories and products closed on a page a few moments later
+	categoriesRedis := repoRedis.NewCategoryRedis(redisProductsClient, cfg.Redis.TTL.Categories)
+
 	dlqProducer := kafka.NewProducer(cfg.Kafka.Brokers, cfg.Kafka.Topics.NotificationsDLQ, log)
 	defer func() {
 		_ = dlqProducer.Close()
@@ -134,7 +147,7 @@ func main() {
 		case domain.TopicProductEvent:
 			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
 		case domain.TopicAnalyticsEvent:
-			handlers = append(handlers, transportKafka.NewAnalyticsConsumer(consumer, analyticsRepo, log))
+			handlers = append(handlers, transportKafka.NewAnalyticsConsumer(consumer, analyticsRepo, categoriesRedis, log))
 		}
 	}
 
