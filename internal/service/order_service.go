@@ -78,6 +78,7 @@ func (s *OrderService) publishOrderItems(ctx context.Context, order *domain.Orde
 		if err := s.eventPublisher.PublishOrderItemCreated(ctx, domain.OrderItemCreatedPayload{
 			OrderID:    order.ID,
 			ProductID:  item.ProductID,
+			Title:      product.Title,
 			CategoryID: product.CategoryID,
 			SellerID:   product.SellerID,
 			Qty:        item.Quantity,
