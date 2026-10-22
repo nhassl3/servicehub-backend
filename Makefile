@@ -1,6 +1,6 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
 els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb \
-clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force
+clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only
 
 .DEFAULT_GOAL := build
 
@@ -43,20 +43,33 @@ export GOARCH := $(shell go env GOARCH)
 CGO_ENABLED ?= 0
 BUILD_TAGS ?= ""
 
-build:
+build: build-consumer els-reindex-build backfill-build
 	@echo "Building with: GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=$(CGO_ENABLED)"
 	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
 	go build \
 	-ldflags="-w -s" \
 	-o $(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH) \
 	$(CMD_PATH)
-	@echo "Successfully built"
+	@echo "Successfully built Main API"
+
+build-only:
+	@echo "Building with: GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=$(CGO_ENABLED)"
+	@CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) GOARCH=$(GOARCH) \
+	go build \
+	-ldflags="-w -s" \
+	-o $(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH) \
+	$(CMD_PATH)
+	@echo "Successfully built Main API"
 
 run:
+	@echo "Run only one API server (not consumer and other services)"
 	go run $(CMD_PATH)/main.go
 
-runb:
-	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH)
+runb: runb-els-reindex runb-backfill # some other needed backfills or reindex
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH) # application
+
+runb-only:
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-$(GOOS)-$(GOARCH) # only application
 
 ## ─── Test ────────────────────────────────────────────────────────────────────
 
@@ -169,7 +182,7 @@ run-consumer:
 	@go run $(CONSUMER_PATH)
 
 runb-consumer:
-	@ENVIRONMENT=$(ENVIRONMENT)  ./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
+	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
 
 kafka-docker:
 	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest
@@ -241,7 +254,7 @@ backfill-build:
 	-ldflags="-w -s" \
 	-o $(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH) \
 	$(BACKFILL_PATH)
-	@echo "Successfully built"
+	@echo "Successfully built backfill for clickhouse"
 
 runb-backfill:
 	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-backfill-$(GOOS)-$(GOARCH)
