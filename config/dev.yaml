@@ -40,8 +40,7 @@ els:
 
 clickhouse:
   hosts:
-    - "clickhouse:19000"
-    - "clickhouse:9440" # if using TLS
+    - "clickhouse:9000" # native port inside the docker network (19000 is the host mapping)
   client:
     product: "servicehub-clickhouse"
     version: "0.1.0"

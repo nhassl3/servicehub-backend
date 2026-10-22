@@ -100,7 +100,7 @@ func main() {
 	defer func() {
 		_ = chConn.Close()
 	}()
-	if cfg.Log.Level == "local" {
+	if cfg.Environment == "local" {
 		if err := repoCH.EnsureSchema(cfg.Clickhouse, cfg.Migrations.ClickhousePath); err != nil {
 			log.Fatal("clickhouse: ensure schema failed", zap.Error(err))
 		}
