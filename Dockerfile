@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /bin/es-reindex ./cmd/es-reindex
 
 # Install migrate via go install (uses already-downloaded Go modules cache)
-RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+RUN go install -tags 'postgres clickhouse' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
 
 # ─── Final stage ──────────────────────────────────────────────────────────────
 FROM alpine:3.21
