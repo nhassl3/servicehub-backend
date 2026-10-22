@@ -151,8 +151,8 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetDefault("minio.use_ssl", "true")
 	yv.SetDefault("smtp.host", "smtp.yandex.ru")
 	yv.SetDefault("smtp.port", 587)
-	yv.SetDefault("clickhoues.client.product", "example-clickhouse-servicehub")
-	yv.SetDefault("clickhoues.client.version", "v0.1.0d")
+	yv.SetDefault("clickhouse.client.product", "example-clickhouse-servicehub")
+	yv.SetDefault("clickhouse.client.version", "v0.1.0d")
 
 	if err := yv.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("config: read yaml %q: %w", configFile, err)
@@ -238,8 +238,8 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Clickhouse.Username = ev.GetString("CLICKHOUSE_USER")
 	cfg.Clickhouse.Database = ev.GetString("CLICKHOUSE_DB")
 	cfg.Clickhouse.Password = ev.GetString("CLICKHOUSE_PASSWORD")
-	cfg.Clickhouse.ClientInfo.Product = yv.GetString("clickhouse.clinet.product")
-	cfg.Clickhouse.ClientInfo.Version = yv.GetString("clickhouse.clinet.version")
+	cfg.Clickhouse.ClientInfo.Product = yv.GetString("clickhouse.client.product")
+	cfg.Clickhouse.ClientInfo.Version = yv.GetString("clickhouse.client.version")
 	cfg.Clickhouse.TLS = yv.GetBool("clickhouse.tls")
 
 	cfg.Migrations.PostgresPath = yv.GetString("migrations.postgres_path")
