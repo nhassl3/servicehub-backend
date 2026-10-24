@@ -75,7 +75,9 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	// RedisClient store tokens, sessions, profiles
 	tokenBlacklist := repoRedis.NewTokenBlacklist(redisClient)
 	userRedis := repoRedis.NewUserRedis(
-		redisClient, cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock, cfg.Redis.TTL.Code, cfg.Redis.TTL.ResetPassword,
+		redisClient,
+		cfg.Redis.TTL.User, cfg.Redis.TTL.AuthBlock, cfg.Redis.TTL.Code,
+		cfg.Redis.TTL.ResetPassword, cfg.Redis.TTL.ResetEmail,
 	)
 	adminRedis := repoRedis.NewAdminRedis(redisClient, cfg.Redis.TTL.Product, cfg.Redis.TTL.Claim)
 
