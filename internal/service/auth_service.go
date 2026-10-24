@@ -245,7 +245,7 @@ func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email str
 	var code string
 	for range 5 {
 		code = GenerateResetPasswordCode()
-		if code != "" {
+		if code != "" && len(code) == 6 {
 			break
 		}
 	}
