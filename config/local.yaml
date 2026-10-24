@@ -22,6 +22,7 @@ redis:
     claim: 20m
     code: 5m
     reset_password: 15m
+    reset_email: 72h
 
 kafka:
   topics:
