@@ -76,6 +76,7 @@ type Querier interface {
 	Reject(ctx context.Context, id uuid.UUID) error
 	Release(ctx context.Context, arg ReleaseParams) error
 	RemoveWishlistItem(ctx context.Context, arg RemoveWishlistItemParams) (int64, error)
+	ResetEmail(ctx context.Context, arg ResetEmailParams) error
 	ReviewExistsByProductAndUser(ctx context.Context, arg ReviewExistsByProductAndUserParams) (bool, error)
 	SearchProducts(ctx context.Context, arg SearchProductsParams) ([]Product, error)
 	SellerExistsByUsername(ctx context.Context, username string) (bool, error)
