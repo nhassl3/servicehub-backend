@@ -35,6 +35,7 @@ var publicMethods = []string{
 var guestMethods = []string{
 	"/auth.v1.AuthService/RequestVerifyEmail",
 	"/auth.v1.AuthService/VerifyEmail",
+	"/auth.v1.AuthService/ResetEmail",
 }
 
 // AuthInterceptor returns a gRPC unary interceptor for PASETO token verification.
@@ -68,6 +69,8 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
+		ctx = context.WithValue(ctx, PayloadKey, payload)
+
 		if payload.IsActive == false {
 			if slices.Contains(guestMethods, info.FullMethod) {
 				return handler(ctx, req)
@@ -75,7 +78,6 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 			return nil, status.Error(codes.PermissionDenied, "email not verified")
 		}
 
-		ctx = context.WithValue(ctx, PayloadKey, payload)
 		return handler(ctx, req)
 	}
 }

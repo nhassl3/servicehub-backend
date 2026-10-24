@@ -43,7 +43,7 @@ func domainErr(err error) error {
 		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, domain.ErrDeviceMistake):
 		return status.Error(codes.FailedPrecondition, err.Error())
-	case errors.Is(err, domain.ErrAuthBlock):
+	case errors.Is(err, domain.ErrAuthBlock), errors.Is(err, domain.ErrAlreadyReset):
 		return status.Error(codes.Unavailable, err.Error())
 	case errors.Is(err, domain.ErrFileTooLarge):
 		return status.Error(codes.InvalidArgument, err.Error())
