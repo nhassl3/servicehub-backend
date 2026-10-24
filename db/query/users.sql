@@ -54,3 +54,9 @@ SET is_active=true,
 WHERE (sqlc.narg(email)::varchar IS NULL OR email = sqlc.narg(email)::varchar)
     AND (sqlc.narg(username)::varchar IS NULL OR username = sqlc.narg(username)::varchar)
 RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at;
+
+-- name: ResetEmail :exec
+UPDATE users
+SET email = sqlc.arg(new_email),
+    updated_at = NOW()
+WHERE (username=sqlc.arg(username));
