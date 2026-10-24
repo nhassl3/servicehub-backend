@@ -204,6 +204,7 @@ els-docker:
 	-p 9200:9200 \
 	-e "discovery.type=single-node" \
 	-e "xpack.security.enabled=false" \
+	-e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
 	elasticsearch:9.3.8
 	@echo "Elasticsearch started on http://localhost:9200"
 
