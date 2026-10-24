@@ -361,6 +361,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	}, nil
 }
 
+// ResetEmail resets email of the user by username
 func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string) (bool, error) {
 	// user exists
 	exists, err := s.userRepo.ExistsByUsername(ctx, username)
