@@ -20,6 +20,9 @@ redis:
     product: 5m
     admin: 15m
     claim: 20m
+    code: 5m
+    reset_password: 15m
+    reset_email: 72h
 
 kafka:
   topics:

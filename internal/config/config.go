@@ -56,7 +56,8 @@ type RedisTTL struct {
 	Product,
 	Claim,
 	Code,
-	ResetPassword time.Duration
+	ResetPassword,
+	ResetEmail time.Duration
 }
 
 type AuthConfig struct {
@@ -147,6 +148,7 @@ func Load(configFile, envFile string) (*Config, error) {
 	yv.SetDefault("redis.ttl.admin", "15m")
 	yv.SetDefault("redis.ttl.code", "5m")
 	yv.SetDefault("redis.ttl.reset_password", "15m")
+	yv.SetDefault("redis.ttl.reset_email", "5m")
 	yv.SetDefault("minio.endpoint", "localhost:9000")
 	yv.SetDefault("minio.use_ssl", "true")
 	yv.SetDefault("smtp.host", "smtp.yandex.ru")
@@ -207,6 +209,7 @@ func Load(configFile, envFile string) (*Config, error) {
 	cfg.Redis.TTL.Claim = yv.GetDuration("redis.ttl.claim")
 	cfg.Redis.TTL.Code = yv.GetDuration("redis.ttl.code")
 	cfg.Redis.TTL.ResetPassword = yv.GetDuration("redis.ttl.reset_password")
+	cfg.Redis.TTL.ResetEmail = yv.GetDuration("redis.ttl.reset_email")
 
 	cfg.Auth.AccessTokenTTL = yv.GetDuration("auth.access_token_ttl")
 	cfg.Auth.RefreshTokenTTL = yv.GetDuration("auth.refresh_token_ttl")

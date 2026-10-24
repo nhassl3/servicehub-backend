@@ -12,9 +12,9 @@ SELECT username FROM admins
 -- name: GetAdminForUpdate :one
 SELECT *
 FROM admins
-WHERE (sqlc.arg(username)::varchar IS NULL OR username = sqlc.arg(username)::varchar)
-  AND (sqlc.arg(admin_id)::uuid IS NULL OR id = sqlc.arg(admin_id)::uuid)
-  AND (sqlc.arg(username)::varchar IS NOT NULL OR sqlc.arg(admin_id)::uuid IS NOT NULL) FOR UPDATE;
+WHERE (sqlc.narg(username)::varchar IS NULL OR username = sqlc.narg(username)::varchar)
+  AND (sqlc.narg(admin_id)::uuid IS NULL OR id = sqlc.narg(admin_id)::uuid)
+  AND (sqlc.narg(username)::varchar IS NOT NULL OR sqlc.narg(admin_id)::uuid IS NOT NULL) LIMIT 1 FOR UPDATE;
 
 -- name: UpdateAdmin :one
 UPDATE admins
@@ -23,7 +23,9 @@ UPDATE admins
         total_moderation = $3,
         avatar_url = $4,
         updated_at = NOW()
-WHERE username = $1
+WHERE (sqlc.narg(username)::varchar IS NULL OR username = sqlc.narg(username)::varchar)
+  AND (sqlc.narg(admin_id)::uuid IS NULL OR id = sqlc.narg(admin_id)::uuid)
+  AND (sqlc.narg(username)::varchar IS NOT NULL OR sqlc.narg(admin_id)::uuid IS NOT NULL)
 RETURNING *;
 
 -- name: AdminExistsByUsername :one

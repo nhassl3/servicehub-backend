@@ -51,7 +51,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE email = $1
+WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -75,7 +75,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 const getUserByUID = `-- name: GetUserByUID :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE uid = $1
+WHERE uid = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error) {
@@ -99,7 +99,7 @@ func (q *Queries) GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error)
 const getUserByUsername = `-- name: GetUserByUsername :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE username = $1
+WHERE username = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -118,6 +118,23 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const resetEmail = `-- name: ResetEmail :exec
+UPDATE users
+SET email = $1,
+    updated_at = NOW()
+WHERE (username=$2)
+`
+
+type ResetEmailParams struct {
+	NewEmail string `json:"new_email"`
+	Username string `json:"username"`
+}
+
+func (q *Queries) ResetEmail(ctx context.Context, arg ResetEmailParams) error {
+	_, err := q.db.Exec(ctx, resetEmail, arg.NewEmail, arg.Username)
+	return err
 }
 
 const setUserRole = `-- name: SetUserRole :one
@@ -216,7 +233,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 }
 
 const userExistsByEmail = `-- name: UserExistsByEmail :one
-SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)
+SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 LIMIT 1)
 `
 
 func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
@@ -227,7 +244,7 @@ func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, er
 }
 
 const userExistsByUsername = `-- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)
+SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 LIMIT 1)
 `
 
 func (q *Queries) UserExistsByUsername(ctx context.Context, username string) (bool, error) {

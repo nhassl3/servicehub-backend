@@ -69,11 +69,15 @@ func (r *AdminRepo) UpdateAdminProfile(ctx context.Context, params domain.Update
 	var admin *domain.Admin
 
 	if err := r.store.ExecTx(ctx, func(q *db.Queries) error {
+		username := stringToNullable(params.Username)
 		row, err := q.GetAdminForUpdate(ctx, db.GetAdminForUpdateParams{
-			Username: params.Username,
+			Username: username,
 		})
 		if err != nil {
-			return err
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.ErrNotFound
+			}
+			return fmt.Errorf("failed to get admin for update: %w", err)
 		}
 
 		displayName := row.DisplayName
@@ -92,13 +96,14 @@ func (r *AdminRepo) UpdateAdminProfile(ctx context.Context, params domain.Update
 		}
 
 		row, err = q.UpdateAdmin(ctx, db.UpdateAdminParams{
+			Username:        username,
 			DisplayName:     displayName,
 			AvatarUrl:       avatarURL,
 			LevelRights:     levelRights,
 			TotalModeration: totalModerates,
 		})
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update admin profile: %w", err)
 		}
 		admin = mapAdmin(row)
 

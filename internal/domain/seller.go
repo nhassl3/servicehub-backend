@@ -36,9 +36,8 @@ type UpdateSellerParams struct {
 }
 
 type UploadSellerAvatarParams struct {
-	Username    string
-	FileData    []byte
-	ContentType string
+	Username string
+	FileData []byte
 }
 
 //go:generate mockgen -source=seller.go -destination=../repository/mock/seller_repo_mock.go -package=mockrepo

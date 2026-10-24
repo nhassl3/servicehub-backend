@@ -245,7 +245,7 @@ func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email str
 	var code string
 	for range 5 {
 		code = GenerateResetPasswordCode()
-		if code != "" {
+		if code != "" && len(code) == 6 {
 			break
 		}
 	}
@@ -359,6 +359,52 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		AccessToken:  accessToken,
 		RefreshToken: session.RefreshToken,
 	}, nil
+}
+
+// ResetEmail resets email of the user by username
+func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string) (bool, error) {
+	// user exists
+	exists, err := s.userRepo.ExistsByUsername(ctx, username)
+	if err != nil {
+		return false, fmt.Errorf("auth_service.ResetEmail check user exists: %w", err)
+	}
+	if !exists {
+		return false, domain.ErrNotFound
+	}
+
+	// email is free
+	exists, err = s.userRepo.ExistsByEmail(ctx, newEmail)
+	if err != nil {
+		return false, fmt.Errorf("auth_service.ResetEmail check user exists: %w", err)
+	}
+	if exists {
+		return false, domain.ErrAlreadyExists
+	}
+
+	reset, err := s.userRedis.MailReset(ctx, username)
+	if err != nil {
+		return false, fmt.Errorf("auth_service.ResetEmail get mail reset attempts: %w", errors.Join(err, domain.ErrAlreadyReset))
+	}
+	if reset {
+		return false, domain.ErrAlreadyReset
+	}
+
+	success, err := s.userRepo.ResetEmail(ctx, domain.ResetEmailParams{
+		Username: username,
+		NewEmail: newEmail,
+	})
+	if err != nil {
+		return false, fmt.Errorf("auth_service.ResetEmail: failed to reset email %w", err)
+	}
+
+	// Switch mail reset
+	if success != false {
+		if err := s.userRedis.SwitchMailReset(ctx, username); err != nil {
+			return false, fmt.Errorf("auth_service.ResetEmail set mail reset attempts: %w", err)
+		}
+	}
+
+	return success, nil
 }
 
 func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User, error) {
