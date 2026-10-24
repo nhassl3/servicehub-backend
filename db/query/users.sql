@@ -6,23 +6,23 @@ RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_a
 -- name: GetUserByUsername :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE username = $1;
+WHERE username = $1 LIMIT 1;
 
 -- name: GetUserByEmail :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE email = $1;
+WHERE email = $1 LIMIT 1;
 
 -- name: GetUserByUID :one
 SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
 FROM users
-WHERE uid = $1;
+WHERE uid = $1 LIMIT 1;
 
 -- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = $1);
+SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 LIMIT 1);
 
 -- name: UserExistsByEmail :one
-SELECT EXISTS(SELECT 1 FROM users WHERE email = $1);
+SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 LIMIT 1);
 
 -- name: UpdateUser :one
 UPDATE users
