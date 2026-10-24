@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
@@ -48,7 +49,8 @@ func (a *AdminService) IncreaseTotalModerates(ctx context.Context, params domain
 }
 
 func (a *AdminService) UploadAdminAvatar(ctx context.Context, params domain.UploadAdminAvatar) (*domain.Admin, error) {
-	if err := ValidateFileUpload(params.FileData, params.ContentType); err != nil {
+	contentType := http.DetectContentType(params.FileData)
+	if err := ValidateFileUpload(params.FileData, contentType); err != nil {
 		return nil, err
 	}
 
@@ -61,7 +63,6 @@ func (a *AdminService) UploadAdminAvatar(ctx context.Context, params domain.Uplo
 			if err != nil {
 				return nil, err
 			}
-			_ = a.adminRedis.SetProfile(ctx, admin) // optional action
 		} else {
 			return nil, err
 		}
@@ -75,9 +76,9 @@ func (a *AdminService) UploadAdminAvatar(ctx context.Context, params domain.Uplo
 		}
 	}
 
-	objectName := GenerateObjectName("avatars/admins", params.Username, params.ContentType)
+	objectName := GenerateObjectName("avatars/admins", params.Username, contentType)
 
-	url, err := a.fileStorage.Upload(ctx, objectName, params.ContentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
+	url, err := a.fileStorage.Upload(ctx, objectName, contentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
 	if err != nil {
 		return nil, fmt.Errorf("admin_service.UploadAvatar upload: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
@@ -56,7 +57,8 @@ func (s *SellerService) UpdateSeller(ctx context.Context, params domain.UpdateSe
 }
 
 func (s *SellerService) UploadAvatar(ctx context.Context, params domain.UploadSellerAvatarParams) (*domain.Seller, error) {
-	if err := ValidateFileUpload(params.FileData, params.ContentType); err != nil {
+	contentType := http.DetectContentType(params.FileData)
+	if err := ValidateFileUpload(params.FileData, contentType); err != nil {
 		return nil, err
 	}
 
@@ -72,9 +74,9 @@ func (s *SellerService) UploadAvatar(ctx context.Context, params domain.UploadSe
 		}
 	}
 
-	objectName := GenerateObjectName("avatars/sellers", params.Username, params.ContentType)
+	objectName := GenerateObjectName("avatars/sellers", params.Username, contentType)
 
-	url, err := s.fileStorage.Upload(ctx, objectName, params.ContentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
+	url, err := s.fileStorage.Upload(ctx, objectName, contentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
 	if err != nil {
 		return nil, fmt.Errorf("seller_service.UploadAvatar upload: %w", err)
 	}

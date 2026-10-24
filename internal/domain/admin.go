@@ -60,9 +60,8 @@ type UploadCategoryAvatar struct {
 }
 
 type UploadAdminAvatar struct {
-	Username    string
-	FileData    []byte
-	ContentType string
+	Username string
+	FileData []byte
 }
 
 type IncreaseTotalModeratesParams struct {

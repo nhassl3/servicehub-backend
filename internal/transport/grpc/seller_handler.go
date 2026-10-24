@@ -43,12 +43,10 @@ func (h *SellerHandler) GetSellerProfile(ctx context.Context, req *sellerv1.GetS
 	var params domain.GetSellerProfileParams
 
 	if req.Username != nil {
-		v := *req.Username
-		params.Username = &v
+		params.Username = new(*req.Username)
 	}
 	if req.SellerId != nil {
-		v := *req.SellerId
-		params.SellerId = &v
+		params.SellerId = new(*req.SellerId)
 	}
 
 	seller, err := h.svc.GetSellerProfile(ctx, params)
@@ -81,9 +79,8 @@ func (h *SellerHandler) UploadAvatar(ctx context.Context, req *sellerv1.UploadAv
 		return nil, domainErr(err)
 	}
 	seller, err := h.svc.UploadAvatar(ctx, domain.UploadSellerAvatarParams{
-		Username:    username,
-		FileData:    req.FileData,
-		ContentType: req.ContentType,
+		Username: username,
+		FileData: req.FileData,
 	})
 	if err != nil {
 		return nil, domainErr(err)
