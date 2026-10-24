@@ -19,6 +19,7 @@ const (
 
 	ResetPasswordEnterKey = "reset_password:"
 	VerifyEmailEnterKey   = "verify_email:"
+	ResetEmailEntryKey    = "reset_email:"
 )
 
 type UserRedis struct {
@@ -26,16 +27,18 @@ type UserRedis struct {
 	profileTTL,
 	authBlockTTL,
 	codeTTL,
-	resetPasswordTTL time.Duration
+	resetPasswordTTL,
+	resetEmailTTL time.Duration
 }
 
-func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL, codeTTL, resetPasswordTTL time.Duration) *UserRedis {
+func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL, codeTTL, resetPasswordTTL, resetEmailTTL time.Duration) *UserRedis {
 	return &UserRedis{
 		client:           client,
 		profileTTL:       profileTTL,
 		authBlockTTL:     authBlockTTL,
 		codeTTL:          codeTTL,
 		resetPasswordTTL: resetPasswordTTL,
+		resetEmailTTL:    resetEmailTTL,
 	}
 }
 
@@ -156,4 +159,25 @@ func (u *UserRedis) DelVerified(ctx context.Context, entryCode, token string) er
 
 func (u *UserRedis) DelCode(ctx context.Context, enterKeyCode, operationId string) error {
 	return u.client.Del(ctx, codePrefix+enterKeyCode+operationId).Err()
+}
+
+// MailReset returns true or false, depending on whether a mail reset has been performed within the last 72 hours
+func (u *UserRedis) MailReset(ctx context.Context, username string) (bool, error) {
+	reset, err := u.client.Get(ctx, ResetEmailEntryKey+username).Bool()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false, nil
+		}
+		return false, err
+	}
+	return reset, nil
+}
+
+// SwitchMailReset switches mail reset
+func (u *UserRedis) SwitchMailReset(ctx context.Context, username string) error {
+	reset, err := u.MailReset(ctx, username)
+	if err != nil {
+		return err
+	}
+	return u.client.Set(ctx, ResetEmailEntryKey+username, !reset, u.resetEmailTTL).Err()
 }

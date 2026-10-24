@@ -94,9 +94,8 @@ type UpdateUserPasswordParams struct {
 }
 
 type UploadAvatarParams struct {
-	Username    string
-	FileData    []byte
-	ContentType string
+	Username string
+	FileData []byte
 }
 
 type RequestResetPasswordParams struct {
@@ -107,6 +106,11 @@ type RequestResetPasswordParams struct {
 type ResetPasswordState struct {
 	Email,
 	Code string
+}
+
+type ResetEmailParams struct {
+	Username,
+	NewEmail string
 }
 
 // MarshalBinary this method needed for correct work of Redis
@@ -153,6 +157,7 @@ type UserRepository interface {
 	Update(ctx context.Context, params UpdateUserParams) (*User, error)
 	UpdatePassword(ctx context.Context, params UpdateUserPasswordParams) (*User, error)
 	VerifyEmail(ctx context.Context, params VerifyEmailAccount) (*User, error)
+	ResetEmail(ctx context.Context, params ResetEmailParams) (bool, error)
 }
 
 type UserRedis interface {
@@ -171,4 +176,6 @@ type UserRedis interface {
 	SetVerified(ctx context.Context, entryCode, token, email string) error
 	DelVerified(ctx context.Context, entryCode, token string) error
 	DelCode(ctx context.Context, enterKeyCode, operationId string) error
+	MailReset(ctx context.Context, username string) (bool, error)
+	SwitchMailReset(ctx context.Context, username string) error
 }

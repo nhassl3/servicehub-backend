@@ -141,6 +141,20 @@ func (r *UserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error
 	return exists, nil
 }
 
+func (r *UserRepo) ResetEmail(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
+	if err := r.store.ResetEmail(ctx, db.ResetEmailParams{
+		Username: params.Username,
+		NewEmail: params.NewEmail,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, domain.ErrNotFound
+		}
+
+		return false, fmt.Errorf("user_repo.ResetEmail: %w", err)
+	}
+	return true, nil
+}
+
 func (r *UserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	row, err := r.store.UpdateUser(ctx, db.UpdateUserParams{
 		Username:  params.Username,
