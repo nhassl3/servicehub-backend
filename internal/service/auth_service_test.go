@@ -77,7 +77,10 @@ func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
 
 // ─── Mock UserRedis ──────────────────────────────────────────────────────────
 
-type mockUserRedis struct{}
+type mockUserRedis struct {
+	mailResetFunc       func(ctx context.Context, username string) (bool, error)
+	switchMailResetFunc func(ctx context.Context, username string) error
+}
 
 func (m *mockUserRedis) Profile(_ context.Context, _ string) (*domain.User, error) {
 	return nil, domain.ErrRedisNotFound
@@ -139,6 +142,20 @@ func (m *mockUserRedis) DelCode(_ context.Context, _, _ string) error {
 	return nil
 }
 
+func (m *mockUserRedis) MailReset(ctx context.Context, username string) (bool, error) {
+	if m.mailResetFunc != nil {
+		return m.mailResetFunc(ctx, username)
+	}
+	return false, nil
+}
+
+func (m *mockUserRedis) SwitchMailReset(ctx context.Context, username string) error {
+	if m.mailResetFunc != nil {
+		return m.switchMailResetFunc(ctx, username)
+	}
+	return nil
+}
+
 // ─── Mock UserRepository ──────────────────────────────────────────────────────
 
 type mockUserRepo struct {
@@ -155,6 +172,14 @@ type mockUserRepo struct {
 	deleteSessionFunc        func(ctx context.Context, username string) error
 	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
 	verifyEmailFunc          func(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error)
+	resetEmailFunc           func(ctx context.Context, params domain.ResetEmailParams) (bool, error)
+}
+
+func (m *mockUserRepo) ResetEmail(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
+	if m.resetEmailFunc != nil {
+		return m.resetEmailFunc(ctx, params)
+	}
+	return false, nil
 }
 
 func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
@@ -262,11 +287,15 @@ func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParam
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-func newAuthService(repo domain.UserRepository) *service.AuthService {
+func newAuthServiceWithRedis(repo domain.UserRepository, redis domain.UserRedis) *service.AuthService {
 	tm := &mockTokenManager{}
 	bl := newMockBlacklist()
-	redis := &mockUserRedis{}
 	return service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{}, noopPublisher{}, zap.NewNop())
+}
+
+func newAuthService(repo domain.UserRepository) *service.AuthService {
+	redis := &mockUserRedis{}
+	return newAuthServiceWithRedis(repo, redis)
 }
 
 // noopPublisher is a trivial EventPublisher stub so existing auth tests don't
@@ -421,4 +450,48 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)
+}
+
+func TestAuthService_ResetEmail_Twice(t *testing.T) {
+	repo := &mockUserRepo{
+		existsByUsernameFunc: func(_ context.Context, username string) (bool, error) {
+			return true, nil
+		},
+		existsByEmailFunc: func(_ context.Context, email string) (bool, error) {
+			return false, nil
+		},
+		resetEmailFunc: func(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
+			return true, nil
+		},
+	}
+	redisStore := make(map[string]bool)
+	redis := &mockUserRedis{
+		mailResetFunc: func(_ context.Context, username string) (bool, error) {
+			reset, ok := redisStore[username]
+			if !ok {
+				return false, nil
+			}
+			return reset, nil
+		},
+		switchMailResetFunc: func(_ context.Context, username string) error {
+			reset, ok := redisStore[username]
+			if !ok {
+				redisStore[username] = true
+			}
+			redisStore[username] = !reset
+			return nil
+		},
+	}
+	svc := newAuthServiceWithRedis(repo, redis)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	reset, err := svc.ResetEmail(ctx, "alice", "new_test_email@mail.ru")
+	require.NoError(t, err)
+	require.Equal(t, true, reset)
+
+	reset2, err := svc.ResetEmail(ctx, "alice", "new_test_email_2@mail.ru")
+	require.ErrorIs(t, err, domain.ErrAlreadyReset)
+	require.Equal(t, false, reset2)
 }
