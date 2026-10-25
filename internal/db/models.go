@@ -165,6 +165,7 @@ type User struct {
 	IsActive     bool               `json:"is_active"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	EmailResetAt pgtype.Timestamptz `json:"email_reset_at"`
 }
 
 type Wishlist struct {

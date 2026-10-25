@@ -12,10 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const confirmEmailReset = `-- name: ConfirmEmailReset :one
+UPDATE users
+SET email = $1,
+    is_active = TRUE,
+    email_reset_at = NOW(),
+    updated_at = NOW()
+WHERE username = $2
+  AND is_active = FALSE
+  AND email_reset_at IS NULL
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+`
+
+type ConfirmEmailResetParams struct {
+	NewEmail string `json:"new_email"`
+	Username string `json:"username"`
+}
+
+// Email can be changed only once and only while the account is still unverified
+// (the 72-hour window is enforced in the service layer). The whole switch is
+// atomic: either the account gets the new email, is activated and the one-shot
+// flag is consumed, or nothing happens.
+func (q *Queries) ConfirmEmailReset(ctx context.Context, arg ConfirmEmailResetParams) (User, error) {
+	row := q.db.QueryRow(ctx, confirmEmailReset, arg.NewEmail, arg.Username)
+	var i User
+	err := row.Scan(
+		&i.Username,
+		&i.Uid,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.AvatarUrl,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.EmailResetAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash, full_name)
 VALUES ($1, $2, $3, $4)
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 `
 
 type CreateUserParams struct {
@@ -44,12 +84,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 FROM users
 WHERE email = $1 LIMIT 1
 `
@@ -68,12 +109,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
 
 const getUserByUID = `-- name: GetUserByUID :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 FROM users
 WHERE uid = $1 LIMIT 1
 `
@@ -92,12 +134,13 @@ func (q *Queries) GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error)
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -116,25 +159,9 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
-}
-
-const resetEmail = `-- name: ResetEmail :exec
-UPDATE users
-SET email = $1,
-    updated_at = NOW()
-WHERE (username=$2)
-`
-
-type ResetEmailParams struct {
-	NewEmail string `json:"new_email"`
-	Username string `json:"username"`
-}
-
-func (q *Queries) ResetEmail(ctx context.Context, arg ResetEmailParams) error {
-	_, err := q.db.Exec(ctx, resetEmail, arg.NewEmail, arg.Username)
-	return err
 }
 
 const setUserRole = `-- name: SetUserRole :one
@@ -142,7 +169,7 @@ UPDATE users
 SET role       = $2,
     updated_at = NOW()
 WHERE username = $1
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 `
 
 type SetUserRoleParams struct {
@@ -164,6 +191,7 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (User,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
@@ -173,7 +201,7 @@ UPDATE users
 SET password_hash = $1,
     updated_at = NOW()
 WHERE username = $2
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 `
 
 type UpdatePasswordParams struct {
@@ -195,6 +223,7 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
@@ -205,7 +234,7 @@ SET full_name  = $2,
     avatar_url = $3,
     updated_at = NOW()
 WHERE username = $1
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 `
 
 type UpdateUserParams struct {
@@ -228,6 +257,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
@@ -260,7 +290,7 @@ SET is_active=true,
     updated_at=NOW()
 WHERE ($1::varchar IS NULL OR email = $1::varchar)
     AND ($2::varchar IS NULL OR username = $2::varchar)
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
 `
 
 type VerifyEmailAccountParams struct {
@@ -282,6 +312,7 @@ func (q *Queries) VerifyEmailAccount(ctx context.Context, arg VerifyEmailAccount
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailResetAt,
 	)
 	return i, err
 }
