@@ -99,17 +99,21 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshToken
 }
 
 func (h *AuthHandler) ResetEmail(ctx context.Context, req *authv1.ResetEmailRequest) (*authv1.ResetEmailResponse, error) {
-	payload, ok := interceptors.PayloadFromContext(ctx)
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	username, ok := interceptors.GuestFromContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.FailedPrecondition, "missing token")
 	}
 
-	resetEmail, err := h.svc.ResetEmail(ctx, payload.Username, req.GetNewEmail())
+	operationId, err := h.svc.ResetEmail(ctx, username, req.GetNewEmail())
 	if err != nil {
 		return nil, domainErr(err)
 	}
 	return &authv1.ResetEmailResponse{
-		Success: resetEmail,
+		OperationId: operationId,
 	}, nil
 }
 
