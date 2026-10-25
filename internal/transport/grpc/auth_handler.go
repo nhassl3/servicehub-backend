@@ -22,6 +22,9 @@ import (
 //   - Logout
 //   - RefreshToken
 //   - GetMe
+//   - RequestResetPassword / ResetPassword
+//   - RequestVerifyEmail / VerifyEmail
+//   - ResetEmail
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
 	svc *service.AuthService
