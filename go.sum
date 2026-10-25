@@ -120,6 +120,8 @@ github.com/nhassl3/servicehub-contracts v0.1.42 h1:zZvIRGweu+QfEVbOJddpST6GXi8xj
 github.com/nhassl3/servicehub-contracts v0.1.42/go.mod h1:wwGA8+HNdyGxF39xoU1vC6N15ap4uVE65rRRIpeqiaI=
 github.com/nhassl3/servicehub-contracts v0.1.43 h1:/T05ZNUU0TOpiYe+eObhIVagP8HePsuL5CP1JPEn7gw=
 github.com/nhassl3/servicehub-contracts v0.1.43/go.mod h1:wwGA8+HNdyGxF39xoU1vC6N15ap4uVE65rRRIpeqiaI=
+github.com/nhassl3/servicehub-contracts v0.1.44 h1:nKW+9hD00S58YaZBTrQZ2So1eoNih64W7kRdjFVMuzU=
+github.com/nhassl3/servicehub-contracts v0.1.44/go.mod h1:wwGA8+HNdyGxF39xoU1vC6N15ap4uVE65rRRIpeqiaI=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
