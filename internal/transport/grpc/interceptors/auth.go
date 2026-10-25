@@ -15,6 +15,7 @@ import (
 type contextKey string
 
 const PayloadKey contextKey = "auth_payload"
+const GuestKey contextKey = "auth_guest"
 
 // publicMethods lists gRPC methods that do not require authentication.
 var publicMethods = []string{
@@ -69,7 +70,7 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
-		ctx = context.WithValue(ctx, PayloadKey, payload)
+		ctx = context.WithValue(ctx, GuestKey, payload.Username)
 
 		if payload.IsActive == false {
 			if slices.Contains(guestMethods, info.FullMethod) {
@@ -78,8 +79,16 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 			return nil, status.Error(codes.PermissionDenied, "email not verified")
 		}
 
+		ctx = context.WithValue(ctx, PayloadKey, payload)
+
 		return handler(ctx, req)
 	}
+}
+
+// GuestFromContext extracts the username from context
+func GuestFromContext(ctx context.Context) (string, bool) {
+	username, ok := ctx.Value(GuestKey).(string)
+	return username, ok
 }
 
 // PayloadFromContext extracts the auth payload from context.
