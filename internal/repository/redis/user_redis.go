@@ -10,16 +10,16 @@ import (
 )
 
 const (
-	sessionPrefix   = "session:"
-	profilePrefix   = "profile:"
-	authBlockPrefix = "auth:block:"
-	codePrefix      = "code:"
-	codeLockPrefix  = "code:lock:"
-	verifiedPrefix  = "verified::"
+	sessionPrefix      = "session:"
+	profilePrefix      = "profile:"
+	authBlockPrefix    = "auth:block:"
+	codePrefix         = "code:"
+	codeLockPrefix     = "code:lock:"
+	codeAttemptsPrefix = "code:attempts:"
+	verifiedPrefix     = "verified::"
 
 	ResetPasswordEnterKey = "reset_password:"
 	VerifyEmailEnterKey   = "verify_email:"
-	ResetEmailEntryKey    = "reset_email:"
 )
 
 type UserRedis struct {
@@ -27,18 +27,16 @@ type UserRedis struct {
 	profileTTL,
 	authBlockTTL,
 	codeTTL,
-	resetPasswordTTL,
-	resetEmailTTL time.Duration
+	resetPasswordTTL time.Duration
 }
 
-func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL, codeTTL, resetPasswordTTL, resetEmailTTL time.Duration) *UserRedis {
+func NewUserRedis(client *redis.Client, profileTTL, authBlockTTL, codeTTL, resetPasswordTTL time.Duration) *UserRedis {
 	return &UserRedis{
 		client:           client,
 		profileTTL:       profileTTL,
 		authBlockTTL:     authBlockTTL,
 		codeTTL:          codeTTL,
 		resetPasswordTTL: resetPasswordTTL,
-		resetEmailTTL:    resetEmailTTL,
 	}
 }
 
@@ -112,8 +110,8 @@ func (u *UserRedis) DelSession(ctx context.Context, username string) error {
 	return u.client.Del(ctx, sessionPrefix+username).Err()
 }
 
-func (u *UserRedis) Code(ctx context.Context, enterKeyCode, operationId string) (*domain.ResetPasswordState, error) {
-	var code domain.ResetPasswordState
+func (u *UserRedis) Code(ctx context.Context, enterKeyCode, operationId string) (*domain.CodeState, error) {
+	var code domain.CodeState
 
 	if err := u.client.Get(ctx, codePrefix+enterKeyCode+operationId).Scan(&code); err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -129,28 +127,28 @@ func (u *UserRedis) CodeExists(ctx context.Context, entryKeyCode, email string) 
 	return u.client.Exists(ctx, codeLockPrefix+entryKeyCode+email).Val() == 1
 }
 
-func (u *UserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.ResetPasswordState) error {
+func (u *UserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.CodeState) error {
 	if err := u.client.Set(ctx, codePrefix+enterKeyCode+operationId, code, u.codeTTL).Err(); err != nil {
 		return err
 	}
 	return u.client.Set(ctx, codeLockPrefix+enterKeyCode+code.Email, true, u.codeTTL).Err()
 }
 
-func (u *UserRedis) Verified(ctx context.Context, entryCode, token string) (string, error) {
-	var email string
+func (u *UserRedis) Verified(ctx context.Context, entryCode, token string) (*domain.VerifiedState, error) {
+	var state domain.VerifiedState
 
-	if err := u.client.Get(ctx, verifiedPrefix+entryCode+token).Scan(&email); err != nil {
+	if err := u.client.Get(ctx, verifiedPrefix+entryCode+token).Scan(&state); err != nil {
 		if errors.Is(err, redis.Nil) {
-			return "", domain.ErrRedisNotFound
+			return nil, domain.ErrRedisNotFound
 		}
-		return "", err
+		return nil, err
 	}
 
-	return email, nil
+	return &state, nil
 }
 
-func (u *UserRedis) SetVerified(ctx context.Context, entryCode, token, email string) error {
-	return u.client.Set(ctx, verifiedPrefix+entryCode+token, email, u.resetPasswordTTL).Err()
+func (u *UserRedis) SetVerified(ctx context.Context, entryCode, token string, state *domain.VerifiedState) error {
+	return u.client.Set(ctx, verifiedPrefix+entryCode+token, state, u.resetPasswordTTL).Err()
 }
 
 func (u *UserRedis) DelVerified(ctx context.Context, entryCode, token string) error {
@@ -161,23 +159,22 @@ func (u *UserRedis) DelCode(ctx context.Context, enterKeyCode, operationId strin
 	return u.client.Del(ctx, codePrefix+enterKeyCode+operationId).Err()
 }
 
-// MailReset returns true or false, depending on whether a mail reset has been performed within the last 72 hours
-func (u *UserRedis) MailReset(ctx context.Context, username string) (bool, error) {
-	reset, err := u.client.Get(ctx, ResetEmailEntryKey+username).Bool()
+// IncrCodeAttempts increments and returns the number of confirmation attempts
+// made for an operation. The counter lives as long as the code itself.
+func (u *UserRedis) IncrCodeAttempts(ctx context.Context, enterKeyCode, operationId string) (int64, error) {
+	key := codeAttemptsPrefix + enterKeyCode + operationId
+	attempts, err := u.client.Incr(ctx, key).Result()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return false, nil
-		}
-		return false, err
+		return 0, err
 	}
-	return reset, nil
+	if attempts == 1 {
+		if err := u.client.Expire(ctx, key, u.codeTTL).Err(); err != nil {
+			return attempts, err
+		}
+	}
+	return attempts, nil
 }
 
-// SwitchMailReset switches mail reset
-func (u *UserRedis) SwitchMailReset(ctx context.Context, username string) error {
-	reset, err := u.MailReset(ctx, username)
-	if err != nil {
-		return err
-	}
-	return u.client.Set(ctx, ResetEmailEntryKey+username, !reset, u.resetEmailTTL).Err()
+func (u *UserRedis) DelCodeAttempts(ctx context.Context, enterKeyCode, operationId string) error {
+	return u.client.Del(ctx, codeAttemptsPrefix+enterKeyCode+operationId).Err()
 }
