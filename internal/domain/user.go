@@ -7,21 +7,22 @@ import (
 )
 
 type User struct {
-	Username     string    `db:"username"`
-	UID          string    `db:"uid"`
-	Email        string    `db:"email"`
-	PasswordHash string    `db:"password_hash"`
-	FullName     string    `db:"full_name"`
-	AvatarURL    string    `db:"avatar_url"`
-	Role         string    `db:"role"`
-	IsActive     bool      `db:"is_active"`
-	CreatedAt    time.Time `db:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at"`
+	Username     string     `db:"username"`
+	UID          string     `db:"uid"`
+	Email        string     `db:"email"`
+	PasswordHash string     `db:"password_hash"`
+	FullName     string     `db:"full_name"`
+	AvatarURL    string     `db:"avatar_url"`
+	Role         string     `db:"role"`
+	IsActive     bool       `db:"is_active"`
+	CreatedAt    time.Time  `db:"created_at"`
+	UpdatedAt    time.Time  `db:"updated_at"`
+	EmailResetAt *time.Time `db:"email_reset_at"` // nil until the one-time email reset is used
 }
 
 // MarshalBinary this method needed for correct work of Redis
 // because Redis only work with JSON, but not with a structures
-// marshalling User structure to the []byte code (JSON)
+// marshaling User structure to the []byte code (JSON)
 func (u *User) MarshalBinary() ([]byte, error) {
 	return json.Marshal(u)
 }
@@ -49,7 +50,7 @@ type Session struct {
 
 // MarshalBinary this method needed for correct work of Redis
 // because Redis only work with JSON, but not with a structures
-// marshalling Session structure to the []byte code (JSON)
+// marshaling Session structure to the []byte code (JSON)
 func (u *Session) MarshalBinary() ([]byte, error) {
 	return json.Marshal(u)
 }
@@ -103,9 +104,15 @@ type RequestResetPasswordParams struct {
 	Email *string
 }
 
-type ResetPasswordState struct {
-	Email,
-	Code string
+// CodeState is the one-time code issued for an email-related flow (email
+// verification, password reset or email reset). Username is set only for the
+// email-reset flow: the verification step needs it to know which account the
+// new email belongs to, because the email itself is switched only after the
+// code is confirmed.
+type CodeState struct {
+	Email    string `json:"email"`
+	Code     string `json:"code"`
+	Username string `json:"username,omitempty"`
 }
 
 type ResetEmailParams struct {
@@ -113,28 +120,42 @@ type ResetEmailParams struct {
 	NewEmail string
 }
 
-// MarshalBinary this method needed for correct work of Redis
-// because Redis only work with JSON, but not with a structures
-// marshalling User structure to the []byte code (JSON)
-func (c *ResetPasswordState) MarshalBinary() ([]byte, error) {
+// MarshalBinary is needed for Redis because it does not work with structures.
+func (c *CodeState) MarshalBinary() ([]byte, error) {
 	return json.Marshal(c)
 }
 
-// UnmarshalBinary this method needed for correct work of Redis
-// because Redis only work with JSON, but not with a structures
-// unmarshalling source data and convert to User structure
-func (c *ResetPasswordState) UnmarshalBinary(data []byte) error {
+// UnmarshalBinary restores CodeState from a Redis value.
+func (c *CodeState) UnmarshalBinary(data []byte) error {
 	if c == nil {
 		return ErrRedisNotFound
 	}
 	return json.Unmarshal(data, c)
 }
 
-func NewCode(email, code string) *ResetPasswordState {
-	return &ResetPasswordState{
-		Email: email,
-		Code:  code,
+// VerifiedState is what a successfully confirmed code is exchanged for.
+// Username is non-empty only when the confirmed code belonged to an email reset.
+type VerifiedState struct {
+	Email    string `json:"email"`
+	Username string `json:"username,omitempty"`
+}
+
+// MarshalBinary is needed for Redis because it does not work with structures.
+func (v *VerifiedState) MarshalBinary() ([]byte, error) {
+	return json.Marshal(v)
+}
+
+// UnmarshalBinary restores VerifiedState from a Redis value.
+func (v *VerifiedState) UnmarshalBinary(data []byte) error {
+	if v == nil {
+		return ErrRedisNotFound
 	}
+	return json.Unmarshal(data, v)
+}
+
+// IsEmailReset reports whether the confirmed code was issued by the email-reset flow.
+func (v *VerifiedState) IsEmailReset() bool {
+	return v != nil && v.Username != ""
 }
 
 type VerifyEmailAccount struct {
@@ -157,7 +178,7 @@ type UserRepository interface {
 	Update(ctx context.Context, params UpdateUserParams) (*User, error)
 	UpdatePassword(ctx context.Context, params UpdateUserPasswordParams) (*User, error)
 	VerifyEmail(ctx context.Context, params VerifyEmailAccount) (*User, error)
-	ResetEmail(ctx context.Context, params ResetEmailParams) (bool, error)
+	ConfirmEmailReset(ctx context.Context, params ResetEmailParams) (*User, error)
 }
 
 type UserRedis interface {
@@ -169,13 +190,15 @@ type UserRedis interface {
 	SetAuthBlock(ctx context.Context, clientIP string) error
 	DelProfile(ctx context.Context, username string) error
 	DelSession(ctx context.Context, username string) error
-	Code(ctx context.Context, enterKeyCode string, operationId string) (*ResetPasswordState, error)
+	Code(ctx context.Context, enterKeyCode string, operationId string) (*CodeState, error)
 	CodeExists(ctx context.Context, entryKeyCode, email string) bool
-	SetCode(ctx context.Context, enterKeyCode, operationId string, code *ResetPasswordState) error
-	Verified(ctx context.Context, entryCode, token string) (string, error)
-	SetVerified(ctx context.Context, entryCode, token, email string) error
+	SetCode(ctx context.Context, enterKeyCode, operationId string, code *CodeState) error
+	Verified(ctx context.Context, entryCode, token string) (*VerifiedState, error)
+	SetVerified(ctx context.Context, entryCode, token string, state *VerifiedState) error
 	DelVerified(ctx context.Context, entryCode, token string) error
 	DelCode(ctx context.Context, enterKeyCode, operationId string) error
-	MailReset(ctx context.Context, username string) (bool, error)
-	SwitchMailReset(ctx context.Context, username string) error
+	// IncrCodeAttempts counts failed confirmation attempts for an operation and
+	// returns the new counter value; the counter expires together with the code.
+	IncrCodeAttempts(ctx context.Context, enterKeyCode, operationId string) (int64, error)
+	DelCodeAttempts(ctx context.Context, enterKeyCode, operationId string) error
 }
