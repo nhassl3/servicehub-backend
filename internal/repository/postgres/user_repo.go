@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/nhassl3/servicehub-backend/internal/db"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
+
+const uniqueViolationCode = "23505"
 
 type UserRepo struct {
 	store *db.Store
@@ -30,18 +33,7 @@ func (r *UserRepo) Create(ctx context.Context, params domain.CreateUserParams) (
 	if err != nil {
 		return nil, fmt.Errorf("user_repo.Create: %w", err)
 	}
-	return mapUser(db.User{
-		Username:     row.Username,
-		Uid:          row.Uid,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		FullName:     row.FullName,
-		AvatarUrl:    row.AvatarUrl,
-		Role:         row.Role,
-		IsActive:     row.IsActive,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
-	}), nil
+	return mapUser(row), nil
 }
 
 func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
@@ -141,18 +133,27 @@ func (r *UserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error
 	return exists, nil
 }
 
-func (r *UserRepo) ResetEmail(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
-	if err := r.store.ResetEmail(ctx, db.ResetEmailParams{
+// ConfirmEmailReset switches the account email after the new address has been
+// confirmed. The SQL statement is the single source of truth for "once only":
+// it updates, activates and consumes the flag atomically, and returns no rows
+// when the reset is no longer allowed.
+func (r *UserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+	row, err := r.store.ConfirmEmailReset(ctx, db.ConfirmEmailResetParams{
 		Username: params.Username,
 		NewEmail: params.NewEmail,
-	}); err != nil {
+	})
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return false, domain.ErrNotFound
+			return nil, domain.ErrEmailAlreadyReset
 		}
 
-		return false, fmt.Errorf("user_repo.ResetEmail: %w", err)
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == uniqueViolationCode {
+			return nil, domain.ErrAlreadyExists
+		}
+
+		return nil, fmt.Errorf("user_repo.ConfirmEmailReset: %w", err)
 	}
-	return true, nil
+	return mapUser(row), nil
 }
 
 func (r *UserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
@@ -167,18 +168,7 @@ func (r *UserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (
 		}
 		return nil, fmt.Errorf("user_repo.Update: %w", err)
 	}
-	return mapUser(db.User{
-		Username:     row.Username,
-		Uid:          row.Uid,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		FullName:     row.FullName,
-		AvatarUrl:    row.AvatarUrl,
-		Role:         row.Role,
-		IsActive:     row.IsActive,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
-	}), nil
+	return mapUser(row), nil
 }
 
 func (r *UserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
@@ -192,18 +182,7 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserP
 		}
 		return nil, fmt.Errorf("user_repo.UpdatePassword: %w", err)
 	}
-	return mapUser(db.User{
-		Username:     row.Username,
-		Uid:          row.Uid,
-		Email:        row.Email,
-		PasswordHash: row.PasswordHash,
-		FullName:     row.FullName,
-		AvatarUrl:    row.AvatarUrl,
-		Role:         row.Role,
-		IsActive:     row.IsActive,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
-	}), nil
+	return mapUser(row), nil
 }
 
 func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
@@ -223,6 +202,11 @@ func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAcc
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
 func mapUser(u db.User) *domain.User {
+	var emailResetAt *time.Time
+	if u.EmailResetAt.Valid { // can be nil-pointer
+		emailResetAt = new(u.EmailResetAt.Time)
+	}
+
 	return &domain.User{
 		Username:     u.Username,
 		UID:          u.Uid.String(),
@@ -234,6 +218,7 @@ func mapUser(u db.User) *domain.User {
 		IsActive:     u.IsActive,
 		CreatedAt:    pgTimeTZ(u.CreatedAt, time.UTC),
 		UpdatedAt:    pgTimeTZ(u.UpdatedAt, time.UTC),
+		EmailResetAt: emailResetAt,
 	}
 }
 
