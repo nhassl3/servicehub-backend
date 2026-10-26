@@ -78,8 +78,13 @@ func (m *mockTokenManager) VerifyToken(_ string) (*auth.Payload, error) {
 // ─── Mock UserRedis ──────────────────────────────────────────────────────────
 
 type mockUserRedis struct {
-	mailResetFunc       func(ctx context.Context, username string) (bool, error)
-	switchMailResetFunc func(ctx context.Context, username string) error
+	codeExistsFunc       func(ctx context.Context, entryKey, email string) bool
+	codeFunc             func(ctx context.Context, entryKey, operationID string) (*domain.CodeState, error)
+	setCodeFunc          func(ctx context.Context, entryKey, operationID string, state *domain.CodeState) error
+	verifiedFunc         func(ctx context.Context, entryKey, token string) (*domain.VerifiedState, error)
+	setVerifiedFunc      func(ctx context.Context, entryKey, token string, state *domain.VerifiedState) error
+	incrCodeAttemptsFunc func(ctx context.Context, entryKey, operationID string) (int64, error)
+	delCodeAttemptsFunc  func(ctx context.Context, entryKey, operationID string) error
 }
 
 func (m *mockUserRedis) Profile(_ context.Context, _ string) (*domain.User, error) {
@@ -114,23 +119,38 @@ func (m *mockUserRedis) DelSession(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockUserRedis) CodeExists(_ context.Context, _, _ string) bool {
+func (m *mockUserRedis) CodeExists(ctx context.Context, entryKey, email string) bool {
+	if m.codeExistsFunc != nil {
+		return m.codeExistsFunc(ctx, entryKey, email)
+	}
 	return false
 }
 
-func (m *mockUserRedis) Code(_ context.Context, _, _ string) (*domain.ResetPasswordState, error) {
+func (m *mockUserRedis) Code(ctx context.Context, entryKey, operationID string) (*domain.CodeState, error) {
+	if m.codeFunc != nil {
+		return m.codeFunc(ctx, entryKey, operationID)
+	}
 	return nil, domain.ErrRedisNotFound
 }
 
-func (m *mockUserRedis) SetCode(_ context.Context, _, _ string, _ *domain.ResetPasswordState) error {
+func (m *mockUserRedis) SetCode(ctx context.Context, entryKey, operationID string, state *domain.CodeState) error {
+	if m.setCodeFunc != nil {
+		return m.setCodeFunc(ctx, entryKey, operationID, state)
+	}
 	return nil
 }
 
-func (m *mockUserRedis) Verified(_ context.Context, _, _ string) (string, error) {
-	return "", domain.ErrRedisNotFound
+func (m *mockUserRedis) Verified(ctx context.Context, entryKey, token string) (*domain.VerifiedState, error) {
+	if m.verifiedFunc != nil {
+		return m.verifiedFunc(ctx, entryKey, token)
+	}
+	return nil, domain.ErrRedisNotFound
 }
 
-func (m *mockUserRedis) SetVerified(_ context.Context, _, _, _ string) error {
+func (m *mockUserRedis) SetVerified(ctx context.Context, entryKey, token string, state *domain.VerifiedState) error {
+	if m.setVerifiedFunc != nil {
+		return m.setVerifiedFunc(ctx, entryKey, token, state)
+	}
 	return nil
 }
 
@@ -142,16 +162,16 @@ func (m *mockUserRedis) DelCode(_ context.Context, _, _ string) error {
 	return nil
 }
 
-func (m *mockUserRedis) MailReset(ctx context.Context, username string) (bool, error) {
-	if m.mailResetFunc != nil {
-		return m.mailResetFunc(ctx, username)
+func (m *mockUserRedis) IncrCodeAttempts(ctx context.Context, entryKey, operationID string) (int64, error) {
+	if m.incrCodeAttemptsFunc != nil {
+		return m.incrCodeAttemptsFunc(ctx, entryKey, operationID)
 	}
-	return false, nil
+	return 1, nil
 }
 
-func (m *mockUserRedis) SwitchMailReset(ctx context.Context, username string) error {
-	if m.mailResetFunc != nil {
-		return m.switchMailResetFunc(ctx, username)
+func (m *mockUserRedis) DelCodeAttempts(ctx context.Context, entryKey, operationID string) error {
+	if m.delCodeAttemptsFunc != nil {
+		return m.delCodeAttemptsFunc(ctx, entryKey, operationID)
 	}
 	return nil
 }
@@ -172,14 +192,14 @@ type mockUserRepo struct {
 	deleteSessionFunc        func(ctx context.Context, username string) error
 	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
 	verifyEmailFunc          func(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error)
-	resetEmailFunc           func(ctx context.Context, params domain.ResetEmailParams) (bool, error)
+	confirmEmailResetFunc    func(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error)
 }
 
-func (m *mockUserRepo) ResetEmail(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
-	if m.resetEmailFunc != nil {
-		return m.resetEmailFunc(ctx, params)
+func (m *mockUserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+	if m.confirmEmailResetFunc != nil {
+		return m.confirmEmailResetFunc(ctx, params)
 	}
-	return false, nil
+	return nil, domain.ErrEmailAlreadyReset
 }
 
 func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
@@ -290,7 +310,7 @@ func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParam
 func newAuthServiceWithRedis(repo domain.UserRepository, redis domain.UserRedis) *service.AuthService {
 	tm := &mockTokenManager{}
 	bl := newMockBlacklist()
-	return service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{}, noopPublisher{}, zap.NewNop())
+	return service.NewAuthService(repo, redis, tm, tm, bl, mailer.NewNoopNotifier(zap.NewNop()), noopPublisher{}, 72*time.Hour, zap.NewNop())
 }
 
 func newAuthService(repo domain.UserRepository) *service.AuthService {
@@ -446,52 +466,162 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	tm := &mockTokenManager{verifyErr: auth.ErrInvalidToken}
 	bl := newMockBlacklist()
 	redis := &mockUserRedis{}
-	svc := service.NewAuthService(repo, redis, tm, tm, bl, &mailer.NoopNotifier{}, noopPublisher{}, zap.NewNop())
+	svc := service.NewAuthService(repo, redis, tm, tm, bl, mailer.NewNoopNotifier(zap.NewNop()), noopPublisher{}, 72*time.Hour, zap.NewNop())
 
 	_, err := svc.RefreshToken(context.Background(), "bad-token")
 	require.ErrorIs(t, err, domain.ErrInvalidToken)
 }
 
-func TestAuthService_ResetEmail_Twice(t *testing.T) {
+func TestAuthService_ResetEmail_OK(t *testing.T) {
+	var stored *domain.CodeState
+
 	repo := &mockUserRepo{
-		existsByUsernameFunc: func(_ context.Context, username string) (bool, error) {
-			return true, nil
-		},
-		existsByEmailFunc: func(_ context.Context, email string) (bool, error) {
-			return false, nil
-		},
-		resetEmailFunc: func(ctx context.Context, params domain.ResetEmailParams) (bool, error) {
-			return true, nil
+		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
+			return &domain.User{
+				Username:  username,
+				Email:     "old@example.com",
+				IsActive:  false,
+				CreatedAt: time.Now().Add(-time.Hour),
+			}, nil
 		},
 	}
-	redisStore := make(map[string]bool)
 	redis := &mockUserRedis{
-		mailResetFunc: func(_ context.Context, username string) (bool, error) {
-			reset, ok := redisStore[username]
-			if !ok {
-				return false, nil
-			}
-			return reset, nil
-		},
-		switchMailResetFunc: func(_ context.Context, username string) error {
-			reset, ok := redisStore[username]
-			if !ok {
-				redisStore[username] = true
-			}
-			redisStore[username] = !reset
+		setCodeFunc: func(_ context.Context, _, _ string, state *domain.CodeState) error {
+			stored = state
 			return nil
 		},
 	}
-	svc := newAuthServiceWithRedis(repo, redis)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	operationID, err := newAuthServiceWithRedis(repo, redis).ResetEmail(context.Background(), "alice", "new@example.com")
 
-	reset, err := svc.ResetEmail(ctx, "alice", "new_test_email@mail.ru")
 	require.NoError(t, err)
-	require.Equal(t, true, reset)
+	require.NotEmpty(t, operationID)
+	require.NotNil(t, stored)
+	require.Equal(t, "new@example.com", stored.Email)
+	require.Equal(t, "alice", stored.Username)
+	require.Len(t, stored.Code, 6)
+}
 
-	reset2, err := svc.ResetEmail(ctx, "alice", "new_test_email_2@mail.ru")
-	require.ErrorIs(t, err, domain.ErrAlreadyReset)
-	require.Equal(t, false, reset2)
+func TestAuthService_ResetEmail_WindowExpired(t *testing.T) {
+	repo := &mockUserRepo{
+		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
+			return &domain.User{
+				Username:  username,
+				CreatedAt: time.Now().Add(-73 * time.Hour),
+			}, nil
+		},
+	}
+
+	_, err := newAuthService(repo).ResetEmail(context.Background(), "alice", "new@example.com")
+	require.ErrorIs(t, err, domain.ErrEmailResetWindowExpired)
+}
+
+func TestAuthService_ResetEmail_AlreadyReset(t *testing.T) {
+	resetAt := time.Now().Add(-time.Hour)
+	repo := &mockUserRepo{
+		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
+			return &domain.User{
+				Username:     username,
+				CreatedAt:    time.Now().Add(-24 * time.Hour),
+				EmailResetAt: &resetAt,
+			}, nil
+		},
+	}
+
+	_, err := newAuthService(repo).ResetEmail(context.Background(), "alice", "new@example.com")
+	require.ErrorIs(t, err, domain.ErrEmailAlreadyReset)
+}
+
+func TestAuthService_ResetEmail_ActiveAccount(t *testing.T) {
+	repo := &mockUserRepo{
+		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
+			return &domain.User{
+				Username:  username,
+				IsActive:  true,
+				CreatedAt: time.Now().Add(-time.Hour),
+			}, nil
+		},
+	}
+
+	_, err := newAuthService(repo).ResetEmail(context.Background(), "alice", "new@example.com")
+	require.ErrorIs(t, err, domain.ErrEmailResetNotAllowed)
+}
+
+func TestAuthService_ResetEmail_EmailTaken(t *testing.T) {
+	repo := &mockUserRepo{
+		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
+			return &domain.User{Username: username, CreatedAt: time.Now().Add(-time.Hour)}, nil
+		},
+		existsByEmailFunc: func(_ context.Context, _ string) (bool, error) {
+			return true, nil
+		},
+	}
+
+	_, err := newAuthService(repo).ResetEmail(context.Background(), "alice", "taken@example.com")
+	require.ErrorIs(t, err, domain.ErrAlreadyExists)
+}
+
+func TestAuthService_VerifyEmailAccount_ResetsEmail(t *testing.T) {
+	var got domain.ResetEmailParams
+
+	repo := &mockUserRepo{
+		confirmEmailResetFunc: func(_ context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+			got = params
+			return &domain.User{
+				Username: params.Username,
+				Email:    params.NewEmail,
+				UID:      "uid-123",
+				Role:     "buyer",
+				IsActive: true,
+			}, nil
+		},
+	}
+	redis := &mockUserRedis{
+		verifiedFunc: func(_ context.Context, _, _ string) (*domain.VerifiedState, error) {
+			return &domain.VerifiedState{Email: "new@example.com", Username: "alice"}, nil
+		},
+	}
+
+	tokens, ok, err := newAuthServiceWithRedis(repo, redis).VerifyEmailAccount(context.Background(), "verify-token")
+
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NotNil(t, tokens)
+	require.NotEmpty(t, tokens.AccessToken)
+	require.Equal(t, domain.ResetEmailParams{Username: "alice", NewEmail: "new@example.com"}, got)
+}
+
+func TestAuthService_VerifyEmailAccount_VerifiesEmail(t *testing.T) {
+	var gotEmail string
+
+	repo := &mockUserRepo{
+		verifyEmailFunc: func(_ context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+			require.NotNil(t, params.Email)
+			gotEmail = *params.Email
+			return &domain.User{
+				Username: "alice",
+				Email:    gotEmail,
+				UID:      "uid-123",
+				Role:     "buyer",
+				IsActive: true,
+			}, nil
+		},
+	}
+	redis := &mockUserRedis{
+		verifiedFunc: func(_ context.Context, _, _ string) (*domain.VerifiedState, error) {
+			return &domain.VerifiedState{Email: "alice@example.com"}, nil
+		},
+	}
+
+	tokens, ok, err := newAuthServiceWithRedis(repo, redis).VerifyEmailAccount(context.Background(), "verify-token")
+
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NotNil(t, tokens)
+	require.Equal(t, "alice@example.com", gotEmail)
+}
+
+func TestAuthService_VerifyEmailAccount_InvalidToken(t *testing.T) {
+	_, _, err := newAuthService(&mockUserRepo{}).VerifyEmailAccount(context.Background(), "expired-token")
+	require.ErrorIs(t, err, domain.ErrInvalidToken)
 }
