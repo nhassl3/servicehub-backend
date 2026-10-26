@@ -36,12 +36,13 @@ func (m *MockSellerRepository) EXPECT() *MockSellerRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockSellerRepository) Create(ctx context.Context, params domain.CreateSellerParams) (*domain.Seller, error) {
+func (m *MockSellerRepository) Create(ctx context.Context, params domain.CreateSellerParams) (*domain.Seller, *domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, params)
 	ret0, _ := ret[0].(*domain.Seller)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(*domain.User)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // Create indicates an expected call of Create.
