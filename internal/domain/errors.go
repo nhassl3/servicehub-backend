@@ -25,4 +25,13 @@ var (
 	ErrCategoryNotFound    = errors.New("category not found")
 	ErrMoreThan5Claimed    = errors.New("claimed more than 5 products to review")
 	ErrCodeAlreadyExists   = errors.New("code already exists")
+	ErrEmailAlreadyReset   = errors.New("email already reset")
+
+	// Email reset is limited to the first hours after registration: later the
+	// address can only be changed by the support team.
+	ErrEmailResetWindowExpired = errors.New("email reset window has expired, contact support")
+	ErrEmailResetNotAllowed    = errors.New("email reset is not allowed for this account, contact support")
+
+	ErrInvalidCode         = errors.New("invalid code")
+	ErrTooManyCodeAttempts = errors.New("too many code attempts, request a new code")
 )

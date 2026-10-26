@@ -20,6 +20,8 @@ redis:
     product: 5m
     admin: 15m
     claim: 20m
+    code: 5m
+    reset_password: 15m
 
 kafka:
   topics:
@@ -49,6 +51,7 @@ clickhouse:
 auth:
   access_token_ttl: 15m
   refresh_token_ttl: 168h
+  email_reset_window: 72h
 
 minio:
   endpoint: "localhost:9000"

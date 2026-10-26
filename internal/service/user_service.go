@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -15,12 +17,6 @@ import (
 )
 
 const maxAvatarSize = 5 << 20 // 5 MB
-
-var allowedContentTypes = map[string]string{
-	"image/jpeg": ".jpg",
-	"image/png":  ".png",
-	"image/webp": ".webp",
-}
 
 type UserService struct {
 	userRepo    domain.UserRepository
@@ -80,7 +76,9 @@ func (s *UserService) UpdatePassword(ctx context.Context, params domain.UpdateUs
 }
 
 func (s *UserService) UploadAvatar(ctx context.Context, params domain.UploadAvatarParams) (*domain.User, error) {
-	if err := ValidateFileUpload(params.FileData, params.ContentType); err != nil {
+	contentType := http.DetectContentType(params.FileData)
+
+	if err := ValidateFileUpload(params.FileData, contentType); err != nil {
 		return nil, err
 	}
 
@@ -105,9 +103,9 @@ func (s *UserService) UploadAvatar(ctx context.Context, params domain.UploadAvat
 		}
 	}
 
-	objectName := GenerateObjectName("avatars/users", params.Username, params.ContentType)
+	objectName := GenerateObjectName("avatars/users", params.Username, contentType)
 
-	url, err := s.fileStorage.Upload(ctx, objectName, params.ContentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
+	url, err := s.fileStorage.Upload(ctx, objectName, contentType, bytes.NewReader(params.FileData), int64(len(params.FileData)))
 	if err != nil {
 		return nil, fmt.Errorf("user_service.UploadAvatar upload: %w", err)
 	}
@@ -143,25 +141,22 @@ func ObjectNameFromURL(url string) string {
 	return extractObjectName(url)
 }
 
-// FileExtForContentType returns the file extension for a given content type.
-func FileExtForContentType(contentType string) (string, bool) {
-	ext, ok := allowedContentTypes[contentType]
-	return ext, ok
-}
-
 // ValidateFileUpload checks file size and content type.
 func ValidateFileUpload(data []byte, contentType string) error {
 	if len(data) > maxAvatarSize {
 		return domain.ErrFileTooLarge
 	}
-	if _, ok := allowedContentTypes[contentType]; !ok {
-		return domain.ErrInvalidFileType
+	if !strings.HasPrefix(contentType, "image/") {
+		return fmt.Errorf("%s: %w", contentType, domain.ErrInvalidFileType)
 	}
 	return nil
 }
 
 // GenerateObjectName creates a unique object path for file storage.
 func GenerateObjectName(prefix, owner, contentType string) string {
-	ext := allowedContentTypes[contentType]
-	return filepath.Join(prefix, owner, uuid.NewString()+ext)
+	ext, err := mime.ExtensionsByType(contentType)
+	if err != nil {
+		return filepath.Join(prefix, owner, uuid.NewString())
+	}
+	return filepath.Join(prefix, owner, uuid.NewString()+ext[0])
 }

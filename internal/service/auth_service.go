@@ -19,14 +19,15 @@ import (
 )
 
 type AuthService struct {
-	userRepo       domain.UserRepository
-	userRedis      domain.UserRedis
-	tokenManager   auth.TokenManager
-	refreshManager auth.TokenManager
-	blacklist      auth.TokenBlacklist
-	smtpClient     mailer.Notifier
-	eventPublisher domain.EventPublisher
-	log            *zap.Logger
+	userRepo         domain.UserRepository
+	userRedis        domain.UserRedis
+	tokenManager     auth.TokenManager
+	refreshManager   auth.TokenManager
+	blacklist        auth.TokenBlacklist
+	smtpClient       mailer.Notifier
+	eventPublisher   domain.EventPublisher
+	emailResetWindow time.Duration
+	log              *zap.Logger
 }
 
 func NewAuthService(
@@ -35,17 +36,19 @@ func NewAuthService(
 	blacklist auth.TokenBlacklist,
 	smtpClient mailer.Notifier,
 	eventPublisher domain.EventPublisher,
+	emailResetWindow time.Duration,
 	log *zap.Logger,
 ) *AuthService {
 	return &AuthService{
-		userRepo:       userRepo,
-		userRedis:      userRedis,
-		tokenManager:   tokenManager,
-		refreshManager: refreshManager,
-		blacklist:      blacklist,
-		smtpClient:     smtpClient,
-		eventPublisher: eventPublisher,
-		log:            log,
+		userRepo:         userRepo,
+		userRedis:        userRedis,
+		tokenManager:     tokenManager,
+		refreshManager:   refreshManager,
+		blacklist:        blacklist,
+		smtpClient:       smtpClient,
+		eventPublisher:   eventPublisher,
+		emailResetWindow: emailResetWindow,
+		log:              log,
 	}
 }
 
@@ -181,11 +184,11 @@ func (s *AuthService) RequestResetPassword(ctx context.Context, params domain.Re
 		return "", domain.ErrInvalidCredentials
 	}
 
-	return s.requestToEntryKey(ctx, redis.ResetPasswordEnterKey, email)
+	return s.requestToEntryKey(ctx, redis.ResetPasswordEnterKey, &domain.CodeState{Email: email})
 }
 
 func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword string) (bool, error) {
-	email, err := s.userRedis.Verified(ctx, redis.ResetPasswordEnterKey, resetToken)
+	state, err := s.userRedis.Verified(ctx, redis.ResetPasswordEnterKey, resetToken)
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
 			return false, domain.ErrNotFound
@@ -193,7 +196,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword
 		return false, fmt.Errorf("auth_service.ResetPassword verify reset token: %w", err)
 	}
 
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	user, err := s.userRepo.GetByEmail(ctx, state.Email)
 	if err != nil {
 		return false, err
 	}
@@ -234,37 +237,36 @@ func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword
 }
 
 func (s *AuthService) RequestVerifyEmail(ctx context.Context, email string) (string, error) {
-	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, email)
+	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, &domain.CodeState{Email: email})
 }
 
-func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email string) (string, error) {
-	if ok := s.userRedis.CodeExists(ctx, entryKey, email); ok {
+// requestToEntryKey issues a six-digit code for an email-related flow, stores
+// it in Redis together with the target email (and, for email resets, the
+// account username) and sends it to the target address. It returns the
+// operation id that is later used to confirm the code.
+func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey string, state *domain.CodeState) (string, error) {
+	if ok := s.userRedis.CodeExists(ctx, entryKey, state.Email); ok {
 		return "", domain.ErrCodeAlreadyExists
 	}
 
-	var code string
-	for range 5 {
-		code = GenerateResetPasswordCode()
-		if code != "" {
-			break
-		}
-	}
+	code := GenerateResetPasswordCode()
 	if code == "" {
 		return "", fmt.Errorf("auth_service.requestToEntryKey reset code is empty")
 	}
+	state.Code = code
 
 	operationId := uuid.NewString()
 
-	if err := s.userRedis.SetCode(ctx, entryKey, operationId, domain.NewCode(email, code)); err != nil {
+	if err := s.userRedis.SetCode(ctx, entryKey, operationId, state); err != nil {
 		return "", fmt.Errorf("auth_service.requestToEntryKey set code: %w", err)
 	}
 
 	var err error
 	switch entryKey {
 	case redis.VerifyEmailEnterKey:
-		err = s.smtpClient.NotifyEmailConfirmation(ctx, code, email)
+		err = s.smtpClient.NotifyEmailConfirmation(ctx, code, state.Email)
 	case redis.ResetPasswordEnterKey:
-		err = s.smtpClient.NotifyResetPassword(ctx, code, email)
+		err = s.smtpClient.NotifyResetPassword(ctx, code, state.Email)
 	default:
 		return "", fmt.Errorf("auth_service.requestToEntryKey unknown entry key")
 	}
@@ -276,25 +278,30 @@ func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey, email str
 }
 
 func (s *AuthService) VerifyEmailAccount(ctx context.Context, verifyToken string) (*TokenPair, bool, error) {
-	email, err := s.userRedis.Verified(ctx, redis.VerifyEmailEnterKey, verifyToken)
+	state, err := s.userRedis.Verified(ctx, redis.VerifyEmailEnterKey, verifyToken)
 	if err != nil {
+		if errors.Is(err, domain.ErrRedisNotFound) {
+			return nil, false, domain.ErrInvalidToken
+		}
 		return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify token: %w", err)
 	}
 
-	// slow request to database
-	exists, err := s.userRepo.ExistsByEmail(ctx, email)
-	if !exists {
+	var user *domain.User
+	if state.IsEmailReset() {
+		// The email is switched only now, after the user has proved access to the
+		// new address; ConfirmEmailReset also consumes the one-time reset flag.
+		user, err = s.userRepo.ConfirmEmailReset(ctx, domain.ResetEmailParams{
+			Username: state.Username,
+			NewEmail: state.Email,
+		})
 		if err != nil {
-			return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount verify email: %w", err)
+			return nil, false, err
 		}
-		return nil, false, domain.ErrNotFound
-	}
-
-	user, err := s.userRepo.VerifyEmail(ctx, domain.VerifyEmailAccount{
-		Email: &email,
-	})
-	if err != nil {
-		return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify email account %w", err)
+	} else {
+		user, err = s.userRepo.VerifyEmail(ctx, domain.VerifyEmailAccount{Email: &state.Email})
+		if err != nil {
+			return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify email account: %w", err)
+		}
 	}
 
 	tokens, err := s.createTokensAndSession(ctx, user, user.Username)
@@ -359,6 +366,37 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		AccessToken:  accessToken,
 		RefreshToken: session.RefreshToken,
 	}, nil
+}
+
+// ResetEmail starts the one-time email change for an unverified account.
+func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string) (string, error) {
+	user, err := s.userRepo.GetByUsername(ctx, username)
+	if err != nil {
+		return "", err
+	}
+
+	if user.IsActive {
+		return "", domain.ErrEmailResetNotAllowed
+	}
+	if user.EmailResetAt != nil {
+		return "", domain.ErrEmailAlreadyReset
+	}
+	if s.emailResetWindow > 0 && time.Since(user.CreatedAt) > s.emailResetWindow {
+		return "", domain.ErrEmailResetWindowExpired
+	}
+
+	exists, err := s.userRepo.ExistsByEmail(ctx, newEmail)
+	if err != nil {
+		return "", fmt.Errorf("auth_service.ResetEmail check email exists: %w", err)
+	}
+	if exists {
+		return "", domain.ErrAlreadyExists
+	}
+
+	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, &domain.CodeState{
+		Email:    newEmail,
+		Username: username,
+	})
 }
 
 func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User, error) {

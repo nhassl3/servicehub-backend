@@ -79,9 +79,8 @@ func (h *AdminHandler) UploadAvatar(ctx context.Context, req *adminv1.UploadAvat
 		return nil, domainErr(err)
 	}
 	admin, err := h.svc.UploadAdminAvatar(ctx, domain.UploadAdminAvatar{
-		Username:    username,
-		FileData:    req.FileData,
-		ContentType: req.ContentType,
+		Username: username,
+		FileData: req.FileData,
 	})
 	if err != nil {
 		return nil, domainErr(err)

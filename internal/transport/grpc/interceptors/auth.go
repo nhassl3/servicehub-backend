@@ -15,6 +15,7 @@ import (
 type contextKey string
 
 const PayloadKey contextKey = "auth_payload"
+const GuestKey contextKey = "auth_guest"
 
 // publicMethods lists gRPC methods that do not require authentication.
 var publicMethods = []string{
@@ -35,6 +36,7 @@ var publicMethods = []string{
 var guestMethods = []string{
 	"/auth.v1.AuthService/RequestVerifyEmail",
 	"/auth.v1.AuthService/VerifyEmail",
+	"/auth.v1.AuthService/ResetEmail",
 }
 
 // AuthInterceptor returns a gRPC unary interceptor for PASETO token verification.
@@ -68,6 +70,8 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 			return nil, status.Error(codes.Unauthenticated, "invalid or expired token")
 		}
 
+		ctx = context.WithValue(ctx, GuestKey, payload.Username)
+
 		if payload.IsActive == false {
 			if slices.Contains(guestMethods, info.FullMethod) {
 				return handler(ctx, req)
@@ -76,8 +80,15 @@ func AuthInterceptor(tokenManager auth.TokenManager) grpc.UnaryServerInterceptor
 		}
 
 		ctx = context.WithValue(ctx, PayloadKey, payload)
+
 		return handler(ctx, req)
 	}
+}
+
+// GuestFromContext extracts the username from context
+func GuestFromContext(ctx context.Context) (string, bool) {
+	username, ok := ctx.Value(GuestKey).(string)
+	return username, ok
 }
 
 // PayloadFromContext extracts the auth payload from context.

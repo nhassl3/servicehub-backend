@@ -35,6 +35,21 @@ func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
 	return m.recorder
 }
 
+// ConfirmEmailReset mocks base method.
+func (m *MockUserRepository) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConfirmEmailReset", ctx, params)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConfirmEmailReset indicates an expected call of ConfirmEmailReset.
+func (mr *MockUserRepositoryMockRecorder) ConfirmEmailReset(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmEmailReset", reflect.TypeOf((*MockUserRepository)(nil).ConfirmEmailReset), ctx, params)
+}
+
 // Create mocks base method.
 func (m *MockUserRepository) Create(ctx context.Context, params domain.CreateUserParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
@@ -269,10 +284,10 @@ func (mr *MockUserRedisMockRecorder) AuthBlock(ctx, clientIP interface{}) *gomoc
 }
 
 // Code mocks base method.
-func (m *MockUserRedis) Code(ctx context.Context, enterKeyCode, operationId string) (*domain.ResetPasswordState, error) {
+func (m *MockUserRedis) Code(ctx context.Context, enterKeyCode, operationId string) (*domain.CodeState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Code", ctx, enterKeyCode, operationId)
-	ret0, _ := ret[0].(*domain.ResetPasswordState)
+	ret0, _ := ret[0].(*domain.CodeState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -309,6 +324,20 @@ func (m *MockUserRedis) DelCode(ctx context.Context, enterKeyCode, operationId s
 func (mr *MockUserRedisMockRecorder) DelCode(ctx, enterKeyCode, operationId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelCode", reflect.TypeOf((*MockUserRedis)(nil).DelCode), ctx, enterKeyCode, operationId)
+}
+
+// DelCodeAttempts mocks base method.
+func (m *MockUserRedis) DelCodeAttempts(ctx context.Context, enterKeyCode, operationId string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DelCodeAttempts", ctx, enterKeyCode, operationId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DelCodeAttempts indicates an expected call of DelCodeAttempts.
+func (mr *MockUserRedisMockRecorder) DelCodeAttempts(ctx, enterKeyCode, operationId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelCodeAttempts", reflect.TypeOf((*MockUserRedis)(nil).DelCodeAttempts), ctx, enterKeyCode, operationId)
 }
 
 // DelProfile mocks base method.
@@ -351,6 +380,21 @@ func (m *MockUserRedis) DelVerified(ctx context.Context, entryCode, token string
 func (mr *MockUserRedisMockRecorder) DelVerified(ctx, entryCode, token interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelVerified", reflect.TypeOf((*MockUserRedis)(nil).DelVerified), ctx, entryCode, token)
+}
+
+// IncrCodeAttempts mocks base method.
+func (m *MockUserRedis) IncrCodeAttempts(ctx context.Context, enterKeyCode, operationId string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncrCodeAttempts", ctx, enterKeyCode, operationId)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IncrCodeAttempts indicates an expected call of IncrCodeAttempts.
+func (mr *MockUserRedisMockRecorder) IncrCodeAttempts(ctx, enterKeyCode, operationId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrCodeAttempts", reflect.TypeOf((*MockUserRedis)(nil).IncrCodeAttempts), ctx, enterKeyCode, operationId)
 }
 
 // Profile mocks base method.
@@ -398,7 +442,7 @@ func (mr *MockUserRedisMockRecorder) SetAuthBlock(ctx, clientIP interface{}) *go
 }
 
 // SetCode mocks base method.
-func (m *MockUserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.ResetPasswordState) error {
+func (m *MockUserRedis) SetCode(ctx context.Context, enterKeyCode, operationId string, code *domain.CodeState) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetCode", ctx, enterKeyCode, operationId, code)
 	ret0, _ := ret[0].(error)
@@ -440,24 +484,24 @@ func (mr *MockUserRedisMockRecorder) SetSession(ctx, session interface{}) *gomoc
 }
 
 // SetVerified mocks base method.
-func (m *MockUserRedis) SetVerified(ctx context.Context, entryCode, token, email string) error {
+func (m *MockUserRedis) SetVerified(ctx context.Context, entryCode, token string, state *domain.VerifiedState) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetVerified", ctx, entryCode, token, email)
+	ret := m.ctrl.Call(m, "SetVerified", ctx, entryCode, token, state)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SetVerified indicates an expected call of SetVerified.
-func (mr *MockUserRedisMockRecorder) SetVerified(ctx, entryCode, token, email interface{}) *gomock.Call {
+func (mr *MockUserRedisMockRecorder) SetVerified(ctx, entryCode, token, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVerified", reflect.TypeOf((*MockUserRedis)(nil).SetVerified), ctx, entryCode, token, email)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVerified", reflect.TypeOf((*MockUserRedis)(nil).SetVerified), ctx, entryCode, token, state)
 }
 
 // Verified mocks base method.
-func (m *MockUserRedis) Verified(ctx context.Context, entryCode, token string) (string, error) {
+func (m *MockUserRedis) Verified(ctx context.Context, entryCode, token string) (*domain.VerifiedState, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Verified", ctx, entryCode, token)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(*domain.VerifiedState)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

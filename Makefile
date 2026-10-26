@@ -1,6 +1,6 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
 els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb \
-clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only
+clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only pgdump
 
 .DEFAULT_GOAL := build
 
@@ -113,6 +113,9 @@ dropdb:
 opendb:
 	@docker exec -it postgres18 psql -U $(DB_USER) $(DB_NAME)
 
+pgdump:
+	@docker exec -it postgres18 pg_dump -U $(DB_USER) -d $(DB_NAME) -s -F p -E UTF-8
+
 postgres:
 	@docker run --name postgres18 -p 5432:5432 -e POSTGRES_USER=$(DB_USER) -e POSTGRES_PASSWORD=$(DB_PASSWORD) -d postgres:18-alpine
 
@@ -201,6 +204,7 @@ els-docker:
 	-p 9200:9200 \
 	-e "discovery.type=single-node" \
 	-e "xpack.security.enabled=false" \
+	-e "ES_JAVA_OPTS=-Xms512m -Xmx512m" \
 	elasticsearch:9.3.8
 	@echo "Elasticsearch started on http://localhost:9200"
 

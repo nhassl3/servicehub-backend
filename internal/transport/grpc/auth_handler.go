@@ -22,6 +22,9 @@ import (
 //   - Logout
 //   - RefreshToken
 //   - GetMe
+//   - RequestResetPassword / ResetPassword
+//   - RequestVerifyEmail / VerifyEmail
+//   - ResetEmail
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
 	svc *service.AuthService
@@ -92,6 +95,25 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshToken
 	return &authv1.RefreshTokenResponse{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
+	}, nil
+}
+
+func (h *AuthHandler) ResetEmail(ctx context.Context, req *authv1.ResetEmailRequest) (*authv1.ResetEmailResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	username, ok := interceptors.GuestFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.FailedPrecondition, "missing token")
+	}
+
+	operationId, err := h.svc.ResetEmail(ctx, username, req.GetNewEmail())
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &authv1.ResetEmailResponse{
+		OperationId: operationId,
 	}, nil
 }
 

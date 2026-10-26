@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,6 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 )
+
+// maxCodeAttempts limits how many times one operation id may be guessed before
+// the code is burnt. Six-digit codes are cheap to brute-force without it.
+const maxCodeAttempts int64 = 5
 
 type NotificationService struct {
 	userRedis domain.UserRedis
@@ -33,16 +38,31 @@ func (s *NotificationService) ApproveCode(ctx context.Context, enterKeyCode, ope
 		}
 		return "", fmt.Errorf("notification_service.ApproveCode get code: %w", err)
 	}
-	if code != storeCode.Code {
-		return "", nil
+
+	attempts, err := s.userRedis.IncrCodeAttempts(ctx, enterKeyCode, operationId)
+	if err != nil {
+		return "", fmt.Errorf("notification_service.ApproveCode increment attempts: %w", err)
+	}
+	if attempts > maxCodeAttempts {
+		_ = s.userRedis.DelCode(ctx, enterKeyCode, operationId) // optional operation
+		return "", domain.ErrTooManyCodeAttempts
+	}
+
+	// Comparing codes with crypto package
+	if subtle.ConstantTimeCompare([]byte(code), []byte(storeCode.Code)) != 1 {
+		return "", domain.ErrInvalidCode
 	}
 
 	resetToken := uuid.NewString()
-	if err = s.userRedis.SetVerified(ctx, enterKeyCode, resetToken, storeCode.Email); err != nil {
+	if err = s.userRedis.SetVerified(ctx, enterKeyCode, resetToken, &domain.VerifiedState{
+		Email:    storeCode.Email,
+		Username: storeCode.Username, // for reset email address (can be empty)
+	}); err != nil {
 		return "", fmt.Errorf("notification_service.ApproveCode set verified reset token: %w", err)
 	}
 
-	_ = s.userRedis.DelCode(ctx, enterKeyCode, operationId) // optional operation
+	_ = s.userRedis.DelCode(ctx, enterKeyCode, operationId)         // optional operation
+	_ = s.userRedis.DelCodeAttempts(ctx, enterKeyCode, operationId) // optional operation
 
 	return resetToken, nil
 }

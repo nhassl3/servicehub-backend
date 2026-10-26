@@ -16,6 +16,11 @@ type Querier interface {
 	// clean up redis lock storage for next methods (Approve, Reject)
 	Approve(ctx context.Context, id uuid.UUID) error
 	ClearCart(ctx context.Context, cartID int64) error
+	// Email can be changed only once and only while the account is still unverified
+	// (the 72-hour window is enforced in the service layer). The whole switch is
+	// atomic: either the account gets the new email, is activated and the one-shot
+	// flag is consumed, or nothing happens.
+	ConfirmEmailReset(ctx context.Context, arg ConfirmEmailResetParams) (User, error)
 	CountBalanceTxByUsername(ctx context.Context, username string) (int64, error)
 	CountListProducts(ctx context.Context, arg CountListProductsParams) (int64, error)
 	CountOrdersByUsername(ctx context.Context, arg CountOrdersByUsernameParams) (int64, error)

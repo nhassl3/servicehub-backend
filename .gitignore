@@ -18,3 +18,5 @@ AGENTS.md
 .claude/
 pprof/
 CLAUDE.md
+.git-old
+.tmp-runtime

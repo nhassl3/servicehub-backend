@@ -85,12 +85,12 @@ SELECT id, username, display_name, level_rights, total_moderation, created_at, u
 FROM admins
 WHERE ($1::varchar IS NULL OR username = $1::varchar)
   AND ($2::uuid IS NULL OR id = $2::uuid)
-  AND ($1::varchar IS NOT NULL OR $2::uuid IS NOT NULL) FOR UPDATE
+  AND ($1::varchar IS NOT NULL OR $2::uuid IS NOT NULL) LIMIT 1 FOR UPDATE
 `
 
 type GetAdminForUpdateParams struct {
-	Username string    `json:"username"`
-	AdminID  uuid.UUID `json:"admin_id"`
+	Username pgtype.Text `json:"username"`
+	AdminID  pgtype.UUID `json:"admin_id"`
 }
 
 func (q *Queries) GetAdminForUpdate(ctx context.Context, arg GetAdminForUpdateParams) (Admin, error) {
@@ -142,15 +142,19 @@ UPDATE admins
         total_moderation = $3,
         avatar_url = $4,
         updated_at = NOW()
-WHERE username = $1
+WHERE ($5::varchar IS NULL OR username = $5::varchar)
+  AND ($6::uuid IS NULL OR id = $6::uuid)
+  AND ($5::varchar IS NOT NULL OR $6::uuid IS NOT NULL)
 RETURNING id, username, display_name, level_rights, total_moderation, created_at, updated_at, avatar_url
 `
 
 type UpdateAdminParams struct {
-	DisplayName     string `json:"display_name"`
-	LevelRights     int32  `json:"level_rights"`
-	TotalModeration int32  `json:"total_moderation"`
-	AvatarUrl       string `json:"avatar_url"`
+	DisplayName     string      `json:"display_name"`
+	LevelRights     int32       `json:"level_rights"`
+	TotalModeration int32       `json:"total_moderation"`
+	AvatarUrl       string      `json:"avatar_url"`
+	Username        pgtype.Text `json:"username"`
+	AdminID         pgtype.UUID `json:"admin_id"`
 }
 
 func (q *Queries) UpdateAdmin(ctx context.Context, arg UpdateAdminParams) (Admin, error) {
@@ -159,6 +163,8 @@ func (q *Queries) UpdateAdmin(ctx context.Context, arg UpdateAdminParams) (Admin
 		arg.LevelRights,
 		arg.TotalModeration,
 		arg.AvatarUrl,
+		arg.Username,
+		arg.AdminID,
 	)
 	var i Admin
 	err := row.Scan(

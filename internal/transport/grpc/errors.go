@@ -45,6 +45,14 @@ func domainErr(err error) error {
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, domain.ErrAuthBlock):
 		return status.Error(codes.Unavailable, err.Error())
+	case errors.Is(err, domain.ErrEmailAlreadyReset):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, domain.ErrEmailResetWindowExpired), errors.Is(err, domain.ErrEmailResetNotAllowed):
+		return status.Error(codes.PermissionDenied, err.Error())
+	case errors.Is(err, domain.ErrInvalidCode):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrTooManyCodeAttempts):
+		return status.Error(codes.ResourceExhausted, err.Error())
 	case errors.Is(err, domain.ErrFileTooLarge):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, domain.ErrInvalidFileType):

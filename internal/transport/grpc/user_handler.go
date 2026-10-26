@@ -74,9 +74,8 @@ func (h *UserHandler) UploadAvatar(ctx context.Context, req *userv1.UploadAvatar
 		return nil, domainErr(err)
 	}
 	user, err := h.svc.UploadAvatar(ctx, domain.UploadAvatarParams{
-		Username:    username,
-		FileData:    req.GetFileData(),
-		ContentType: req.GetContentType(),
+		Username: username,
+		FileData: req.GetFileData(),
 	})
 	if err != nil {
 		return nil, domainErr(err)
