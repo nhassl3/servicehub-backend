@@ -163,6 +163,12 @@ type VerifyEmailAccount struct {
 	Username *string
 }
 
+type OAuthLoginParams struct {
+	Username,
+	Email,
+	PasswordHash string
+}
+
 //go:generate mockgen -source=user.go -destination=../repository/mock/user_repo_mock.go -package=mockrepo
 type UserRepository interface {
 	Create(ctx context.Context, params CreateUserParams) (*User, error)
@@ -179,6 +185,7 @@ type UserRepository interface {
 	UpdatePassword(ctx context.Context, params UpdateUserPasswordParams) (*User, error)
 	VerifyEmail(ctx context.Context, params VerifyEmailAccount) (*User, error)
 	ConfirmEmailReset(ctx context.Context, params ResetEmailParams) (*User, error)
+	OAuthLogin(ctx context.Context, params OAuthLoginParams) (*User, error)
 }
 
 type UserRedis interface {
