@@ -1,0 +1,14 @@
+{
+  "heap": [],
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [],
+      "handler": {
+        "type": "Router",
+        "name": "_router",
+        "capture": "all"
+      }
+    }
+  }
+}
