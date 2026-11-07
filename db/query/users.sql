@@ -69,3 +69,8 @@ WHERE username = sqlc.arg(username)
   AND is_active = FALSE
   AND email_reset_at IS NULL
 RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at;
+
+-- name: OAuthLogin :one
+INSERT INTO users (username, email, password_hash)
+VALUES ($1, $2, $3)
+    ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username RETURNING *;

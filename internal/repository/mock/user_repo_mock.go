@@ -199,6 +199,21 @@ func (mr *MockUserRepositoryMockRecorder) GetSessionByUsername(ctx, username int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSessionByUsername", reflect.TypeOf((*MockUserRepository)(nil).GetSessionByUsername), ctx, username)
 }
 
+// OAuthLogin mocks base method.
+func (m *MockUserRepository) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "OAuthLogin", ctx, params)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// OAuthLogin indicates an expected call of OAuthLogin.
+func (mr *MockUserRepositoryMockRecorder) OAuthLogin(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OAuthLogin", reflect.TypeOf((*MockUserRepository)(nil).OAuthLogin), ctx, params)
+}
+
 // Update mocks base method.
 func (m *MockUserRepository) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
 	m.ctrl.T.Helper()

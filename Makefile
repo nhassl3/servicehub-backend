@@ -1,6 +1,6 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
 els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb \
-clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only pgdump
+clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only pgdump openig
 
 .DEFAULT_GOAL := build
 
@@ -279,3 +279,13 @@ clickhouse-force:
 
 clickhouse-create:
 	@$(MIGRATE_BIN) create -ext sql -dir $(CLICKHOUSE_MIGRATE_PATH) -seq $(NAME)
+
+##  ─── OpenIG oAuth v2.0 ───────────────────────────────────────────────────
+
+openig:
+	@docker run -d \
+	  --name servicehub-openig-local \
+	  -p 8079:8080 \
+	  -v "./openig-config:/usr/local/openig-config:ro" \
+	  -e 'CATALINA_OPTS=-Dopenig.base=/usr/local/openig-config -DOAUTH.CLIENT_ID=$(OAUTH_CLIENT_ID) -DOAUTH.CLIENT_SECRET=$(OAUTH_CLIENT_SECRET) -Dendpoint.app=$(ENDPOINT_APP)' \
+	  openidentityplatform/openig:6.2.0

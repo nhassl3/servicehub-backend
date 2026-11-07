@@ -78,6 +78,7 @@ type Querier interface {
 	ListNotification(ctx context.Context, arg ListNotificationParams) ([]Notification, error)
 	ListOrdersByUsername(ctx context.Context, arg ListOrdersByUsernameParams) ([]Order, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	OAuthLogin(ctx context.Context, arg OAuthLoginParams) (User, error)
 	Reject(ctx context.Context, id uuid.UUID) error
 	Release(ctx context.Context, arg ReleaseParams) error
 	RemoveWishlistItem(ctx context.Context, arg RemoveWishlistItemParams) (int64, error)

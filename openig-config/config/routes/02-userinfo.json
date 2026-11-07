@@ -1,0 +1,88 @@
+{
+  "heap": [
+    {
+      "name": "UnAuthorizedHandler",
+      "type": "StaticResponseHandler",
+      "config": {
+        "status": 403,
+        "reason": "Forbidden",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "entity": "{\"error\": \"forbidden\" }"
+      }
+    },
+    {
+      "name": "UnAuthenticatedHandler",
+      "type": "StaticResponseHandler",
+      "config": {
+        "status": 401,
+        "reason": "Unauthenticated",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "entity": "{\"error\": \"unauthenticated\" }"
+      }
+    }
+  ],
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [
+        {
+          "name": "ProtectedResourceFilter",
+          "type": "OAuth2ResourceServerFilter",
+          "config": {
+            "tokenInfoEndpoint": "https://login.yandex.ru/info?format=jwt",
+            "accessTokenResolver": {
+              "type": "ScriptableAccessTokenResolver",
+              "config": {
+                "type": "application/x-groovy",
+                "file": "ResolveAccessToken.groovy"
+              }
+            },
+            "requireHttps": false,
+            "providerHandler": "ClientHandler",
+            "scopes": [],
+            "cacheExpiration": "2 minutes"
+          }
+        },
+        {
+          "name": "AuthenticationFilter",
+          "type": "ConditionEnforcementFilter",
+          "config": {
+            "condition": "${not empty (contexts['oauth2'])}",
+            "failureHandler": "UnAuthenticatedHandler"
+          }
+        },
+        {
+          "name": "AuthorizationFilter",
+          "type": "ConditionEnforcementFilter",
+          "config": {
+            "condition": "${matches(contexts['oauth2'].accessToken.info.email, '(?i)^[^@]+@(yandex[.]ru|ya[.]ru|yandex[.]com)$')}",
+            "failureHandler": "UnAuthorizedHandler"
+          }
+        }
+      ],
+      "handler": {
+        "name": "UserInfoHandler",
+        "type": "StaticResponseHandler",
+        "config": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "entity": "{\"email\": \"${contexts['oauth2'].accessToken.info['email']}\" }"
+        }
+      }
+    }
+  },
+  "condition": "${matches(request.uri.path, '^/userinfo')}",
+  "baseURI": "http://openig.servicehub.org"
+}

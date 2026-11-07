@@ -1,0 +1,66 @@
+{
+  "heap": [
+    {
+      "name": "Yandex",
+      "type": "Issuer",
+      "config": {
+        "authorizeEndpoint": "https://oauth.yandex.ru/authorize",
+        "tokenEndpoint": "https://oauth.yandex.ru/token"
+      }
+    },
+    {
+      "comment": "To reuse client registrations, configure them in the parent route",
+      "name": "OAuth2RelyingParty",
+      "type": "ClientRegistration",
+      "config": {
+        "issuer": "Yandex",
+        "clientId": "${system['OAUTH.CLIENT_ID']}",
+        "clientSecret": "${system['OAUTH.CLIENT_SECRET']}",
+        "scopes": [
+          "login:email"
+        ]
+      }
+    }
+  ],
+  "handler": {
+    "type": "Chain",
+    "config": {
+      "filters": [
+        {
+          "type": "OAuth2ClientFilter",
+          "config": {
+            "clientEndpoint": "/oauth",
+            "defaultLoginGoto": "/oauth",
+            "requireHttps": false,
+            "requireLogin": true,
+            "target": "${attributes.access_token}",
+            "failureHandler": {
+              "type": "StaticResponseHandler",
+              "config": {
+                "status": 500,
+                "reason": "Error",
+                "entity": "${attributes.access_token}"
+              }
+            },
+            "registrations": "OAuth2RelyingParty"
+          }
+        }
+      ],
+      "handler": {
+        "name": "AccessTokenHandler",
+        "type": "StaticResponseHandler",
+        "config": {
+          "status": 302,
+          "reason": "Found",
+          "headers": {
+            "Location": [
+              "${system['endpoint.app']}#access_token=${attributes.access_token.access_token}"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "condition": "${matches(request.uri.path, '^/oauth')}",
+  "baseURI": "http://openig.servicehub.org"
+}
