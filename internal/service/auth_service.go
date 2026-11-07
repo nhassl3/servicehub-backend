@@ -59,10 +59,72 @@ type RegisterInput struct {
 	FullName string
 }
 
+type OAuthLoginInput struct {
+	Username string
+	Email    string
+	Password string
+}
+
 type TokenPair struct {
 	AccessToken         string
 	RefreshToken        string
 	RefreshTokenPayload *auth.Payload
+}
+
+func (s *AuthService) OAuthLogin(ctx context.Context, input OAuthLoginInput) (*domain.User, *TokenPair, error) {
+	clientIP, _ := getMetadataFromContext(ctx)
+
+	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
+		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	}
+
+	existsUsername, err := s.userRepo.ExistsByUsername(ctx, input.Username)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth_service.oAuthLogin: failed to check username %w", err)
+	}
+
+	var user *domain.User
+	existsEmail, err := s.userRepo.ExistsByEmail(ctx, input.Email)
+	if err != nil {
+		return nil, nil, fmt.Errorf("auth_service.Register check email: %w", err)
+	}
+	if !existsEmail && !existsUsername {
+		passwordHash, err := hash.CreateHashPassword(input.Password)
+		if err != nil {
+			return nil, nil, fmt.Errorf("auth_service.Register hash: %w", err)
+		}
+
+		user, err = s.userRepo.OAuthLogin(ctx, domain.OAuthLoginParams{
+			Username:     input.Username,
+			Email:        input.Email,
+			PasswordHash: passwordHash,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
+		}
+
+		if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
+			UID:       user.UID,
+			Username:  user.Username,
+			CreatedAt: user.CreatedAt,
+		}); err != nil {
+			s.log.Warn("(Kafka) analytics: failed to publish user.registered", zap.Error(err))
+		}
+	} else {
+		user, err = s.userRepo.GetByEmail(ctx, input.Email)
+		if err != nil {
+			return nil, nil, fmt.Errorf("auth_service.oAuthLogin: failed to get user by email: %w", err)
+		}
+	}
+
+	tokens, err := s.createTokensAndSession(ctx, user, input.Username)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+
+	return user, tokens, nil
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, *TokenPair, error) {
@@ -103,7 +165,6 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domai
 		return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
 	}
 
-	// Analytics fact: log the registration (best-effort, PG is the source of truth).
 	if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
 		UID:       user.UID,
 		Username:  user.Username,
