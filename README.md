@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/nhassl3/servicehub-backend?style=flat-square" alt="License"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/actions"><img src="https://img.shields.io/github/actions/workflow/status/nhassl3/servicehub-backend/go.yaml?branch=main&style=flat-square&label=CI" alt="CI"></a>
-  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/badge/version-v0.4.0-2C8EBB?style=flat-square" alt="Version v0.4.0"></a>
+  <a href="https://github.com/nhassl3/servicehub-backend/releases"><img src="https://img.shields.io/badge/version-v0.4.3-2C8EBB?style=flat-square" alt="Version v0.4.3"></a>
   <a href="https://grpc.io"><img src="https://img.shields.io/badge/gRPC-gateway-244c5a?style=flat-square" alt="gRPC"></a>
   <a href="https://paseto.io"><img src="https://img.shields.io/badge/auth-PASETO%20v4-2C8EBB?style=flat-square" alt="PASETO v4"></a>
   <a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/PostgreSQL-18-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 18"></a>
@@ -15,6 +15,9 @@
   <a href="https://www.elastic.co/elasticsearch"><img src="https://img.shields.io/badge/Elasticsearch-9.3-005571?style=flat-square&logo=elasticsearch&logoColor=white" alt="Elasticsearch 9.3"></a>
   <a href="https://www.elastic.co/kibana"><img src="https://img.shields.io/badge/Kibana-9.3-005571?style=flat-square&logo=kibana&logoColor=white" alt="Kibana 9.3"></a>
   <a href="https://clickhouse.com"><img src="https://img.shields.io/badge/ClickHouse-analytics-16253D?style=flat-square&logo=clickhouse&logoColor=white" alt="ClickHouse"></a>
+  <a href="https://backstage.forgerock.com/docs/ig/6.2/" target="_blank" rel="noopener">
+  <img src="https://img.shields.io/badge/OpenIG-6.2.0-blue" alt="OpenIG 6.2.0">
+</a>
   <a href="https://sqlc.dev"><img src="https://img.shields.io/badge/sqlc-generated-16253D?style=flat-square" alt="sqlc"></a>
   <a href="https://github.com/golang-migrate/migrate"><img src="https://img.shields.io/badge/migrate-golang--migrate-6479EB?style=flat-square" alt="golang-migrate"></a>
   <a href="https://github.com/nhassl3/servicehub-backend/blob/main/CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome"></a>
@@ -35,6 +38,7 @@ ServiceHub is a modern service marketplace platform inspired by the architecture
 - **v0.2.0** — Added Kafka for stream processing (async notifications, event-driven workflows)
 - **v0.3.0** — Added Elasticsearch + Kibana for full-text search and observability
 - **v0.4.0** — Added ClickHouse for OLAP analytics (event ingestion + materialized aggregates)
+- **v0.4.3** — Added oAuth login with Yandex (OpenIG resolve-proxy for web-applications API)
 
 ---
 
@@ -145,11 +149,24 @@ docker compose up --build
 
 Services exposed:
 
-| Service | Port |
-|---|---|
-| gRPC | 9090 |
-| HTTP gateway | 8080 |
-| PostgreSQL | 5432 |
+| Service           | Port  |
+|-------------------|-------|
+| gRPC              | 50051 |
+| HTTP gateway      | 8082  |
+| PostgreSQL        | 5432  |
+| OpenIG            | 8079  |
+| Redis             | 6380  |
+| MinIO             | 9000  |
+| MinIOWeb          | 9001  |
+| Kafka             | 9092  |
+| KafkaDebug        | 29092 |
+| KafkaUI           | 8081  |
+| setup-script      | -     |
+| kibana            | 5601  |
+| ClickHouse        | 18123 |
+| ClickHouse Native | 19000 |
+| Consumer          | -     |
+| Client            | 3000  |
 
 Migrations run automatically on container startup.
 
@@ -210,6 +227,14 @@ Transport (gRPC) → Service (business logic) → Repository (data access) → D
 
 ---
 
+### OpenIG (Open Identity Gateway)
+
+Needed for manage single sign-on (SSO) and credential replay for web applications and APIs
+
+```
+Client → Replay-Proxy → oAuth-Provider → Replay-Proxy → Frontend → Transport (gRPC)
+```
+
 ## Testing
 
 ```bash
@@ -225,13 +250,14 @@ make test
 
 ## Related Repositories
 
-| Repository | Description |
-|---|---|
-| `servicehub-contracts` | Protobuf definitions shared between backend and frontend |
-| `servicehub-frontend` | React + Vite + TypeScript frontend |
+| Repository              | Description                                              |
+|-------------------------|----------------------------------------------------------|
+| `servicehub-contracts`  | Protobuf definitions shared between backend and frontend |
+| `servicehub-frontend`   | React + Vite + TypeScript frontend                       |
+| `servicehub-consumer`   | Kafka                                                    |
 
 ---
 
 ## License
 
-MIT
+This project protected by [MIT](https://github.com/nhassl3/servicehub-backend/blob/main/LICENSE) license
