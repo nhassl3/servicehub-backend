@@ -199,6 +199,18 @@ func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAcc
 	return mapUser(user), nil
 }
 
+func (r *UserRepo) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+	user, err := r.store.OAuthLogin(ctx, db.OAuthLoginParams{
+		Username:     params.Username,
+		Email:        params.Email,
+		PasswordHash: params.PasswordHash,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("user_repo.oAuthLogin: %w", err)
+	}
+	return mapUser(user), nil
+}
+
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
 func mapUser(u db.User) *domain.User {
