@@ -164,6 +164,37 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
+const oAuthLogin = `-- name: OAuthLogin :one
+INSERT INTO users (username, email, password_hash)
+VALUES ($1, $2, $3)
+    ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+`
+
+type OAuthLoginParams struct {
+	Username     string `json:"username"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"password_hash"`
+}
+
+func (q *Queries) OAuthLogin(ctx context.Context, arg OAuthLoginParams) (User, error) {
+	row := q.db.QueryRow(ctx, oAuthLogin, arg.Username, arg.Email, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.Username,
+		&i.Uid,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.AvatarUrl,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.EmailResetAt,
+	)
+	return i, err
+}
+
 const setUserRole = `-- name: SetUserRole :one
 UPDATE users
 SET role       = $2,
