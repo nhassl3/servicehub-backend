@@ -31,6 +31,7 @@ var publicMethods = []string{
 	"/seller.v1.SellerService/GetSellerProfile",
 	"/review.v1.ReviewService/ListReviews",
 	"/notification.v1.NotificationService/ApproveCode",
+	"/auth.v1.AuthService/oAuthLogin",
 }
 
 var guestMethods = []string{
