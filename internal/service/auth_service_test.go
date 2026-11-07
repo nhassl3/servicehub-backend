@@ -193,6 +193,14 @@ type mockUserRepo struct {
 	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
 	verifyEmailFunc          func(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error)
 	confirmEmailResetFunc    func(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error)
+	oAuthLogin               func(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error)
+}
+
+func (m *mockUserRepo) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+	if m.oAuthLogin != nil {
+		return m.oAuthLogin(ctx, params)
+	}
+	return nil, domain.ErrAlreadyExists
 }
 
 func (m *mockUserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
