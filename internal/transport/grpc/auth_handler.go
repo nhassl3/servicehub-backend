@@ -37,7 +37,23 @@ func NewAuthHandler(svc *service.AuthService, _ auth.TokenManager) *AuthHandler 
 	return &AuthHandler{svc: svc}
 }
 
-func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.RegisterResponse, error) {
+func (h *AuthHandler) OAuthLogin(ctx context.Context, req *authv1.OAuthLoginRequest) (*authv1.AuthResponse, error) {
+	user, tokens, err := h.svc.OAuthLogin(ctx, service.OAuthLoginInput{
+		Username: req.GetUsername(),
+		Email:    req.GetEmail(),
+		Password: req.GetPassword(),
+	})
+	if err != nil {
+		return nil, domainErr(err)
+	}
+	return &authv1.AuthResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		User:         protoUserInfo(user),
+	}, nil
+}
+
+func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest) (*authv1.AuthResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -51,7 +67,7 @@ func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest)
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	return &authv1.RegisterResponse{
+	return &authv1.AuthResponse{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 		User:         protoUserInfo(user),
