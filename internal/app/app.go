@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -19,7 +21,7 @@ import (
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/internal/service"
 	serviceKafka "github.com/nhassl3/servicehub-backend/internal/service/kafka"
-	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc"
+	transportGRPC "github.com/nhassl3/servicehub-backend/internal/transport/grpc/servers"
 	transportHTTP "github.com/nhassl3/servicehub-backend/internal/transport/http"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/clickhouse"
@@ -212,24 +214,54 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	}
 
 	// ─── gRPC Server ──────────────────────────────────────────────────────────
-	grpcServer := transportGRPC.NewServer(svcs, accessManager, log)
+	grpcServers := []*transportGRPC.Server{
+		transportGRPC.NewAuthServer(svcs, accessManager, log),
+		transportGRPC.NewAdminServer(svcs, accessManager, log),
+		transportGRPC.NewProductServer(svcs, accessManager, log),
+		transportGRPC.NewUserServer(svcs, accessManager, log),
+		transportGRPC.NewSellerServer(svcs, accessManager, log),
+		transportGRPC.NewNotificationServer(svcs, accessManager, log),
+	}
 
 	// ─── Start servers ────────────────────────────────────────────────────────
 	errCh := make(chan error, 2)
 
 	// gRPC server
-	go func() {
-		if err := grpcServer.Start(cfg.Server.GRPCPort); err != nil {
-			errCh <- fmt.Errorf("grpc server: %w", err)
+	for i, grpcServer := range grpcServers {
+		port, err := strconv.Atoi(strings.Trim(cfg.Server.GRPCPort, ":"))
+		if err != nil {
+			return fmt.Errorf("app: create grpc server: %w", err)
 		}
-	}()
+		go func() {
+			if err := grpcServer.Start(fmt.Sprintf(":%d", port+i)); err != nil {
+				errCh <- fmt.Errorf("grpc server: %w", err)
+			}
+		}()
+	}
 
 	// gateway gRPC server (HTTP)
-	go func() {
-		if err := grpcServer.StartGateway(ctx, "localhost"+cfg.Server.GRPCPort, cfg.Server.HTTPPort); err != nil {
-			errCh <- fmt.Errorf("error http gateway: %w", err)
+	for i, grpcServer := range grpcServers {
+		gRPCPort, err := strconv.Atoi(strings.Trim(cfg.Server.GRPCPort, ":"))
+		if err != nil {
+			return fmt.Errorf("app: grpc server port: %w", err)
 		}
-	}()
+
+		httpPort, err := strconv.Atoi(strings.Trim(cfg.Server.HTTPPort, ":"))
+		if err != nil {
+			return fmt.Errorf("app: http server port: %w", err)
+		}
+
+		go func() {
+			if err := grpcServer.StartGateway(
+				ctx,
+				"localhost"+fmt.Sprintf(":%d", gRPCPort+i),
+				fmt.Sprintf(":%d", httpPort+i),
+				grpcServer.HandlerFn,
+			); err != nil {
+				errCh <- fmt.Errorf("error http gateway: %w", err)
+			}
+		}()
+	}
 
 	log.Info("ServiceHub started",
 		zap.String("grpc_port", cfg.Server.GRPCPort),
@@ -270,7 +302,9 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 			return kafkaProducerError
 		}
 
-		grpcServer.Shutdown(shutdownCtx)
+		for _, grpcServer := range grpcServers {
+			grpcServer.Shutdown(shutdownCtx)
+		}
 		return nil
 	}
 }
