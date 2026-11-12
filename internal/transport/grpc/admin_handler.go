@@ -30,7 +30,7 @@ func NewAdminHandler(svc *service.AdminService, analytics *service.AnalyticsServ
 }
 
 func (h *AdminHandler) CreateAdmin(ctx context.Context, req *adminv1.CreateAdminRequest) (*adminv1.CreateAdminResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (h *AdminHandler) GetAdminProfile(ctx context.Context, req *adminv1.GetAdmi
 }
 
 func (h *AdminHandler) UpdateAdminProfile(ctx context.Context, req *adminv1.UpdateAdminProfileRequest) (*adminv1.UpdateAdminProfileResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -74,7 +74,7 @@ func (h *AdminHandler) UpdateAdminProfile(ctx context.Context, req *adminv1.Upda
 }
 
 func (h *AdminHandler) UploadAvatar(ctx context.Context, req *adminv1.UploadAvatarRequest) (*adminv1.UploadAvatarResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -91,7 +91,7 @@ func (h *AdminHandler) UploadAvatar(ctx context.Context, req *adminv1.UploadAvat
 }
 
 func (h *AdminHandler) IncreaseTotalModerates(ctx context.Context, req *adminv1.IncreaseAdminModeratesRequest) (*adminv1.IncreaseAdminModeratesResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -102,7 +102,7 @@ func (h *AdminHandler) IncreaseTotalModerates(ctx context.Context, req *adminv1.
 }
 
 func (h *AdminHandler) GetAdminStatistics(ctx context.Context, req *adminv1.GetAdminStatisticsRequest) (*adminv1.GetAdminStatisticsResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -149,8 +149,8 @@ func protoAdmin(s *domain.Admin) *adminv1.AdminProfile {
 		LevelRights:     s.LevelRights,
 		TotalModeration: s.TotalModerates,
 		AvatarUrl:       s.AvatarURL,
-		CreatedAt:       safeTimestamp(s.CreatedAt),
-		UpdatedAt:       safeTimestamp(s.UpdatedAt),
+		CreatedAt:       SafeTimestamp(s.CreatedAt),
+		UpdatedAt:       SafeTimestamp(s.UpdatedAt),
 	}
 }
 
@@ -187,7 +187,7 @@ func protoRegistrations(pts []domain.RegistrationPoint) []*adminv1.RegistrationP
 	res := make([]*adminv1.RegistrationPoint, 0, len(pts))
 	for _, p := range pts {
 		res = append(res, &adminv1.RegistrationPoint{
-			Bucket: safeTimestamp(p.Bucket),
+			Bucket: SafeTimestamp(p.Bucket),
 			Count:  int32(p.Count),
 		})
 	}
@@ -198,7 +198,7 @@ func protoModerates(pts []domain.ModeratePoint) []*adminv1.ModeratePoint {
 	res := make([]*adminv1.ModeratePoint, 0, len(pts))
 	for _, p := range pts {
 		res = append(res, &adminv1.ModeratePoint{
-			Bucket:    safeTimestamp(p.Bucket),
+			Bucket:    SafeTimestamp(p.Bucket),
 			Count:     int32(p.Count),
 			AdminId:   p.AdminID,
 			AdminName: p.AdminUsername,

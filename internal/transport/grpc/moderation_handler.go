@@ -37,7 +37,7 @@ func NewModerationHandler(svc *service.ModerationService) *ModerationHandler {
 }
 
 func (h *ModerationHandler) Queue(ctx context.Context, req *moderationv1.QueueRequest) (*moderationv1.QueueResponse, error) {
-	if _, err := mustUsername(ctx); err != nil {
+	if _, err := MustUsername(ctx); err != nil {
 		return nil, err
 	}
 	rows, total, err := h.svc.Queue(ctx, domain.ListParams{
@@ -54,7 +54,7 @@ func (h *ModerationHandler) Queue(ctx context.Context, req *moderationv1.QueueRe
 }
 
 func (h *ModerationHandler) MyReviews(ctx context.Context, req *moderationv1.MyReviewsRequest) (*moderationv1.MyReviewsResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (h *ModerationHandler) MyReviews(ctx context.Context, req *moderationv1.MyR
 }
 
 func (h *ModerationHandler) Claim(ctx context.Context, req *moderationv1.ClaimRequest) (*moderationv1.ClaimResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (h *ModerationHandler) Claim(ctx context.Context, req *moderationv1.ClaimRe
 }
 
 func (h *ModerationHandler) Release(ctx context.Context, req *moderationv1.ReleaseRequest) (*moderationv1.ReleaseResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (h *ModerationHandler) Release(ctx context.Context, req *moderationv1.Relea
 }
 
 func (h *ModerationHandler) Approve(ctx context.Context, req *moderationv1.ApproveRequest) (*moderationv1.ApproveResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (h *ModerationHandler) Approve(ctx context.Context, req *moderationv1.Appro
 }
 
 func (h *ModerationHandler) Reject(ctx context.Context, req *moderationv1.RejectRequest) (*moderationv1.RejectResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (h *ModerationHandler) Reject(ctx context.Context, req *moderationv1.Reject
 }
 
 func (h *ModerationHandler) Stats(ctx context.Context, _ *moderationv1.StatsRequest) (*moderationv1.StatsResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +148,8 @@ func protoModeration(m *domain.Moderation, fallbackUsername string) *moderationv
 		AdminId:       m.AdminID,
 		AdminUsername: fallbackUsername,
 		Active:        m.Active,
-		CreatedAt:     safeTimestamp(m.CreatedAt),
-		UpdatedAt:     safeTimestamp(m.UpdatedAt),
+		CreatedAt:     SafeTimestamp(m.CreatedAt),
+		UpdatedAt:     SafeTimestamp(m.UpdatedAt),
 	}
 }
 

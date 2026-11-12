@@ -40,7 +40,7 @@ func (h *ReviewHandler) ListReviews(ctx context.Context, req *reviewv1.ListRevie
 }
 
 func (h *ReviewHandler) CreateReview(ctx context.Context, req *reviewv1.CreateReviewRequest) (*reviewv1.CreateReviewResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (h *ReviewHandler) CreateReview(ctx context.Context, req *reviewv1.CreateRe
 }
 
 func (h *ReviewHandler) DeleteReview(ctx context.Context, req *reviewv1.DeleteReviewRequest) (*reviewv1.DeleteReviewResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +76,6 @@ func protoReview(r *domain.Review) *reviewv1.Review {
 		Username:  r.Username,
 		Rating:    int32(r.Rating),
 		Comment:   r.Comment,
-		CreatedAt: safeTimestamp(r.CreatedAt),
+		CreatedAt: SafeTimestamp(r.CreatedAt),
 	}
 }

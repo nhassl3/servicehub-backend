@@ -24,7 +24,7 @@ func NewWishlistHandler(svc *service.WishlistService) *WishlistHandler {
 }
 
 func (h *WishlistHandler) GetWishlist(ctx context.Context, _ *wishlistv1.GetWishlistRequest) (*wishlistv1.GetWishlistResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (h *WishlistHandler) GetWishlist(ctx context.Context, _ *wishlistv1.GetWish
 }
 
 func (h *WishlistHandler) InWishlist(ctx context.Context, req *wishlistv1.InWishlistRequest) (*wishlistv1.InWishlistResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (h *WishlistHandler) InWishlist(ctx context.Context, req *wishlistv1.InWish
 }
 
 func (h *WishlistHandler) ToggleWishlistItem(ctx context.Context, req *wishlistv1.ToggleWishlistItemRequest) (*wishlistv1.ToggleWishlistItemResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (h *WishlistHandler) ToggleWishlistItem(ctx context.Context, req *wishlistv
 }
 
 func (h *WishlistHandler) RemoveItem(ctx context.Context, req *wishlistv1.RemoveItemRequest) (*wishlistv1.RemoveItemResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func protoWishlistItem(wi *domain.WishlistItem) *wishlistv1.WishlistItem {
 	return &wishlistv1.WishlistItem{
 		Id:        wi.ID,
 		ProductId: wi.ProductID,
-		CreatedAt: safeTimestamp(wi.CreatedAt),
+		CreatedAt: SafeTimestamp(wi.CreatedAt),
 		Added:     wi.Added,
 	}
 }

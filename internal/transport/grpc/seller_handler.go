@@ -24,7 +24,7 @@ func NewSellerHandler(svc *service.SellerService) *SellerHandler {
 }
 
 func (h *SellerHandler) CreateSeller(ctx context.Context, req *sellerv1.CreateSellerRequest) (*sellerv1.CreateSellerResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (h *SellerHandler) GetSellerProfile(ctx context.Context, req *sellerv1.GetS
 }
 
 func (h *SellerHandler) UpdateSeller(ctx context.Context, req *sellerv1.UpdateSellerRequest) (*sellerv1.UpdateSellerResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -74,7 +74,7 @@ func (h *SellerHandler) UpdateSeller(ctx context.Context, req *sellerv1.UpdateSe
 }
 
 func (h *SellerHandler) UploadAvatar(ctx context.Context, req *sellerv1.UploadAvatarRequest) (*sellerv1.UploadAvatarResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -101,7 +101,7 @@ func protoSeller(s *domain.Seller) *sellerv1.SellerProfile {
 		AvatarUrl:   s.AvatarURL,
 		Rating:      s.Rating,
 		TotalSales:  int32(s.TotalSales),
-		CreatedAt:   safeTimestamp(s.CreatedAt),
-		UpdatedAt:   safeTimestamp(s.UpdatedAt),
+		CreatedAt:   SafeTimestamp(s.CreatedAt),
+		UpdatedAt:   SafeTimestamp(s.UpdatedAt),
 	}
 }

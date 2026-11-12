@@ -5,10 +5,7 @@ import (
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/nhassl3/servicehub-backend/internal/service"
-	"github.com/nhassl3/servicehub-backend/internal/transport/grpc/interceptors"
 	cartv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/cart/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // CartHandler implements cartv1.CartServiceServer.
@@ -29,7 +26,7 @@ func NewCartHandler(svc *service.CartService) *CartHandler {
 }
 
 func (h *CartHandler) GetCart(ctx context.Context, _ *cartv1.GetCartRequest) (*cartv1.GetCartResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +38,7 @@ func (h *CartHandler) GetCart(ctx context.Context, _ *cartv1.GetCartRequest) (*c
 }
 
 func (h *CartHandler) AddItem(ctx context.Context, req *cartv1.AddItemRequest) (*cartv1.AddItemResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +50,7 @@ func (h *CartHandler) AddItem(ctx context.Context, req *cartv1.AddItemRequest) (
 }
 
 func (h *CartHandler) RemoveItem(ctx context.Context, req *cartv1.RemoveItemRequest) (*cartv1.RemoveItemResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +62,7 @@ func (h *CartHandler) RemoveItem(ctx context.Context, req *cartv1.RemoveItemRequ
 }
 
 func (h *CartHandler) UpdateItemQty(ctx context.Context, req *cartv1.UpdateItemQtyRequest) (*cartv1.UpdateItemQtyResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +74,7 @@ func (h *CartHandler) UpdateItemQty(ctx context.Context, req *cartv1.UpdateItemQ
 }
 
 func (h *CartHandler) ClearCart(ctx context.Context, _ *cartv1.ClearCartRequest) (*cartv1.ClearCartResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +106,4 @@ func protoCart(c *domain.Cart) *cartv1.Cart {
 		Items:    items,
 		Subtotal: subtotal,
 	}
-}
-
-// mustUsername extracts the authenticated username from context or returns
-// an Unauthenticated gRPC status error.
-func mustUsername(ctx context.Context) (string, error) {
-	payload, ok := interceptors.PayloadFromContext(ctx)
-	if !ok {
-		return "", status.Error(codes.Unauthenticated, "missing auth payload")
-	}
-	return payload.Username, nil
 }

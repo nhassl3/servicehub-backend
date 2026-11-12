@@ -24,7 +24,7 @@ func NewBalanceHandler(svc *service.BalanceService) *BalanceHandler {
 }
 
 func (h *BalanceHandler) GetBalance(ctx context.Context, _ *balancev1.GetBalanceRequest) (*balancev1.GetBalanceResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (h *BalanceHandler) GetBalance(ctx context.Context, _ *balancev1.GetBalance
 }
 
 func (h *BalanceHandler) Deposit(ctx context.Context, req *balancev1.DepositRequest) (*balancev1.DepositResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (h *BalanceHandler) Deposit(ctx context.Context, req *balancev1.DepositRequ
 }
 
 func (h *BalanceHandler) GetTransactionHistory(ctx context.Context, req *balancev1.GetTransactionHistoryRequest) (*balancev1.GetTransactionHistoryResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (h *BalanceHandler) GetTransactionHistory(ctx context.Context, req *balance
 			Type:      tx.Type,
 			Amount:    tx.Amount,
 			Comment:   tx.Comment,
-			CreatedAt: safeTimestamp(tx.CreatedAt),
+			CreatedAt: SafeTimestamp(tx.CreatedAt),
 		}
 	}
 	return &balancev1.GetTransactionHistoryResponse{Transactions: proto, Total: total}, nil

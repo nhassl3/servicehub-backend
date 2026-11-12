@@ -26,7 +26,7 @@ func NewOrderHandler(svc *service.OrderService) *OrderHandler {
 }
 
 func (h *OrderHandler) CreateOrder(ctx context.Context, _ *orderv1.CreateOrderRequest) (*orderv1.CreateOrderResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (h *OrderHandler) CreateOrder(ctx context.Context, _ *orderv1.CreateOrderRe
 }
 
 func (h *OrderHandler) GetOrder(ctx context.Context, req *orderv1.GetOrderRequest) (*orderv1.GetOrderResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (h *OrderHandler) GetOrder(ctx context.Context, req *orderv1.GetOrderReques
 }
 
 func (h *OrderHandler) ListOrders(ctx context.Context, req *orderv1.ListOrdersRequest) (*orderv1.ListOrdersResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (h *OrderHandler) ListOrders(ctx context.Context, req *orderv1.ListOrdersRe
 }
 
 func (h *OrderHandler) CancelOrder(ctx context.Context, req *orderv1.CancelOrderRequest) (*orderv1.CancelOrderResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func protoOrder(o *domain.Order) *orderv1.Order {
 		Status:      o.Status,
 		TotalAmount: o.TotalAmount,
 		Items:       items,
-		CreatedAt:   safeTimestamp(o.CreatedAt),
-		UpdatedAt:   safeTimestamp(o.UpdatedAt),
+		CreatedAt:   SafeTimestamp(o.CreatedAt),
+		UpdatedAt:   SafeTimestamp(o.UpdatedAt),
 	}
 }

@@ -69,7 +69,7 @@ func (h *UserHandler) UpdatePassword(ctx context.Context, req *userv1.UpdatePass
 }
 
 func (h *UserHandler) UploadAvatar(ctx context.Context, req *userv1.UploadAvatarRequest) (*userv1.UploadAvatarResponse, error) {
-	username, err := mustUsername(ctx)
+	username, err := MustUsername(ctx)
 	if err != nil {
 		return nil, domainErr(err)
 	}
@@ -94,7 +94,7 @@ func protoUserProfile(u *domain.User) *userv1.UserProfile {
 		AvatarUrl: u.AvatarURL,
 		Role:      u.Role,
 		IsActive:  u.IsActive,
-		CreatedAt: safeTimestamp(u.CreatedAt),
-		UpdatedAt: safeTimestamp(u.UpdatedAt),
+		CreatedAt: SafeTimestamp(u.CreatedAt),
+		UpdatedAt: SafeTimestamp(u.UpdatedAt),
 	}
 }

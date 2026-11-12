@@ -146,7 +146,7 @@ func ProtoProduct(p *domain.Product) *productv1.Product {
 		SalesCount:   int32(p.SalesCount),
 		Rating:       p.Rating,
 		ReviewsCount: int32(p.ReviewsCount),
-		CreatedAt:    safeTimestamp(p.CreatedAt),
-		UpdatedAt:    safeTimestamp(p.UpdatedAt),
+		CreatedAt:    SafeTimestamp(p.CreatedAt),
+		UpdatedAt:    SafeTimestamp(p.UpdatedAt),
 	}
 }

@@ -2,16 +2,13 @@ package grpc
 
 import (
 	"context"
-	"time"
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/nhassl3/servicehub-backend/internal/service"
 	"github.com/nhassl3/servicehub-backend/internal/transport/grpc/interceptors"
-	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	authv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/auth/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // AuthHandler implements authv1.AuthServiceServer.
@@ -28,12 +25,9 @@ import (
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
 	svc *service.AuthService
-	// refresh is kept here only to satisfy injection; token verification is
-	// handled by the AuthInterceptor, not directly in handlers.
-	_ auth.TokenManager
 }
 
-func NewAuthHandler(svc *service.AuthService, _ auth.TokenManager) *AuthHandler {
+func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 	return &AuthHandler{svc: svc}
 }
 
@@ -225,16 +219,7 @@ func protoUserInfo(u *domain.User) *authv1.UserInfo {
 		FullName:  u.FullName,
 		AvatarUrl: u.AvatarURL,
 		Role:      u.Role,
-		CreatedAt: safeTimestamp(u.CreatedAt),
+		CreatedAt: SafeTimestamp(u.CreatedAt),
 		IsActive:  u.IsActive,
 	}
-}
-
-// safeTimestamp converts a time.Time to a protobuf Timestamp.
-// Zero times are returned as nil.
-func safeTimestamp(t time.Time) *timestamppb.Timestamp {
-	if t.IsZero() {
-		return nil
-	}
-	return timestamppb.New(t)
 }
