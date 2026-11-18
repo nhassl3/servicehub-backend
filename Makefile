@@ -1,6 +1,6 @@
 .PHONY: build run runb test lint mock sqlc migrate-up migrate-down migrate-force clean docker-build postgres opendb dropdb createdb generate-data redis cli-redis minio minio-stop build-consumer run-consumer runb-consumer kafka-docker \
 els-docker els-docker-stop els-reindex-build runb-els-reindex clickhouse-docker clickhouse cli-ch backfill-build runb-backfill clickhouse-open clickhouse-createdb \
-clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only pgdump openig
+clickhouse-up clickhouse-down clickhouse-down-all clickhouse-create clickhouse-force build-only runb-only pgdump openig docker-start docker-stop
 
 .DEFAULT_GOAL := build
 
@@ -100,24 +100,26 @@ sqlc:
 
 ## ─── DATABSE CONTROLL ────────────────────────────────────────────────────────
 
+DOCKER_DB_IT=postgres18
+
 generate-data:
 	@docker exec -i $(CONTAINER_NAME) psql -U servicehub -d servicehub < /home/nhassl3/Projects/servicehub/scripts/seed.sql
 	@echo "Successfully created data"
 
 createdb:
-	@docker exec -it postgres18 createdb --username=$(DB_USER) --owner=$(DB_USER) $(DB_NAME)
+	@docker exec -it $(DOCKER_DB_IT) createdb --username=$(DB_USER) --owner=$(DB_USER) $(DB_NAME)
 
 dropdb:
-	@docker exec -it postgres18 dropdb --username=$(DB_USER) $(DB_NAME)
+	@docker exec -it $(DOCKER_DB_IT) dropdb --username=$(DB_USER) $(DB_NAME)
 
 opendb:
-	@docker exec -it postgres18 psql -U $(DB_USER) $(DB_NAME)
+	@docker exec -it $(DOCKER_DB_IT) psql -U $(DB_USER) $(DB_NAME)
 
 pgdump:
-	@docker exec -it postgres18 pg_dump -U $(DB_USER) -d $(DB_NAME) -s -F p -E UTF-8
+	@docker exec -it $(DOCKER_DB_IT) pg_dump -U $(DB_USER) -d $(DB_NAME) -s -F p -E UTF-8
 
 postgres:
-	@docker run --name postgres18 -p 5432:5432 -e POSTGRES_USER=$(DB_USER) -e POSTGRES_PASSWORD=$(DB_PASSWORD) -d postgres:18-alpine
+	@docker run --name $(DOCKER_DB_IT) -p 5432:5432 -e POSTGRES_USER=$(DB_USER) -e POSTGRES_PASSWORD=$(DB_PASSWORD) -d postgres:18-alpine
 
 ## ─── Migrations ──────────────────────────────────────────────────────────────
 
@@ -131,7 +133,7 @@ migrate-down-all:
 	@$(MIGRATE_BIN) -path  $(POSTGRES_MIGRATE_PATH) -database "$(DB_URL)" -verbose down
 
 migrate-force:
-	@$(MIGRATE_BIN) -path $(POSTGRES_MIGRATE_PATH) migrations -database "$(DB_URL)" force $(V)
+	@$(MIGRATE_BIN) -path $(POSTGRES_MIGRATE_PATH) -database "$(DB_URL)" force $(V)
 
 migrate-create:
 	@$(MIGRATE_BIN) create -ext sql -dir $(POSTGRES_MIGRATE_PATH) -seq $(NAME)
@@ -155,15 +157,21 @@ vet:
 	@go vet ./...
 
 ##  ─── Redis ───────────────────────────────────────────────────────────────────
+
+DOCKER_REDIS_IT=redis7
+
 redis:
-	@docker run -d -p 127.0.0.1:6380:6380 -v ./redis-config:/usr/local/etc/redis --name redis7 redis:7-alpine redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
+	@docker run -d -p 127.0.0.1:6380:6380 -v ./redis-config:/usr/local/etc/redis --name $(DOCKER_REDIS_IT) redis:7-alpine redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
 
 cli-redis:
 	@redis-cli -h localhost -p 6380 --user $(REDIS_USER) -a $(REDIS_USER_PASSWORD)
 
 ##  ─── MinIO ───────────────────────────────────────────────────────────────────
+
+DOCKER_MINIO_IT=minioRELEASE.2025-09-07T16-13-09Z-cpuv1
+
 minio:
-	@docker run -d --name minioRELEASE.2025-09-07T16-13-09Z-cpuv1 \
+	@docker run -d --name $(DOCKER_MINIO_IT) \
 		-p 9000:9000 -p 9001:9001 \
 		-e MINIO_ROOT_USER=$(MINIO_ACCESS_KEY) \
 		-e MINIO_ROOT_PASSWORD=$(MINIO_SECRET_KEY) \
@@ -176,6 +184,9 @@ minio-stop:
 	@echo "MinIO stopped"
 
 ##  ─── Kafka ───────────────────────────────────────────────────────────────────
+
+DOCKER_KAFKA_IT=servicehub-kafka-local
+
 build-consumer:
 	go build -o $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH) $(CONSUMER_PATH)
 	@chmod +x $(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
@@ -188,7 +199,7 @@ runb-consumer:
 	@ENVIRONMENT=$(ENVIRONMENT) ./$(BUILD_DIR)/$(BINARY_NAME)-consumer-$(GOOS)-$(GOARCH)
 
 kafka-docker:
-	@docker run -d --name servicehub-kafka-local -p 9092:9092 apache/kafka:latest
+	@docker run -d --name $(DOCKER_KAFKA_IT) -p 9092:9092 apache/kafka:latest
 
 ##  ─── GitHub ───────────────────────────────────────────────────────────────────
 push:
@@ -199,8 +210,11 @@ get-contracts:
 	@go get -u github.com/nhassl3/servicehub-contracts@$(VER)
 
 ##  ─── Elasticsearch (FTS) ──────────────────────────────────────────────────────
+
+DOCKER_ELASTICSEARCH_IT=servicehub-elasticsearch-local
+
 els-docker:
-	@docker run -d --name servicehub-elasticsearch-local \
+	@docker run -d --name $(DOCKER_ELASTICSEARCH_IT) \
 	-p 9200:9200 \
 	-e "discovery.type=single-node" \
 	-e "xpack.security.enabled=false" \
@@ -222,9 +236,11 @@ runb-els-reindex:
 
 ##  ─── Clickhouse (OLAP) ──────────────────────────────────────────────────────
 
+DOCKER_CLICKHOUSE_IT=servicehub-clickhouse-local
+
 clickhouse-docker:
 	@docker run -d \
- 	--name servicehub-clickhouse-local \
+ 	--name $(DOCKER_CLICKHOUSE_IT) \
  	-e CLICKHOUSE_USER=$(CLICKHOUSE_USER) \
  	-e CLICKHOUSE_PASSWORD=$(CLICKHOUSE_PASSWORD) \
  	-e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
@@ -282,10 +298,20 @@ clickhouse-create:
 
 ##  ─── OpenIG oAuth v2.0 ───────────────────────────────────────────────────
 
+DOCKER_OPENIG_IT=servicehub-openig-local
+
 openig:
 	@docker run -d \
-	  --name servicehub-openig-local \
+	  --name $(DOCKER_OPENIG_IT) \
 	  -p 8079:8080 \
 	  -v "./openig-config:/usr/local/openig-config:ro" \
 	  -e 'CATALINA_OPTS=-Dopenig.base=/usr/local/openig-config -DOAUTH.CLIENT_ID=$(OAUTH_CLIENT_ID) -DOAUTH.CLIENT_SECRET=$(OAUTH_CLIENT_SECRET) -Dendpoint.app=$(ENDPOINT_APP)' \
 	  openidentityplatform/openig:6.2.0
+
+## ─── Docker settings ───────────────────────────────────────────────────
+
+docker-start:
+	@docker start $(DOCKER_DB_IT) $(DOCKER_MINIO_IT) $(DOCKER_REDIS_IT) $(DOCKER_CLICKHOUSE_IT) $(DOCKER_ELASTICSEARCH_IT) $(DOCKER_KAFKA_IT) $(DOCKER_OPENIG_IT)
+
+docker-stop:
+	@docker stop $$(docker ps -a -q)
