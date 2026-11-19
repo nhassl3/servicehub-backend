@@ -5,9 +5,63 @@
 package db
 
 import (
+	"database/sql/driver"
+	"encoding/json"
+	"fmt"
+	"net/netip"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type UserHistoryAction string
+
+const (
+	UserHistoryActionUnspecified     UserHistoryAction = "unspecified"
+	UserHistoryActionCreated         UserHistoryAction = "created"
+	UserHistoryActionUpdated         UserHistoryAction = "updated"
+	UserHistoryActionDeleted         UserHistoryAction = "deleted"
+	UserHistoryActionRestored        UserHistoryAction = "restored"
+	UserHistoryActionLogin           UserHistoryAction = "login"
+	UserHistoryActionPasswordChanged UserHistoryAction = "password_changed"
+	UserHistoryActionEmailChanged    UserHistoryAction = "email_changed"
+	UserHistoryActionRoleChanged     UserHistoryAction = "role_changed"
+)
+
+func (e *UserHistoryAction) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UserHistoryAction(s)
+	case string:
+		*e = UserHistoryAction(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UserHistoryAction: %T", src)
+	}
+	return nil
+}
+
+type NullUserHistoryAction struct {
+	UserHistoryAction UserHistoryAction `json:"user_history_action"`
+	Valid             bool              `json:"valid"` // Valid is true if UserHistoryAction is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUserHistoryAction) Scan(value interface{}) error {
+	if value == nil {
+		ns.UserHistoryAction, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UserHistoryAction.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUserHistoryAction) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UserHistoryAction), nil
+}
 
 type Admin struct {
 	ID              uuid.UUID          `json:"id"`
@@ -166,6 +220,21 @@ type User struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	EmailResetAt pgtype.Timestamptz `json:"email_reset_at"`
+	LastLogin    pgtype.Timestamp   `json:"last_login"`
+}
+
+// Append-only журнал изменений пользователя
+type UserHistory struct {
+	ID            int64             `json:"id"`
+	Username      string            `json:"username"`
+	ActorUsername pgtype.Text       `json:"actor_username"`
+	Action        UserHistoryAction `json:"action"`
+	// Diff вида {"field": {"old": ..., "new": ...}}. Секреты (пароли, токены) не хранить
+	Changes   json.RawMessage    `json:"changes"`
+	IpAddress netip.Addr         `json:"ip_address"`
+	UserAgent pgtype.Text        `json:"user_agent"`
+	RequestID pgtype.Text        `json:"request_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Wishlist struct {

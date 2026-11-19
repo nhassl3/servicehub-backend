@@ -8,7 +8,6 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -21,7 +20,7 @@ SET email = $1,
 WHERE username = $2
   AND is_active = FALSE
   AND email_reset_at IS NULL
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type ConfirmEmailResetParams struct {
@@ -48,6 +47,7 @@ func (q *Queries) ConfirmEmailReset(ctx context.Context, arg ConfirmEmailResetPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
@@ -55,7 +55,7 @@ func (q *Queries) ConfirmEmailReset(ctx context.Context, arg ConfirmEmailResetPa
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, email, password_hash, full_name)
 VALUES ($1, $2, $3, $4)
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type CreateUserParams struct {
@@ -85,18 +85,27 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
 
-const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+const getUser = `-- name: GetUser :one
+SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 FROM users
-WHERE email = $1 LIMIT 1
+WHERE ($1::varchar IS NOT NULL AND username=$1)
+    OR ($2::varchar IS NOT NULL AND email=$2)
+    OR ($3::uuid IS NOT NULL AND uid=$3) LIMIT 1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, email)
+type GetUserParams struct {
+	Username pgtype.Text `json:"username"`
+	Email    pgtype.Text `json:"email"`
+	Uid      pgtype.UUID `json:"uid"`
+}
+
+func (q *Queries) GetUser(ctx context.Context, arg GetUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, getUser, arg.Username, arg.Email, arg.Uid)
 	var i User
 	err := row.Scan(
 		&i.Username,
@@ -110,56 +119,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
-	)
-	return i, err
-}
-
-const getUserByUID = `-- name: GetUserByUID :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
-FROM users
-WHERE uid = $1 LIMIT 1
-`
-
-func (q *Queries) GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUID, uid)
-	var i User
-	err := row.Scan(
-		&i.Username,
-		&i.Uid,
-		&i.Email,
-		&i.PasswordHash,
-		&i.FullName,
-		&i.AvatarUrl,
-		&i.Role,
-		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.EmailResetAt,
-	)
-	return i, err
-}
-
-const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
-FROM users
-WHERE username = $1 LIMIT 1
-`
-
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsername, username)
-	var i User
-	err := row.Scan(
-		&i.Username,
-		&i.Uid,
-		&i.Email,
-		&i.PasswordHash,
-		&i.FullName,
-		&i.AvatarUrl,
-		&i.Role,
-		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
@@ -167,7 +127,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 const oAuthLogin = `-- name: OAuthLogin :one
 INSERT INTO users (username, email, password_hash)
 VALUES ($1, $2, $3)
-    ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+    ON CONFLICT (username) DO UPDATE SET username = EXCLUDED.username RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type OAuthLoginParams struct {
@@ -191,6 +151,7 @@ func (q *Queries) OAuthLogin(ctx context.Context, arg OAuthLoginParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
@@ -200,7 +161,7 @@ UPDATE users
 SET role       = $2,
     updated_at = NOW()
 WHERE username = $1
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type SetUserRoleParams struct {
@@ -223,6 +184,7 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (User,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
@@ -232,7 +194,7 @@ UPDATE users
 SET password_hash = $1,
     updated_at = NOW()
 WHERE username = $2
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type UpdatePasswordParams struct {
@@ -255,6 +217,7 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
@@ -265,7 +228,7 @@ SET full_name  = $2,
     avatar_url = $3,
     updated_at = NOW()
 WHERE username = $1
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type UpdateUserParams struct {
@@ -289,27 +252,24 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
 
-const userExistsByEmail = `-- name: UserExistsByEmail :one
-SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 LIMIT 1)
+const userExists = `-- name: UserExists :one
+SELECT EXISTS(SELECT 1 FROM users WHERE
+                                      ($1::varchar IS NOT NULL AND email=$1)
+                                  OR ($2::varchar IS NOT NULL AND username=$2))
 `
 
-func (q *Queries) UserExistsByEmail(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRow(ctx, userExistsByEmail, email)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+type UserExistsParams struct {
+	Email    pgtype.Text `json:"email"`
+	Username pgtype.Text `json:"username"`
 }
 
-const userExistsByUsername = `-- name: UserExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM users WHERE username = $1 LIMIT 1)
-`
-
-func (q *Queries) UserExistsByUsername(ctx context.Context, username string) (bool, error) {
-	row := q.db.QueryRow(ctx, userExistsByUsername, username)
+func (q *Queries) UserExists(ctx context.Context, arg UserExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, userExists, arg.Email, arg.Username)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -321,7 +281,7 @@ SET is_active=true,
     updated_at=NOW()
 WHERE ($1::varchar IS NULL OR email = $1::varchar)
     AND ($2::varchar IS NULL OR username = $2::varchar)
-RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at
+RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 
 type VerifyEmailAccountParams struct {
@@ -344,6 +304,7 @@ func (q *Queries) VerifyEmailAccount(ctx context.Context, arg VerifyEmailAccount
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.EmailResetAt,
+		&i.LastLogin,
 	)
 	return i, err
 }
