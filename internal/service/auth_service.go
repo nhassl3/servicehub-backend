@@ -599,7 +599,7 @@ func createUser[T any](
 	}
 	user, err := create(ctx, input, passwordHash)
 	if err != nil {
-		return nil, fmt.Errorf(fmt.Sprintf("auth_service.%s: failed to create user: %w", operation, err))
+		return nil, fmt.Errorf("auth_service.%s: failed to create user: %w", operation, err)
 	}
 	return user, nil
 }
