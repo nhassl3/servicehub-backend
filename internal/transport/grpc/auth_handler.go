@@ -32,7 +32,7 @@ func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) OAuthLogin(ctx context.Context, req *authv1.OAuthLoginRequest) (*authv1.AuthResponse, error) {
-	user, tokens, err := h.svc.OAuthLogin(ctx, service.OAuthLoginInput{
+	user, tokens, err := h.svc.OAuthLogin(ctx, domain.OAuthLoginInput{
 		Username: req.GetUsername(),
 		Email:    req.GetEmail(),
 		Password: req.GetPassword(),
@@ -52,7 +52,7 @@ func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	user, tokens, err := h.svc.Register(ctx, service.RegisterInput{
+	user, tokens, err := h.svc.Register(ctx, domain.RegisterInput{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: req.Password,
