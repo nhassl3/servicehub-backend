@@ -525,14 +525,83 @@ func (s *AuthService) createTokensAndSession(ctx context.Context, user *domain.U
 	if err != nil {
 		return nil, err
 	}
-
 	if err := s.createSession(ctx, sessionUsername, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
 		return nil, err
 	}
-
-	_ = s.userRedis.SetProfile(ctx, user)
-
+	if err = s.userRedis.SetProfile(ctx, user); err != nil {
+		s.log.Warn("(Redis) failed to set profile for session creation", zap.Error(err))
+	}
 	return tokens, nil
+}
+
+// checkBlockAuth checks auth blocking in redis storage cache
+func (s *AuthService) checkBlockAuth(ctx context.Context, clientIP string) error {
+	block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP)
+	if err != nil {
+		return fmt.Errorf("auth_service.OAuthLogin: check auth block: %w", err)
+	}
+	if block {
+		return fmt.Errorf(
+			"%w: %.0f seconds remaining",
+			domain.ErrAuthBlock,
+			ttl,
+		)
+	}
+	return nil
+}
+
+func (s *AuthService) publishUserRegistered(ctx context.Context, user *domain.User, clientIP, userAgent string) {
+	if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
+		UID:       user.UID,
+		Username:  user.Username,
+		CreatedAt: user.CreatedAt,
+	}); err != nil {
+		s.log.Warn("(Kafka) analytics: failed to publish user.registered", zap.Error(err))
+	}
+
+	s.publishNewUserHistory(ctx,
+		user.Username, user.Username,
+		domain.Created, domain.Created.AccountCreatedChanges(user.CreatedAt),
+		clientIP, userAgent,
+	)
+}
+
+func (s *AuthService) publishNewUserHistory(ctx context.Context,
+	username, actorUsername string,
+	action domain.Action,
+	changes map[string]interface{},
+	clientIP,
+	userAgent string) {
+	if err := s.eventPublisher.PublishCreateUserHistory(ctx, domain.CreateUserHistoryParams{
+		Username:      username,
+		ActorUsername: actorUsername,
+		Action:        action,
+		Changes:       changes,
+		IpAddress:     clientIP,
+		UserAgent:     userAgent,
+		RequestId:     uuid.NewString(),
+	}); err != nil {
+		s.log.Warn("(Kafka) history: failed to publish user_history.create_user_history", zap.Error(err))
+	}
+}
+
+// createUser creates user by any types
+func createUser[T any](
+	ctx context.Context,
+	input T,
+	getPassword func(T) string,
+	create func(context.Context, T, string) (*domain.User, error),
+	operation string,
+) (*domain.User, error) {
+	passwordHash, err := hash.CreateHashPassword(getPassword(input))
+	if err != nil {
+		return nil, fmt.Errorf("auth_service.%s: failed to hash password: %w", operation, err)
+	}
+	user, err := create(ctx, input, passwordHash)
+	if err != nil {
+		return nil, fmt.Errorf(fmt.Sprintf("auth_service.%s: failed to create user: %w", operation, err))
+	}
+	return user, nil
 }
 
 // getMetadataFromContext TODO: update function (wrong ip and user-agent on response)
