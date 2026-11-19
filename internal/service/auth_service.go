@@ -166,11 +166,11 @@ func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) 
 func (s *AuthService) Login(ctx context.Context, username, password string) (*domain.User, *TokenPair, error) {
 	clientIP, _ := getMetadataFromContext(ctx)
 
-	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
-		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	if err := s.checkBlockAuth(ctx, clientIP); err != nil {
+		return nil, nil, err
 	}
 
-	user, err := s.userRepo.GetByUsername(ctx, username)
+	user, err := s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil, domain.ErrInvalidCredentials
@@ -186,12 +186,16 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 		return nil, nil, domain.ErrInvalidCredentials
 	}
 
-	tokens, err := s.createTokensAndSession(ctx, user, username)
+	tokens, err := s.createTokensAndSession(ctx, user, user.Username)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
+		s.log.Warn("auth_service.OAuthLogin: failed to set auth block",
+			zap.Error(err),
+		)
+	}
 
 	return user, tokens, nil
 }
@@ -202,7 +206,7 @@ func (s *AuthService) RequestResetPassword(ctx context.Context, params domain.Re
 		user, err := s.userRedis.Profile(ctx, *params.Username)
 		if err != nil {
 			if errors.Is(err, domain.ErrRedisNotFound) {
-				user, err = s.userRepo.GetByUsername(ctx, *params.Username)
+				user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: params.Username}))
 				if err != nil {
 					return "", fmt.Errorf("auth_service.GetMe get from database: %w", err)
 				}
@@ -213,7 +217,7 @@ func (s *AuthService) RequestResetPassword(ctx context.Context, params domain.Re
 		}
 		email = user.Email
 	} else if params.Email != nil && *params.Email != "" && strings.Contains(*params.Email, "@") {
-		ok, err := s.userRepo.ExistsByEmail(ctx, *params.Email)
+		ok, err := s.userRepo.UserExists(ctx, new(domain.UserExistsParams{Email: params.Email}))
 		if err != nil {
 			return "", fmt.Errorf("auth_serivce.ResetPassword check email: %w", err)
 		}
@@ -237,7 +241,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword
 		return false, fmt.Errorf("auth_service.ResetPassword verify reset token: %w", err)
 	}
 
-	user, err := s.userRepo.GetByEmail(ctx, state.Email)
+	user, err := s.userRepo.GetUser(ctx, new(domain.GetUserParams{Email: &state.Email}))
 	if err != nil {
 		return false, err
 	}
@@ -268,7 +272,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword
 		NewPassword: newPasswordHashed,
 	}
 
-	if _, err = s.userRepo.UpdatePassword(ctx, params); err != nil {
+	if _, err = s.userRepo.UpdatePassword(ctx, &params); err != nil {
 		return false, fmt.Errorf("auth_service.UpdatePassword: %w", err)
 	}
 
@@ -331,15 +335,15 @@ func (s *AuthService) VerifyEmailAccount(ctx context.Context, verifyToken string
 	if state.IsEmailReset() {
 		// The email is switched only now, after the user has proved access to the
 		// new address; ConfirmEmailReset also consumes the one-time reset flag.
-		user, err = s.userRepo.ConfirmEmailReset(ctx, domain.ResetEmailParams{
+		user, err = s.userRepo.ConfirmEmailReset(ctx, new(domain.ResetEmailParams{
 			Username: state.Username,
 			NewEmail: state.Email,
-		})
+		}))
 		if err != nil {
 			return nil, false, err
 		}
 	} else {
-		user, err = s.userRepo.VerifyEmail(ctx, domain.VerifyEmailAccount{Email: &state.Email})
+		user, err = s.userRepo.VerifyEmail(ctx, new(domain.VerifyEmailAccount{Email: &state.Email}))
 		if err != nil {
 			return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify email account: %w", err)
 		}
@@ -411,7 +415,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 
 // ResetEmail starts the one-time email change for an unverified account.
 func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string) (string, error) {
-	user, err := s.userRepo.GetByUsername(ctx, username)
+	user, err := s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 	if err != nil {
 		return "", err
 	}
@@ -426,7 +430,7 @@ func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string)
 		return "", domain.ErrEmailResetWindowExpired
 	}
 
-	exists, err := s.userRepo.ExistsByEmail(ctx, newEmail)
+	exists, err := s.userRepo.UserExists(ctx, new(domain.UserExistsParams{Email: &newEmail}))
 	if err != nil {
 		return "", fmt.Errorf("auth_service.ResetEmail check email exists: %w", err)
 	}
@@ -444,7 +448,7 @@ func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User,
 	user, err := s.userRedis.Profile(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
-			user, err = s.userRepo.GetByUsername(ctx, username)
+			user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 			if err != nil {
 				return nil, fmt.Errorf("auth_service.GetMe get from database: %w", err)
 			}
@@ -490,27 +494,27 @@ func (s *AuthService) createSession(ctx context.Context, username, refreshToken 
 		}
 	}
 
-	// TODO: implement IPs and useragent checker
-	if session != nil && session.ClientIP != clientIp && session.UserAgent != userAgent {
+	// TODO: IP-address can be change by new device. Deep check IP-address needed
+	if session != nil && (session.ClientIP != clientIp || session.UserAgent != userAgent) {
 		return domain.ErrDeviceMistake
 	}
 
 	// Creating session record about user session in main database
-	newSession, err := s.userRepo.CreateSession(ctx, domain.CreateSessionParams{
+	newSession, err := s.userRepo.CreateSession(ctx, new(domain.CreateSessionParams{
 		Username:     username,
 		RefreshToken: refreshToken,
 		UserAgent:    userAgent,
 		ClientIp:     clientIp,
 		IsBlocked:    false,
 		ExpiresAt:    expiredAt,
-	})
+	}))
 	if err != nil {
 		return fmt.Errorf("auth_service.createSession create session: %w", err)
 	}
 
 	// Creating session record about user session in Redis
-	if err := s.userRedis.SetSession(ctx, newSession); err != nil {
-		return fmt.Errorf("auth_service.createSession create session (redis): %w", err)
+	if err = s.userRedis.SetSession(ctx, newSession); err != nil {
+		s.log.Warn("(Redis) auth_service.createSession create session (redis)", zap.Error(err))
 	}
 
 	return nil
