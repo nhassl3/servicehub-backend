@@ -34,4 +34,5 @@ var (
 
 	ErrInvalidCode         = errors.New("invalid code")
 	ErrTooManyCodeAttempts = errors.New("too many code attempts, request a new code")
+	ErrNothingToSave       = errors.New("nothing to save")
 )
