@@ -17,6 +17,7 @@ type User struct {
 	IsActive     bool       `db:"is_active"`
 	CreatedAt    time.Time  `db:"created_at"`
 	UpdatedAt    time.Time  `db:"updated_at"`
+	LastLogin    time.Time  `db:"last_login"`
 	EmailResetAt *time.Time `db:"email_reset_at"` // nil until the one-time email reset is used
 }
 
@@ -63,6 +64,19 @@ func (u *Session) UnmarshalBinary(data []byte) error {
 		return ErrRedisNotFound
 	}
 	return json.Unmarshal(data, u)
+}
+
+type RegisterInput struct {
+	Username string
+	Email    string
+	Password string
+	FullName string
+}
+
+type OAuthLoginInput struct {
+	Username string
+	Email    string
+	Password string
 }
 
 type CreateUserParams struct {
@@ -169,23 +183,31 @@ type OAuthLoginParams struct {
 	PasswordHash string
 }
 
+type UserExistsParams struct {
+	Username,
+	Email *string
+}
+
+type GetUserParams struct {
+	Username,
+	Email,
+	UID *string
+}
+
 //go:generate mockgen -source=user.go -destination=../repository/mock/user_repo_mock.go -package=mockrepo
 type UserRepository interface {
-	Create(ctx context.Context, params CreateUserParams) (*User, error)
-	CreateSession(ctx context.Context, params CreateSessionParams) (*Session, error)
+	Create(ctx context.Context, params *CreateUserParams) (*User, error)
+	CreateSession(ctx context.Context, params *CreateSessionParams) (*Session, error)
 	GetSession(ctx context.Context, refreshToken string) (*Session, error)
 	GetSessionByUsername(ctx context.Context, username string) (*Session, error)
 	DeleteSession(ctx context.Context, username string) error
-	GetByUsername(ctx context.Context, username string) (*User, error)
-	GetByEmail(ctx context.Context, email string) (*User, error)
-	GetByUID(ctx context.Context, uid string) (*User, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
-	ExistsByEmail(ctx context.Context, email string) (bool, error)
-	Update(ctx context.Context, params UpdateUserParams) (*User, error)
-	UpdatePassword(ctx context.Context, params UpdateUserPasswordParams) (*User, error)
-	VerifyEmail(ctx context.Context, params VerifyEmailAccount) (*User, error)
-	ConfirmEmailReset(ctx context.Context, params ResetEmailParams) (*User, error)
-	OAuthLogin(ctx context.Context, params OAuthLoginParams) (*User, error)
+	GetUser(ctx context.Context, params *GetUserParams) (*User, error)
+	UserExists(ctx context.Context, params *UserExistsParams) (bool, error)
+	Update(ctx context.Context, params *UpdateUserParams) (*User, error)
+	UpdatePassword(ctx context.Context, params *UpdateUserPasswordParams) (*User, error)
+	VerifyEmail(ctx context.Context, params *VerifyEmailAccount) (*User, error)
+	ConfirmEmailReset(ctx context.Context, params *ResetEmailParams) (*User, error)
+	OAuthLogin(ctx context.Context, params *OAuthLoginParams) (*User, error)
 }
 
 type UserRedis interface {
