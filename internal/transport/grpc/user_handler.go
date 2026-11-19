@@ -38,7 +38,7 @@ func (h *UserHandler) UpdateProfile(ctx context.Context, req *userv1.UpdateProfi
 	if !ok {
 		return nil, status.Error(codes.Unauthenticated, "missing auth payload")
 	}
-	user, err := h.svc.UpdateProfile(ctx, domain.UpdateUserParams{
+	user, err := h.svc.UpdateProfile(ctx, &domain.UpdateUserParams{
 		Username:  payload.Username,
 		FullName:  req.FullName,
 		AvatarURL: req.AvatarUrl,
