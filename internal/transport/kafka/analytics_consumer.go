@@ -11,6 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const opAc = "analytics-consumer: "
+
 // AnalyticsConsumer subscribes to all domain topics, normalizes the relevant
 // events into analytics facts and batch-writes them to ClickHouse. Unfamiliar
 // event types are ignored (mirrors NotificationConsumer). ClickHouse is not a
@@ -38,13 +40,13 @@ func (c *AnalyticsConsumer) Run(ctx context.Context) error {
 func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) error {
 	var env domain.Envelope
 	if err := json.Unmarshal(msg.Value, &env); err != nil {
-		c.log.Error("analytics-consumer: bad envelope", zap.Error(err))
+		c.log.Error(opAc+"bad envelope", zap.Error(err))
 		return err
 	}
 
 	event, ok := c.mapEvent(env)
 	if !ok {
-		c.log.Debug("analytics-consumer: skipping unknown event type", zap.Int8("type", int8(env.Type)))
+		c.log.Debug(opAc+"skipping unknown event type", zap.Int8("type", int8(env.Type)))
 		return nil
 	}
 
@@ -57,7 +59,7 @@ func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) e
 	if err := util.WithRetry(ctx, util.DefaultCloseRetry, func() error {
 		return c.repo.InsertEvents(ctx, []domain.AnalyticsEvent{event})
 	}); err != nil {
-		c.log.Debug("analytics-consumer: failed to insert events", zap.Error(err))
+		c.log.Debug(opAc+"failed to insert events", zap.Error(err))
 	}
 
 	return nil
@@ -69,12 +71,12 @@ func (c *AnalyticsConsumer) handle(ctx context.Context, msg segmentio.Message) e
 func (c *AnalyticsConsumer) getCategoryName(ctx context.Context, categoryID int) string {
 	categories, err := c.categoriesRedis.Categories(ctx)
 	if err != nil {
-		c.log.Warn("analytics-consumer: failed to get categories", zap.Error(err))
+		c.log.Warn(opAc+"failed to get categories", zap.Error(err))
 		return ""
 	}
 	category := categories.GetCategoryById(categoryID)
 	if category == nil {
-		c.log.Warn("analytics-consumer: failed to get category by ID", zap.Int("ID", categoryID))
+		c.log.Warn(opAc+"failed to get category by ID", zap.Int("ID", categoryID))
 		return ""
 	}
 	return category.Name
