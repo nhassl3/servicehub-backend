@@ -258,6 +258,12 @@ make test
 
 ---
 
+## Database
+
+![Database](.github/assets/db/db-12-11-2026.svg)
+
+---
+
 ## License
 
 This project protected by [MIT](https://github.com/nhassl3/servicehub-backend/blob/main/LICENSE) license
