@@ -33,10 +33,10 @@ func NewUserService(userRepo domain.UserRepository, fileStorage domain.PhotoStor
 }
 
 func (s *UserService) GetUser(ctx context.Context, username string) (*domain.User, error) {
-	return s.userRepo.GetByUsername(ctx, username)
+	return s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 }
 
-func (s *UserService) UpdateProfile(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
+func (s *UserService) UpdateProfile(ctx context.Context, params *domain.UpdateUserParams) (*domain.User, error) {
 	return s.userRepo.Update(ctx, params)
 }
 
@@ -72,7 +72,7 @@ func (s *UserService) UpdatePassword(ctx context.Context, params domain.UpdateUs
 		NewPassword: newPasswordHashed,
 	}
 
-	return s.userRepo.UpdatePassword(ctx, params)
+	return s.userRepo.UpdatePassword(ctx, &params)
 }
 
 func (s *UserService) UploadAvatar(ctx context.Context, params domain.UploadAvatarParams) (*domain.User, error) {
@@ -85,7 +85,9 @@ func (s *UserService) UploadAvatar(ctx context.Context, params domain.UploadAvat
 	user, err := s.userRedis.Profile(ctx, params.Username)
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
-			user, err = s.userRepo.GetByUsername(ctx, params.Username)
+			user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{
+				Username: &params.Username,
+			}))
 			if err != nil {
 				return nil, err
 			}
@@ -110,11 +112,11 @@ func (s *UserService) UploadAvatar(ctx context.Context, params domain.UploadAvat
 		return nil, fmt.Errorf("user_service.UploadAvatar upload: %w", err)
 	}
 
-	user, err = s.userRepo.Update(ctx, domain.UpdateUserParams{
+	user, err = s.userRepo.Update(ctx, new(domain.UpdateUserParams{
 		Username:  params.Username,
 		FullName:  user.FullName,
 		AvatarURL: url,
-	})
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("user_service.UploadAvatar update user: %w", err)
 	}
