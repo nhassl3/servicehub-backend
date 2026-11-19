@@ -51,6 +51,13 @@ func (p *EventPublisher) PublishDeletedProduct(ctx context.Context, id string) e
 	return p.publish(ctx, domain.TopicProductEvent, fmt.Sprintf("deleted-product-%s", id), env)
 }
 
+// History events:
+
+func (p *EventPublisher) PublishCreateUserHistory(ctx context.Context, payload domain.CreateUserHistoryParams) error {
+	env := domain.NewEnvelope(domain.CreateUserHistory, payload)
+	return p.publish(ctx, domain.TopicHistoryEvent, fmt.Sprintf("create-user-history-%s", payload.Username), env)
+}
+
 // Analytics events:
 
 func (p *EventPublisher) PublishUserRegistered(ctx context.Context, payload domain.UserRegisteredPayload) error {
