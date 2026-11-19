@@ -178,6 +178,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 
 	// ─── Repositories ─────────────────────────────────────────────────────────
 	userRepo := repoPostgres.NewUserRepo(store)
+	userHistoryRepo := repoPostgres.NewUserHistoryRepo(store)
 	categoryRepo := repoPostgres.NewCategoryRepo(store)
 	productRepo := repoPostgres.NewProductRepo(store)
 	sellerRepo := repoPostgres.NewSellerRepo(store)
@@ -200,6 +201,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Admin:        service.NewAdminService(adminRepo, minIOClient, adminRedis),
 		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient, eventPublisher, cfg.Auth.EmailResetWindow, log),
 		User:         service.NewUserService(userRepo, minIOClient, userRedis),
+		UserHistory:  service.NewUserHistoryService(userHistoryRepo),
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:      service.NewProductService(productRepo, esProductRepo, sellerRepo, eventPublisher, log),
 		Cart:         service.NewCartService(cartRepo),
