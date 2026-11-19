@@ -57,7 +57,7 @@ func (r *SellerRepo) GetSeller(ctx context.Context, params domain.GetSellerProfi
 		return nil, domain.ErrInvalidInput
 	}
 	row, err := r.store.GetSeller(ctx, db.GetSellerParams{
-		Username: usernamePtrToNullable(params.Username),
+		Username: stringPtrToNullable(params.Username),
 		SellerID: sellerID,
 	})
 	if err != nil {

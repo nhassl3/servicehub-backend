@@ -55,6 +55,14 @@ func intPtrToNullable(v *int) pgtype.Int4 {
 	return pgtype.Int4{Int32: int32(*v), Valid: true}
 }
 
+// int64PtrToNullable converts an optional *int64 to pgtype.Int8.
+func int64PtrToNullable(v int64) pgtype.Int8 {
+	if v == 0 {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: v, Valid: true}
+}
+
 // float64PtrToNullable converts an optional *float64 to pgtype.Numeric.
 func float64PtrToNullable(v *float64) pgtype.Numeric {
 	if v == nil {
@@ -77,8 +85,8 @@ func numericToFloat64(n pgtype.Numeric) float64 {
 	return 0
 }
 
-// usernamePtrToNullable safely converts string pointer to pgtype.Text.
-func usernamePtrToNullable(s *string) pgtype.Text {
+// stringPtrToNullable safely converts string pointer to pgtype.Text.
+func stringPtrToNullable(s *string) pgtype.Text {
 	if s == nil {
 		return pgtype.Text{}
 	}
