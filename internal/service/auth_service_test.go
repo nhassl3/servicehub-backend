@@ -179,38 +179,35 @@ func (m *mockUserRedis) DelCodeAttempts(ctx context.Context, entryKey, operation
 // ─── Mock UserRepository ──────────────────────────────────────────────────────
 
 type mockUserRepo struct {
-	existsByUsernameFunc     func(ctx context.Context, username string) (bool, error)
-	existsByEmailFunc        func(ctx context.Context, email string) (bool, error)
-	createFunc               func(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
-	getByUsernameFunc        func(ctx context.Context, username string) (*domain.User, error)
-	getByEmailFunc           func(ctx context.Context, email string) (*domain.User, error)
-	getByUIDFunc             func(ctx context.Context, uid string) (*domain.User, error)
-	updateFunc               func(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error)
-	updatePasswordFunc       func(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error)
+	userExists               func(ctx context.Context, params *domain.UserExistsParams) (bool, error)
+	createFunc               func(ctx context.Context, params *domain.CreateUserParams) (*domain.User, error)
+	getUser                  func(ctx context.Context, params *domain.GetUserParams) (*domain.User, error)
+	updateFunc               func(ctx context.Context, params *domain.UpdateUserParams) (*domain.User, error)
+	updatePasswordFunc       func(ctx context.Context, params *domain.UpdateUserPasswordParams) (*domain.User, error)
 	getSessionFunc           func(ctx context.Context, refreshToken string) (*domain.Session, error)
 	getSessionByUsernameFunc func(ctx context.Context, username string) (*domain.Session, error)
 	deleteSessionFunc        func(ctx context.Context, username string) error
-	createSessionFunc        func(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error)
-	verifyEmailFunc          func(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error)
-	confirmEmailResetFunc    func(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error)
-	oAuthLogin               func(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error)
+	createSessionFunc        func(ctx context.Context, params *domain.CreateSessionParams) (*domain.Session, error)
+	verifyEmailFunc          func(ctx context.Context, params *domain.VerifyEmailAccount) (*domain.User, error)
+	confirmEmailResetFunc    func(ctx context.Context, params *domain.ResetEmailParams) (*domain.User, error)
+	oAuthLogin               func(ctx context.Context, params *domain.OAuthLoginParams) (*domain.User, error)
 }
 
-func (m *mockUserRepo) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+func (m *mockUserRepo) OAuthLogin(ctx context.Context, params *domain.OAuthLoginParams) (*domain.User, error) {
 	if m.oAuthLogin != nil {
 		return m.oAuthLogin(ctx, params)
 	}
 	return nil, domain.ErrAlreadyExists
 }
 
-func (m *mockUserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+func (m *mockUserRepo) ConfirmEmailReset(ctx context.Context, params *domain.ResetEmailParams) (*domain.User, error) {
 	if m.confirmEmailResetFunc != nil {
 		return m.confirmEmailResetFunc(ctx, params)
 	}
 	return nil, domain.ErrEmailAlreadyReset
 }
 
-func (m *mockUserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
+func (m *mockUserRepo) CreateSession(ctx context.Context, params *domain.CreateSessionParams) (*domain.Session, error) {
 	if m.createSessionFunc != nil {
 		return m.createSessionFunc(ctx, params)
 	}
@@ -245,28 +242,21 @@ func (m *mockUserRepo) DeleteSession(ctx context.Context, username string) error
 	return nil
 }
 
-func (m *mockUserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
+func (m *mockUserRepo) UpdatePassword(ctx context.Context, params *domain.UpdateUserPasswordParams) (*domain.User, error) {
 	if m.updatePasswordFunc != nil {
 		return m.updatePasswordFunc(ctx, params)
 	}
 	return &domain.User{}, nil
 }
 
-func (m *mockUserRepo) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	if m.existsByUsernameFunc != nil {
-		return m.existsByUsernameFunc(ctx, username)
+func (m *mockUserRepo) UserExists(ctx context.Context, params *domain.UserExistsParams) (bool, error) {
+	if m.userExists != nil {
+		return m.userExists(ctx, params)
 	}
 	return false, nil
 }
 
-func (m *mockUserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	if m.existsByEmailFunc != nil {
-		return m.existsByEmailFunc(ctx, email)
-	}
-	return false, nil
-}
-
-func (m *mockUserRepo) Create(ctx context.Context, params domain.CreateUserParams) (*domain.User, error) {
+func (m *mockUserRepo) Create(ctx context.Context, params *domain.CreateUserParams) (*domain.User, error) {
 	if m.createFunc != nil {
 		return m.createFunc(ctx, params)
 	}
@@ -278,35 +268,21 @@ func (m *mockUserRepo) Create(ctx context.Context, params domain.CreateUserParam
 	}, nil
 }
 
-func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
-	if m.getByUsernameFunc != nil {
-		return m.getByUsernameFunc(ctx, username)
+func (m *mockUserRepo) GetUser(ctx context.Context, params *domain.GetUserParams) (*domain.User, error) {
+	if m.getUser != nil {
+		return m.getUser(ctx, params)
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	if m.getByEmailFunc != nil {
-		return m.getByEmailFunc(ctx, email)
-	}
-	return nil, domain.ErrNotFound
-}
-
-func (m *mockUserRepo) GetByUID(ctx context.Context, uid string) (*domain.User, error) {
-	if m.getByUIDFunc != nil {
-		return m.getByUIDFunc(ctx, uid)
-	}
-	return nil, domain.ErrNotFound
-}
-
-func (m *mockUserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+func (m *mockUserRepo) VerifyEmail(ctx context.Context, params *domain.VerifyEmailAccount) (*domain.User, error) {
 	if m.verifyEmailFunc != nil {
 		return m.verifyEmailFunc(ctx, params)
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (m *mockUserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
+func (m *mockUserRepo) Update(ctx context.Context, params *domain.UpdateUserParams) (*domain.User, error) {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, params)
 	}
@@ -350,6 +326,9 @@ func (noopPublisher) PublishUserRegistered(context.Context, domain.UserRegistere
 func (noopPublisher) PublishProductStatusChanged(context.Context, domain.ProductStatusChangedPayload) error {
 	return nil
 }
+func (noopPublisher) PublishCreateUserHistory(context.Context, domain.CreateUserHistoryParams) error {
+	return nil
+}
 func (noopPublisher) PublishProductRatingChanged(context.Context, domain.ProductRatingChangedPayload) error {
 	return nil
 }
@@ -368,7 +347,7 @@ func TestAuthService_Register_OK(t *testing.T) {
 	repo := &mockUserRepo{}
 	svc := newAuthService(repo)
 
-	user, tokens, err := svc.Register(context.Background(), service.RegisterInput{
+	user, tokens, err := svc.Register(context.Background(), domain.RegisterInput{
 		Username: "alice",
 		Email:    "alice@example.com",
 		Password: "password123",
@@ -385,13 +364,16 @@ func TestAuthService_Register_OK(t *testing.T) {
 
 func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 	repo := &mockUserRepo{
-		existsByUsernameFunc: func(_ context.Context, username string) (bool, error) {
-			return username == "alice", nil
+		userExists: func(_ context.Context, params *domain.UserExistsParams) (bool, error) {
+			if params.Username == nil {
+				return false, nil
+			}
+			return *params.Username == "alice", nil
 		},
 	}
 	svc := newAuthService(repo)
 
-	_, _, err := svc.Register(context.Background(), service.RegisterInput{
+	_, _, err := svc.Register(context.Background(), domain.RegisterInput{
 		Username: "alice",
 		Email:    "new@example.com",
 		Password: "password123",
@@ -403,13 +385,16 @@ func TestAuthService_Register_DuplicateUsername(t *testing.T) {
 
 func TestAuthService_Register_DuplicateEmail(t *testing.T) {
 	repo := &mockUserRepo{
-		existsByEmailFunc: func(_ context.Context, email string) (bool, error) {
-			return email == "alice@example.com", nil
+		userExists: func(_ context.Context, params *domain.UserExistsParams) (bool, error) {
+			if params.Email == nil {
+				return false, nil
+			}
+			return *params.Email == "alice@example.com", nil
 		},
 	}
 	svc := newAuthService(repo)
 
-	_, _, err := svc.Register(context.Background(), service.RegisterInput{
+	_, _, err := svc.Register(context.Background(), domain.RegisterInput{
 		Username: "newuser",
 		Email:    "alice@example.com",
 		Password: "password123",
@@ -424,14 +409,16 @@ func TestAuthService_Login_OK(t *testing.T) {
 	hashedPw := "$argon2id$v=19$m=65536,t=3,p=4$AAAAAAAAAAAAAAAAAAAAAA$tnYfz0WUPkpCFwD1zxH0HKP3xJiGUmJ5x/Vvom+xISU"
 
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			if username == "alice" {
-				return &domain.User{
-					Username:     "alice",
-					UID:          "uid-123",
-					Role:         "buyer",
-					PasswordHash: hashedPw,
-				}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				if *params.Username == "alice" {
+					return &domain.User{
+						Username:     "alice",
+						UID:          "uid-123",
+						Role:         "buyer",
+						PasswordHash: hashedPw,
+					}, nil
+				}
 			}
 			return nil, domain.ErrNotFound
 		},
@@ -453,7 +440,7 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 
 func TestAuthService_Login_WrongPassword(t *testing.T) {
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, _ string) (*domain.User, error) {
+		getUser: func(_ context.Context, _ *domain.GetUserParams) (*domain.User, error) {
 			return &domain.User{
 				Username:     "alice",
 				UID:          "uid",
@@ -484,13 +471,16 @@ func TestAuthService_ResetEmail_OK(t *testing.T) {
 	var stored *domain.CodeState
 
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			return &domain.User{
-				Username:  username,
-				Email:     "old@example.com",
-				IsActive:  false,
-				CreatedAt: time.Now().Add(-time.Hour),
-			}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				return &domain.User{
+					Username:  *params.Username,
+					Email:     "old@example.com",
+					IsActive:  false,
+					CreatedAt: time.Now().Add(-time.Hour),
+				}, nil
+			}
+			return nil, domain.ErrNotFound
 		},
 	}
 	redis := &mockUserRedis{
@@ -512,11 +502,14 @@ func TestAuthService_ResetEmail_OK(t *testing.T) {
 
 func TestAuthService_ResetEmail_WindowExpired(t *testing.T) {
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			return &domain.User{
-				Username:  username,
-				CreatedAt: time.Now().Add(-73 * time.Hour),
-			}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				return &domain.User{
+					Username:  *params.Username,
+					CreatedAt: time.Now().Add(-73 * time.Hour),
+				}, nil
+			}
+			return nil, domain.ErrNotFound
 		},
 	}
 
@@ -527,12 +520,15 @@ func TestAuthService_ResetEmail_WindowExpired(t *testing.T) {
 func TestAuthService_ResetEmail_AlreadyReset(t *testing.T) {
 	resetAt := time.Now().Add(-time.Hour)
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			return &domain.User{
-				Username:     username,
-				CreatedAt:    time.Now().Add(-24 * time.Hour),
-				EmailResetAt: &resetAt,
-			}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				return &domain.User{
+					Username:     *params.Username,
+					CreatedAt:    time.Now().Add(-24 * time.Hour),
+					EmailResetAt: &resetAt,
+				}, nil
+			}
+			return nil, domain.ErrNotFound
 		},
 	}
 
@@ -542,12 +538,15 @@ func TestAuthService_ResetEmail_AlreadyReset(t *testing.T) {
 
 func TestAuthService_ResetEmail_ActiveAccount(t *testing.T) {
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			return &domain.User{
-				Username:  username,
-				IsActive:  true,
-				CreatedAt: time.Now().Add(-time.Hour),
-			}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				return &domain.User{
+					Username:  *params.Username,
+					IsActive:  true,
+					CreatedAt: time.Now().Add(-time.Hour),
+				}, nil
+			}
+			return nil, domain.ErrNotFound
 		},
 	}
 
@@ -557,10 +556,13 @@ func TestAuthService_ResetEmail_ActiveAccount(t *testing.T) {
 
 func TestAuthService_ResetEmail_EmailTaken(t *testing.T) {
 	repo := &mockUserRepo{
-		getByUsernameFunc: func(_ context.Context, username string) (*domain.User, error) {
-			return &domain.User{Username: username, CreatedAt: time.Now().Add(-time.Hour)}, nil
+		getUser: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			if params != nil && params.Username != nil {
+				return &domain.User{Username: *params.Username, CreatedAt: time.Now().Add(-time.Hour)}, nil
+			}
+			return nil, domain.ErrNotFound
 		},
-		existsByEmailFunc: func(_ context.Context, _ string) (bool, error) {
+		userExists: func(_ context.Context, _ *domain.UserExistsParams) (bool, error) {
 			return true, nil
 		},
 	}
@@ -570,10 +572,10 @@ func TestAuthService_ResetEmail_EmailTaken(t *testing.T) {
 }
 
 func TestAuthService_VerifyEmailAccount_ResetsEmail(t *testing.T) {
-	var got domain.ResetEmailParams
+	var got *domain.ResetEmailParams
 
 	repo := &mockUserRepo{
-		confirmEmailResetFunc: func(_ context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+		confirmEmailResetFunc: func(_ context.Context, params *domain.ResetEmailParams) (*domain.User, error) {
 			got = params
 			return &domain.User{
 				Username: params.Username,
@@ -596,14 +598,14 @@ func TestAuthService_VerifyEmailAccount_ResetsEmail(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, tokens)
 	require.NotEmpty(t, tokens.AccessToken)
-	require.Equal(t, domain.ResetEmailParams{Username: "alice", NewEmail: "new@example.com"}, got)
+	require.Equal(t, &domain.ResetEmailParams{Username: "alice", NewEmail: "new@example.com"}, got)
 }
 
 func TestAuthService_VerifyEmailAccount_VerifiesEmail(t *testing.T) {
 	var gotEmail string
 
 	repo := &mockUserRepo{
-		verifyEmailFunc: func(_ context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+		verifyEmailFunc: func(_ context.Context, params *domain.VerifyEmailAccount) (*domain.User, error) {
 			require.NotNil(t, params.Email)
 			gotEmail = *params.Email
 			return &domain.User{
