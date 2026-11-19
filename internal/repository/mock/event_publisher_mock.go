@@ -63,6 +63,20 @@ func (mr *MockEventPublisherMockRecorder) PublishBalanceUpdated(ctx, payload int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishBalanceUpdated", reflect.TypeOf((*MockEventPublisher)(nil).PublishBalanceUpdated), ctx, payload)
 }
 
+// PublishCreateUserHistory mocks base method.
+func (m *MockEventPublisher) PublishCreateUserHistory(ctx context.Context, payload domain.CreateUserHistoryParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishCreateUserHistory", ctx, payload)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PublishCreateUserHistory indicates an expected call of PublishCreateUserHistory.
+func (mr *MockEventPublisherMockRecorder) PublishCreateUserHistory(ctx, payload interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishCreateUserHistory", reflect.TypeOf((*MockEventPublisher)(nil).PublishCreateUserHistory), ctx, payload)
+}
+
 // PublishDeletedProduct mocks base method.
 func (m *MockEventPublisher) PublishDeletedProduct(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()

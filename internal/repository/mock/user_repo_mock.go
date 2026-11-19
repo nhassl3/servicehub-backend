@@ -36,7 +36,7 @@ func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
 }
 
 // ConfirmEmailReset mocks base method.
-func (m *MockUserRepository) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+func (m *MockUserRepository) ConfirmEmailReset(ctx context.Context, params *domain.ResetEmailParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ConfirmEmailReset", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
@@ -51,7 +51,7 @@ func (mr *MockUserRepositoryMockRecorder) ConfirmEmailReset(ctx, params interfac
 }
 
 // Create mocks base method.
-func (m *MockUserRepository) Create(ctx context.Context, params domain.CreateUserParams) (*domain.User, error) {
+func (m *MockUserRepository) Create(ctx context.Context, params *domain.CreateUserParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
@@ -66,7 +66,7 @@ func (mr *MockUserRepositoryMockRecorder) Create(ctx, params interface{}) *gomoc
 }
 
 // CreateSession mocks base method.
-func (m *MockUserRepository) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
+func (m *MockUserRepository) CreateSession(ctx context.Context, params *domain.CreateSessionParams) (*domain.Session, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateSession", ctx, params)
 	ret0, _ := ret[0].(*domain.Session)
@@ -92,81 +92,6 @@ func (m *MockUserRepository) DeleteSession(ctx context.Context, username string)
 func (mr *MockUserRepositoryMockRecorder) DeleteSession(ctx, username interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSession", reflect.TypeOf((*MockUserRepository)(nil).DeleteSession), ctx, username)
-}
-
-// ExistsByEmail mocks base method.
-func (m *MockUserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExistsByEmail", ctx, email)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExistsByEmail indicates an expected call of ExistsByEmail.
-func (mr *MockUserRepositoryMockRecorder) ExistsByEmail(ctx, email interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsByEmail", reflect.TypeOf((*MockUserRepository)(nil).ExistsByEmail), ctx, email)
-}
-
-// ExistsByUsername mocks base method.
-func (m *MockUserRepository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExistsByUsername", ctx, username)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ExistsByUsername indicates an expected call of ExistsByUsername.
-func (mr *MockUserRepositoryMockRecorder) ExistsByUsername(ctx, username interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsByUsername", reflect.TypeOf((*MockUserRepository)(nil).ExistsByUsername), ctx, username)
-}
-
-// GetByEmail mocks base method.
-func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByEmail", ctx, email)
-	ret0, _ := ret[0].(*domain.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByEmail indicates an expected call of GetByEmail.
-func (mr *MockUserRepositoryMockRecorder) GetByEmail(ctx, email interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByEmail", reflect.TypeOf((*MockUserRepository)(nil).GetByEmail), ctx, email)
-}
-
-// GetByUID mocks base method.
-func (m *MockUserRepository) GetByUID(ctx context.Context, uid string) (*domain.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByUID", ctx, uid)
-	ret0, _ := ret[0].(*domain.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByUID indicates an expected call of GetByUID.
-func (mr *MockUserRepositoryMockRecorder) GetByUID(ctx, uid interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUID", reflect.TypeOf((*MockUserRepository)(nil).GetByUID), ctx, uid)
-}
-
-// GetByUsername mocks base method.
-func (m *MockUserRepository) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByUsername", ctx, username)
-	ret0, _ := ret[0].(*domain.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByUsername indicates an expected call of GetByUsername.
-func (mr *MockUserRepositoryMockRecorder) GetByUsername(ctx, username interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUsername", reflect.TypeOf((*MockUserRepository)(nil).GetByUsername), ctx, username)
 }
 
 // GetSession mocks base method.
@@ -199,8 +124,23 @@ func (mr *MockUserRepositoryMockRecorder) GetSessionByUsername(ctx, username int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSessionByUsername", reflect.TypeOf((*MockUserRepository)(nil).GetSessionByUsername), ctx, username)
 }
 
+// GetUser mocks base method.
+func (m *MockUserRepository) GetUser(ctx context.Context, params *domain.GetUserParams) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUser", ctx, params)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUser indicates an expected call of GetUser.
+func (mr *MockUserRepositoryMockRecorder) GetUser(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockUserRepository)(nil).GetUser), ctx, params)
+}
+
 // OAuthLogin mocks base method.
-func (m *MockUserRepository) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+func (m *MockUserRepository) OAuthLogin(ctx context.Context, params *domain.OAuthLoginParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "OAuthLogin", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
@@ -215,7 +155,7 @@ func (mr *MockUserRepositoryMockRecorder) OAuthLogin(ctx, params interface{}) *g
 }
 
 // Update mocks base method.
-func (m *MockUserRepository) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
+func (m *MockUserRepository) Update(ctx context.Context, params *domain.UpdateUserParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
@@ -230,7 +170,7 @@ func (mr *MockUserRepositoryMockRecorder) Update(ctx, params interface{}) *gomoc
 }
 
 // UpdatePassword mocks base method.
-func (m *MockUserRepository) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
+func (m *MockUserRepository) UpdatePassword(ctx context.Context, params *domain.UpdateUserPasswordParams) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdatePassword", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
@@ -244,8 +184,23 @@ func (mr *MockUserRepositoryMockRecorder) UpdatePassword(ctx, params interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePassword", reflect.TypeOf((*MockUserRepository)(nil).UpdatePassword), ctx, params)
 }
 
+// UserExists mocks base method.
+func (m *MockUserRepository) UserExists(ctx context.Context, params *domain.UserExistsParams) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserExists", ctx, params)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserExists indicates an expected call of UserExists.
+func (mr *MockUserRepositoryMockRecorder) UserExists(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserExists", reflect.TypeOf((*MockUserRepository)(nil).UserExists), ctx, params)
+}
+
 // VerifyEmail mocks base method.
-func (m *MockUserRepository) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+func (m *MockUserRepository) VerifyEmail(ctx context.Context, params *domain.VerifyEmailAccount) (*domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyEmail", ctx, params)
 	ret0, _ := ret[0].(*domain.User)
