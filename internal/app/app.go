@@ -197,10 +197,12 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 	analyticsRepo := repoClickhouse.NewAnalyticsRepo(conn)
 
 	// ─── Services ─────────────────────────────────────────────────────────────
+	eventPublishService := service.NewPublishService(eventPublisher, log)
+	tokenService := service.NewTokenService(accessManager, refreshManager, userRedis, userRepo, log)
 	svcs := &transportGRPC.Services{
 		Admin:        service.NewAdminService(adminRepo, minIOClient, adminRedis),
-		Auth:         service.NewAuthService(userRepo, userRedis, accessManager, refreshManager, tokenBlacklist, smtpClient, eventPublisher, cfg.Auth.EmailResetWindow, log),
-		User:         service.NewUserService(userRepo, minIOClient, userRedis),
+		Auth:         service.NewAuthService(userRepo, userRedis, tokenBlacklist, eventPublishService, tokenService, log),
+		User:         service.NewUserService(userRepo, minIOClient, userRedis, eventPublishService, cfg.Auth.EmailResetWindow, smtpClient, tokenService, log),
 		UserHistory:  service.NewUserHistoryService(userHistoryRepo),
 		Category:     service.NewCategoryService(categoryRepo, categoriesRedis, minIOClient),
 		Product:      service.NewProductService(productRepo, esProductRepo, sellerRepo, eventPublisher, log),
@@ -211,7 +213,7 @@ func Run(cfg *config.Config, log *zap.Logger) error {
 		Seller:       service.NewSellerService(sellerRepo, minIOClient, userRedis),
 		Balance:      service.NewBalanceService(balanceRepo, eventPublisher, userRedis, log),
 		Moderation:   service.NewModerationService(moderationRepo, adminRepo, productRepo, adminRedis, adminRedis, eventPublisher, log),
-		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo),
+		Notification: service.NewNotificationService(userRedis, userRepo, notificationRepo, log),
 		Analytics:    service.NewAnalyticsService(analyticsRepo, adminRepo, adminRedis),
 	}
 

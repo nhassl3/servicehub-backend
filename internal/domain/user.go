@@ -7,18 +7,18 @@ import (
 )
 
 type User struct {
-	Username     string     `db:"username"`
-	UID          string     `db:"uid"`
-	Email        string     `db:"email"`
-	PasswordHash string     `db:"password_hash"`
-	FullName     string     `db:"full_name"`
-	AvatarURL    string     `db:"avatar_url"`
-	Role         string     `db:"role"`
-	IsActive     bool       `db:"is_active"`
-	CreatedAt    time.Time  `db:"created_at"`
-	UpdatedAt    time.Time  `db:"updated_at"`
-	LastLogin    time.Time  `db:"last_login"`
-	EmailResetAt *time.Time `db:"email_reset_at"` // nil until the one-time email reset is used
+	Username     string    `db:"username"`
+	UID          string    `db:"uid"`
+	Email        string    `db:"email"`
+	PasswordHash string    `db:"password_hash"`
+	FullName     string    `db:"full_name"`
+	AvatarURL    string    `db:"avatar_url"`
+	Role         string    `db:"role"`
+	IsActive     bool      `db:"is_active"`
+	CreatedAt    time.Time `db:"created_at"`
+	UpdatedAt    time.Time `db:"updated_at"`
+	LastLogin    time.Time `db:"last_login"`
+	EmailResetAt time.Time `db:"email_reset_at"`
 }
 
 // MarshalBinary this method needed for correct work of Redis

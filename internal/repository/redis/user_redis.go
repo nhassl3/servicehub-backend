@@ -20,6 +20,7 @@ const (
 
 	ResetPasswordEnterKey = "reset_password:"
 	VerifyEmailEnterKey   = "verify_email:"
+	ResetEmailEnterKey    = "reset_email:"
 )
 
 type UserRedis struct {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"mime"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"google.golang.org/grpc/metadata"
 )
 
 // extractObjectName extracts the object path from a full MinIO URL.
@@ -45,4 +47,22 @@ func GenerateObjectName(prefix, owner, contentType string) string {
 		return filepath.Join(prefix, owner, uuid.NewString())
 	}
 	return filepath.Join(prefix, owner, uuid.NewString()+ext[0])
+}
+
+// GetMetadataFromContext returns IP-address of client and him user-agent of browser
+func GetMetadataFromContext(ctx context.Context) (clientIp string, userAgent string) {
+	if headers, ok := metadata.FromIncomingContext(ctx); ok {
+		xForwardFor := headers.Get("x-forwarded-for")
+		if len(xForwardFor) > 0 && xForwardFor[0] != "" {
+			ips := strings.Split(xForwardFor[0], ",")
+			if len(ips) > 0 {
+				clientIp = ips[0]
+			}
+		}
+		usrAgent := headers.Get("user-agent")
+		if len(usrAgent) >= 1 && usrAgent[0] != "" {
+			userAgent = usrAgent[0]
+		}
+	}
+	return
 }

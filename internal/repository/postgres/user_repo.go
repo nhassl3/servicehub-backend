@@ -187,9 +187,9 @@ func (r *UserRepo) OAuthLogin(ctx context.Context, params *domain.OAuthLoginPara
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
 func mapUser(u db.User) *domain.User {
-	var emailResetAt *time.Time
+	var emailResetAt time.Time
 	if u.EmailResetAt.Valid { // can be nil-pointer
-		emailResetAt = new(u.EmailResetAt.Time)
+		emailResetAt = u.EmailResetAt.Time
 	}
 
 	return &domain.User{

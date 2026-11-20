@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"go.uber.org/zap"
 )
 
 // maxCodeAttempts limits how many times one operation id may be guessed before
@@ -20,13 +21,15 @@ type NotificationService struct {
 	userRedis domain.UserRedis
 	userRepo  domain.UserRepository
 	repo      domain.NotificationRepository
+	log       *zap.Logger
 }
 
-func NewNotificationService(userRedis domain.UserRedis, userRepo domain.UserRepository, repo domain.NotificationRepository) *NotificationService {
+func NewNotificationService(userRedis domain.UserRedis, userRepo domain.UserRepository, repo domain.NotificationRepository, log *zap.Logger) *NotificationService {
 	return &NotificationService{
 		userRedis: userRedis,
 		userRepo:  userRepo,
 		repo:      repo,
+		log:       log,
 	}
 }
 
@@ -61,15 +64,19 @@ func (s *NotificationService) ApproveCode(ctx context.Context, enterKeyCode, ope
 		return "", fmt.Errorf("notification_service.ApproveCode set verified reset token: %w", err)
 	}
 
-	_ = s.userRedis.DelCode(ctx, enterKeyCode, operationId)         // optional operation
-	_ = s.userRedis.DelCodeAttempts(ctx, enterKeyCode, operationId) // optional operation
+	if err = s.userRedis.DelCode(ctx, enterKeyCode, operationId); err != nil {
+		s.log.Warn("(Redis) failed to delete the code from redis cache")
+	}
+	if err = s.userRedis.DelCodeAttempts(ctx, enterKeyCode, operationId); err != nil {
+		s.log.Warn("(Redis) failed to delete the code attempts from redis cache")
+	}
 
 	return resetToken, nil
 }
 
-// GenerateResetPasswordCode crypto graphic safely method to create six-signs reset password code
+// GenerateCode crypto graphic safely method to create six-signs reset password code
 // This will protect the code from predictability.
-func GenerateResetPasswordCode() string {
+func GenerateCode() string {
 	maxN := big.NewInt(1000000) // from 0 to 999999
 	n, err := rand.Int(rand.Reader, maxN)
 	if err != nil {
