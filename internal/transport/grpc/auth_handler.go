@@ -108,6 +108,9 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshToken
 	}, nil
 }
 
+// TODO: Change this contract to RequestResetEmail and added new ResetEmail for reseting email address
+// Email reset available ones in 72-hours
+
 func (h *AuthHandler) ResetEmail(ctx context.Context, req *authv1.ResetEmailRequest) (*authv1.ResetEmailResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
