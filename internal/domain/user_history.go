@@ -66,6 +66,42 @@ func (sa Action) AccountCreatedChanges(createdAt time.Time) map[string]interface
 	return nil
 }
 
+func (sa Action) PasswordChangedChanges(oldValue, newValue string) map[string]interface{} {
+	if sa == PasswordChanged {
+		return map[string]interface{}{
+			"password_hash": map[string]interface{}{
+				"oldValue": oldValue,
+				"newValue": newValue,
+			},
+		}
+	}
+	return nil
+}
+
+func (sa Action) EmailVerifiedChanges() map[string]interface{} {
+	if sa == EmailChanged {
+		return map[string]interface{}{
+			"is_active": map[string]interface{}{
+				"oldValue": false,
+				"newValue": true,
+			},
+		}
+	}
+	return nil
+}
+
+func (sa Action) EmailChangedChanges(oldValue, newValue time.Time) map[string]interface{} {
+	if sa == EmailChanged {
+		return map[string]interface{}{
+			"email_reset_at": map[string]interface{}{
+				"oldValue": oldValue,
+				"newValue": newValue,
+			},
+		}
+	}
+	return nil
+}
+
 var actionByName = func() map[string]Action {
 	m := make(map[string]Action, len(ActionState))
 	for k, v := range ActionState {

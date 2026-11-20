@@ -18,8 +18,6 @@ SET email = $1,
     email_reset_at = NOW(),
     updated_at = NOW()
 WHERE username = $2
-  AND is_active = FALSE
-  AND email_reset_at IS NULL
 RETURNING username, uid, email, password_hash, full_name, avatar_url, role, is_active, created_at, updated_at, email_reset_at, last_login
 `
 

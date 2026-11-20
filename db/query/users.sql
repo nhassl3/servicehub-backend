@@ -56,8 +56,6 @@ SET email = sqlc.arg(new_email),
     email_reset_at = NOW(),
     updated_at = NOW()
 WHERE username = sqlc.arg(username)
-  AND is_active = FALSE
-  AND email_reset_at IS NULL
 RETURNING *;
 
 -- name: OAuthLogin :one

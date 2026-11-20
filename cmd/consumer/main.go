@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/nhassl3/servicehub-backend/internal/db"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	elsRepo "github.com/nhassl3/servicehub-backend/internal/repository/elasticsearch"
+	"github.com/nhassl3/servicehub-backend/internal/repository/postgres"
 	repoRedis "github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	elsPkg "github.com/nhassl3/servicehub-backend/pkg/elasticsearch"
 	"github.com/nhassl3/servicehub-backend/pkg/mailer"
@@ -108,6 +110,18 @@ func main() {
 
 	analyticsRepo := repoCH.NewAnalyticsRepo(chConn)
 
+	// Database connect
+	pool, err := db.NewPool(ctx, cfg.DB)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer pool.Close()
+	log.Info("connected to PostgresSQL")
+
+	store := db.NewStore(pool)
+
+	userHistoryRepo := postgres.NewUserHistoryRepo(store)
+
 	// Redis connect
 	redisProductsClient, err := pkgRedis.New(ctx, cfg.Redis.Addr, cfg.Redis.Username, cfg.Redis.Password, cfg.Redis.DB+1)
 	if err != nil {
@@ -148,6 +162,8 @@ func main() {
 			handlers = append(handlers, transportKafka.NewProductConsumer(consumer, elsRepository, log))
 		case domain.TopicAnalyticsEvent:
 			handlers = append(handlers, transportKafka.NewAnalyticsConsumer(consumer, analyticsRepo, categoriesRedis, log))
+		case domain.TopicHistoryEvent:
+			handlers = append(handlers, transportKafka.NewUserHistoryConsumer(consumer, userHistoryRepo, log))
 		}
 	}
 

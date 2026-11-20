@@ -47,7 +47,7 @@ func domainErr(err error) error {
 		return status.Error(codes.Unavailable, err.Error())
 	case errors.Is(err, domain.ErrEmailAlreadyReset):
 		return status.Error(codes.AlreadyExists, err.Error())
-	case errors.Is(err, domain.ErrEmailResetWindowExpired), errors.Is(err, domain.ErrEmailResetNotAllowed):
+	case errors.Is(err, domain.EmailResetManyAttempts):
 		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, domain.ErrInvalidCode):
 		return status.Error(codes.InvalidArgument, err.Error())
