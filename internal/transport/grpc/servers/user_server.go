@@ -12,6 +12,7 @@ import (
 	cartv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/cart/v1"
 	orderv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/order/v1"
 	userv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/user/v1"
+	userhistoryv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/user_history/v1"
 	wishlistv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/wishlist/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -24,6 +25,7 @@ var (
 	// UserHandlerFn register user handlers for registration gRPC Gateway (HTTP mux)
 	UserHandlerFn = []func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn) error{
 		userv1.RegisterUserServiceHandler,
+		userhistoryv1.RegisterUserHistoryServiceHandler,
 		cartv1.RegisterCartServiceHandler,
 		orderv1.RegisterOrderServiceHandler,
 		wishlistv1.RegisterWishlistServiceHandler,
@@ -32,19 +34,21 @@ var (
 )
 
 type UserServices struct {
-	User     *service.UserService
-	Cart     *service.CartService
-	Balance  *service.BalanceService
-	Order    *service.OrderService
-	Wishlist *service.WishlistService
+	User        *service.UserService
+	UserHistory *service.UserHistoryService
+	Cart        *service.CartService
+	Balance     *service.BalanceService
+	Order       *service.OrderService
+	Wishlist    *service.WishlistService
 }
 
 type UserHandlers struct {
-	User     *transport.UserHandler
-	Cart     *transport.CartHandler
-	Balance  *transport.BalanceHandler
-	Order    *transport.OrderHandler
-	Wishlist *transport.WishlistHandler
+	User        *transport.UserHandler
+	UserHistory *transport.UserHistoryHandler
+	Cart        *transport.CartHandler
+	Balance     *transport.BalanceHandler
+	Order       *transport.OrderHandler
+	Wishlist    *transport.WishlistHandler
 }
 
 // NewUserServer creates new server with user, cart, balance, order and wishlist handlers
@@ -58,15 +62,17 @@ func NewUserServer(services *Services, tokenManager auth.TokenManager, log *zap.
 	)
 
 	handlers := &Handlers{
-		User:     transport.NewUserHandler(services.User),
-		Cart:     transport.NewCartHandler(services.Cart),
-		Balance:  transport.NewBalanceHandler(services.Balance),
-		Order:    transport.NewOrderHandler(services.Order),
-		Wishlist: transport.NewWishlistHandler(services.Wishlist),
+		User:        transport.NewUserHandler(services.User),
+		UserHistory: transport.NewUserHistoryHandler(services.UserHistory),
+		Cart:        transport.NewCartHandler(services.Cart),
+		Balance:     transport.NewBalanceHandler(services.Balance),
+		Order:       transport.NewOrderHandler(services.Order),
+		Wishlist:    transport.NewWishlistHandler(services.Wishlist),
 	}
 
 	// Register services for server
 	userv1.RegisterUserServiceServer(grpcUserServer, handlers.User)
+	userhistoryv1.RegisterUserHistoryServiceServer(grpcUserServer, handlers.UserHistory)
 	cartv1.RegisterCartServiceServer(grpcUserServer, handlers.Cart)
 	balancev1.RegisterBalanceServiceServer(grpcUserServer, handlers.Balance)
 	orderv1.RegisterOrderServiceServer(grpcUserServer, handlers.Order)

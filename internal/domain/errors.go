@@ -29,9 +29,10 @@ var (
 
 	// Email reset is limited to the first hours after registration: later the
 	// address can only be changed by the support team.
-	ErrEmailResetWindowExpired = errors.New("email reset window has expired, contact support")
-	ErrEmailResetNotAllowed    = errors.New("email reset is not allowed for this account, contact support")
+
+	EmailResetManyAttempts = errors.New("mailing address can be changed once every three days")
 
 	ErrInvalidCode         = errors.New("invalid code")
 	ErrTooManyCodeAttempts = errors.New("too many code attempts, request a new code")
+	ErrNothingToSave       = errors.New("nothing to save")
 )

@@ -28,6 +28,7 @@ type Services struct {
 	Admin        *service.AdminService
 	Auth         *service.AuthService
 	User         *service.UserService
+	UserHistory  *service.UserHistoryService
 	Category     *service.CategoryService
 	Product      *service.ProductService
 	Cart         *service.CartService
@@ -63,6 +64,7 @@ type Handlers struct {
 	Admin        *grpc2.AdminHandler
 	Auth         *grpc2.AuthHandler
 	User         *grpc2.UserHandler
+	UserHistory  *grpc2.UserHistoryHandler
 	Category     *grpc2.CategoryHandler
 	Product      *grpc2.ProductHandler
 	Cart         *grpc2.CartHandler

@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -26,6 +27,7 @@ type Querier interface {
 	CountOrdersByUsername(ctx context.Context, arg CountOrdersByUsernameParams) (int64, error)
 	CountReviewsByProduct(ctx context.Context, productID uuid.UUID) (int64, error)
 	CountSearchProducts(ctx context.Context, plaintoTsquery string) (int64, error)
+	CountUserHistory(ctx context.Context, username string) (int64, error)
 	CreateAdmin(ctx context.Context, arg CreateAdminParams) (Admin, error)
 	CreateBalanceTx(ctx context.Context, arg CreateBalanceTxParams) (BalanceTransaction, error)
 	CreateModeration(ctx context.Context, arg CreateModerationParams) (Moderation, error)
@@ -37,11 +39,14 @@ type Querier interface {
 	CreateSeller(ctx context.Context, arg CreateSellerParams) (Seller, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserHistory(ctx context.Context, arg CreateUserHistoryParams) (UserHistory, error)
 	DeductFromBalance(ctx context.Context, arg DeductFromBalanceParams) (Balance, error)
 	DeleteCartItem(ctx context.Context, arg DeleteCartItemParams) (int64, error)
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
 	DeleteReview(ctx context.Context, id int64) (int64, error)
 	DeleteSession(ctx context.Context, username string) error
+	// Retention: удаляет записи старше указанной даты.
+	DeleteUserHistoryOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
 	GetAdmin(ctx context.Context, arg GetAdminParams) (Admin, error)
 	GetAdminForUpdate(ctx context.Context, arg GetAdminForUpdateParams) (Admin, error)
 	GetAdminUsernameByProductId(ctx context.Context, productID uuid.UUID) (string, error)
@@ -64,9 +69,8 @@ type Querier interface {
 	GetSellerByProductId(ctx context.Context, id uuid.UUID) (string, error)
 	GetSession(ctx context.Context, refreshToken string) (Session, error)
 	GetSessionByUsername(ctx context.Context, username string) (Session, error)
-	GetUserByEmail(ctx context.Context, email string) (User, error)
-	GetUserByUID(ctx context.Context, uid uuid.UUID) (User, error)
-	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUser(ctx context.Context, arg GetUserParams) (User, error)
+	GetUserHistory(ctx context.Context, id int64) (UserHistory, error)
 	GetWishlistItems(ctx context.Context, username string) ([]Wishlist, error)
 	IncreaseReviewsCount(ctx context.Context, id uuid.UUID) error
 	IncreaseTotalModerates(ctx context.Context, arg IncreaseTotalModeratesParams) error
@@ -78,6 +82,10 @@ type Querier interface {
 	ListNotification(ctx context.Context, arg ListNotificationParams) ([]Notification, error)
 	ListOrdersByUsername(ctx context.Context, arg ListOrdersByUsernameParams) ([]Order, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	// Keyset-пагинация: первая страница — before_id = NULL,
+	// следующая — before_id = id последней записи предыдущей страницы.
+	ListUserHistory(ctx context.Context, arg ListUserHistoryParams) ([]UserHistory, error)
+	ListUserHistoryByActor(ctx context.Context, arg ListUserHistoryByActorParams) ([]UserHistory, error)
 	OAuthLogin(ctx context.Context, arg OAuthLoginParams) (User, error)
 	Reject(ctx context.Context, id uuid.UUID) error
 	Release(ctx context.Context, arg ReleaseParams) error
@@ -103,8 +111,7 @@ type Querier interface {
 	UpsertBalance(ctx context.Context, username string) (Balance, error)
 	UpsertCart(ctx context.Context, username string) (UpsertCartRow, error)
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
-	UserExistsByEmail(ctx context.Context, email string) (bool, error)
-	UserExistsByUsername(ctx context.Context, username string) (bool, error)
+	UserExists(ctx context.Context, arg UserExistsParams) (bool, error)
 	VerifyEmailAccount(ctx context.Context, arg VerifyEmailAccountParams) (User, error)
 	WishlistItemExists(ctx context.Context, arg WishlistItemExistsParams) (bool, error)
 }

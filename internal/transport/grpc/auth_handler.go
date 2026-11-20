@@ -15,13 +15,11 @@ import (
 //
 // Implemented RPC methods:
 //   - Register
+//   - OAuthLogin
 //   - Login
 //   - Logout
 //   - RefreshToken
 //   - GetMe
-//   - RequestResetPassword / ResetPassword
-//   - RequestVerifyEmail / VerifyEmail
-//   - ResetEmail
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
 	svc *service.AuthService
@@ -32,7 +30,7 @@ func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) OAuthLogin(ctx context.Context, req *authv1.OAuthLoginRequest) (*authv1.AuthResponse, error) {
-	user, tokens, err := h.svc.OAuthLogin(ctx, service.OAuthLoginInput{
+	user, tokens, err := h.svc.OAuthLogin(ctx, domain.OAuthLoginInput{
 		Username: req.GetUsername(),
 		Email:    req.GetEmail(),
 		Password: req.GetPassword(),
@@ -52,7 +50,7 @@ func (h *AuthHandler) Register(ctx context.Context, req *authv1.RegisterRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	user, tokens, err := h.svc.Register(ctx, service.RegisterInput{
+	user, tokens, err := h.svc.Register(ctx, domain.RegisterInput{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: req.Password,
@@ -108,25 +106,6 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *authv1.RefreshToken
 	}, nil
 }
 
-func (h *AuthHandler) ResetEmail(ctx context.Context, req *authv1.ResetEmailRequest) (*authv1.ResetEmailResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	username, ok := interceptors.GuestFromContext(ctx)
-	if !ok {
-		return nil, status.Error(codes.FailedPrecondition, "missing token")
-	}
-
-	operationId, err := h.svc.ResetEmail(ctx, username, req.GetNewEmail())
-	if err != nil {
-		return nil, domainErr(err)
-	}
-	return &authv1.ResetEmailResponse{
-		OperationId: operationId,
-	}, nil
-}
-
 func (h *AuthHandler) GetMe(ctx context.Context, _ *authv1.GetMeRequest) (*authv1.GetMeResponse, error) {
 	payload, ok := interceptors.PayloadFromContext(ctx)
 	if !ok {
@@ -137,74 +116,6 @@ func (h *AuthHandler) GetMe(ctx context.Context, _ *authv1.GetMeRequest) (*authv
 		return nil, domainErr(err)
 	}
 	return &authv1.GetMeResponse{User: protoUserInfo(user)}, nil
-}
-
-func (h *AuthHandler) ResetPassword(ctx context.Context, req *authv1.ResetPasswordRequest) (*authv1.ResetPasswordResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	ok, err := h.svc.ResetPassword(ctx, req.GetResetToken(), req.GetPassword())
-	if err != nil {
-		return nil, domainErr(err)
-	}
-
-	return &authv1.ResetPasswordResponse{
-		Success: ok,
-	}, nil
-}
-
-func (h *AuthHandler) RequestResetPassword(ctx context.Context, req *authv1.RequestResetPasswordRequest) (*authv1.RequestResetPasswordResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	operationId, err := h.svc.RequestResetPassword(ctx, domain.RequestResetPasswordParams{
-		Username: req.Username,
-		Email:    req.Email,
-	})
-	if err != nil {
-		return nil, domainErr(err)
-	}
-
-	return &authv1.RequestResetPasswordResponse{
-		OperationId: operationId,
-	}, nil
-}
-
-func (h *AuthHandler) RequestVerifyEmail(ctx context.Context, req *authv1.RequestVerifyEmailRequest) (*authv1.RequestVerifyEmailResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	operationId, err := h.svc.RequestVerifyEmail(ctx, req.GetEmail())
-	if err != nil {
-		return nil, domainErr(err)
-	}
-
-	return &authv1.RequestVerifyEmailResponse{
-		OperationId: operationId,
-	}, nil
-}
-
-func (h *AuthHandler) VerifyEmail(ctx context.Context, req *authv1.VerifyEmailRequest) (*authv1.VerifyEmailResponse, error) {
-	if err := req.Validate(); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	tokens, ok, err := h.svc.VerifyEmailAccount(ctx, req.GetVerifyToken())
-	if err != nil {
-		return nil, domainErr(err)
-	}
-	if tokens == nil || tokens.AccessToken == "" || tokens.RefreshToken == "" {
-		return nil, domainErr(domain.ErrBuiltToken)
-	}
-
-	return &authv1.VerifyEmailResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-		Success:      ok,
-	}, nil
 }
 
 // ── Shared proto mapper ───────────────────────────────────────────────────────

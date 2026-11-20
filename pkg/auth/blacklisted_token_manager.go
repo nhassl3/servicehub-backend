@@ -14,12 +14,24 @@ func NewBlacklistedTokenManager(inner TokenManager, blacklist TokenBlacklist) *B
 	return &BlacklistedTokenManager{inner: inner, blacklist: blacklist}
 }
 
-func (m *BlacklistedTokenManager) CreateToken(username, uid, role, email string, isActive bool) (string, error) {
-	return m.inner.CreateToken(username, uid, role, email, isActive)
+func (m *BlacklistedTokenManager) CreateToken(params *CreateTokenParams) (string, error) {
+	return m.inner.CreateToken(&CreateTokenParams{
+		Username: params.Username,
+		UID:      params.UID,
+		Role:     params.Role,
+		Email:    params.Email,
+		IsActive: params.IsActive,
+	})
 }
 
-func (m *BlacklistedTokenManager) CreateRefreshToken(username, uid, role, email string, isActive bool) (string, *Payload, error) {
-	return m.inner.CreateRefreshToken(username, uid, role, email, isActive)
+func (m *BlacklistedTokenManager) CreateRefreshToken(params *CreateTokenParams) (string, *Payload, error) {
+	return m.inner.CreateRefreshToken(&CreateTokenParams{
+		Username: params.Username,
+		UID:      params.UID,
+		Role:     params.Role,
+		Email:    params.Email,
+		IsActive: params.IsActive,
+	})
 }
 
 // VerifyToken delegates to the inner TokenManager and then checks the blacklist.

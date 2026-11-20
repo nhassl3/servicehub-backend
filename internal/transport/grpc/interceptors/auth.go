@@ -21,8 +21,8 @@ const GuestKey contextKey = "auth_guest"
 var publicMethods = []string{
 	"/auth.v1.AuthService/Register",
 	"/auth.v1.AuthService/Login",
-	"/auth.v1.AuthService/RequestResetPassword",
-	"/auth.v1.AuthService/ResetPassword",
+	"/auth.v1.UserService/RequestResetPassword",
+	"/auth.v1.UserService/ResetPassword",
 	"/auth.v1.AuthService/RefreshToken",
 	"/category.v1.CategoryService/ListCategories",
 	"/product.v1.ProductService/ListProducts",

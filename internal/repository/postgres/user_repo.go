@@ -23,7 +23,7 @@ func NewUserRepo(store *db.Store) *UserRepo {
 	return &UserRepo{store: store}
 }
 
-func (r *UserRepo) Create(ctx context.Context, params domain.CreateUserParams) (*domain.User, error) {
+func (r *UserRepo) Create(ctx context.Context, params *domain.CreateUserParams) (*domain.User, error) {
 	row, err := r.store.CreateUser(ctx, db.CreateUserParams{
 		Username:     params.Username,
 		Email:        params.Email,
@@ -36,7 +36,7 @@ func (r *UserRepo) Create(ctx context.Context, params domain.CreateUserParams) (
 	return mapUser(row), nil
 }
 
-func (r *UserRepo) CreateSession(ctx context.Context, params domain.CreateSessionParams) (*domain.Session, error) {
+func (r *UserRepo) CreateSession(ctx context.Context, params *domain.CreateSessionParams) (*domain.Session, error) {
 	session, err := r.store.CreateSession(ctx, db.CreateSessionParams{
 		Username:     params.Username,
 		RefreshToken: params.RefreshToken,
@@ -80,55 +80,28 @@ func (r *UserRepo) DeleteSession(ctx context.Context, username string) error {
 	return nil
 }
 
-func (r *UserRepo) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
-	row, err := r.store.GetUserByUsername(ctx, username)
+func (r *UserRepo) GetUser(ctx context.Context, params *domain.GetUserParams) (*domain.User, error) {
+	row, err := r.store.GetUser(ctx, db.GetUserParams{
+		Username: stringPtrToNullable(params.Username),
+		Email:    stringPtrToNullable(params.Email),
+		Uid:      uuidPtrToNullable(params.UID),
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
-		return nil, fmt.Errorf("user_repo.GetByUsername: %w", err)
+		return nil, fmt.Errorf("user_repo.GetUser: failed to get User: %w", err)
 	}
 	return mapUser(row), nil
 }
 
-func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	row, err := r.store.GetUserByEmail(ctx, email)
+func (r *UserRepo) UserExists(ctx context.Context, params *domain.UserExistsParams) (bool, error) {
+	exists, err := r.store.UserExists(ctx, db.UserExistsParams{
+		Username: stringPtrToNullable(params.Username),
+		Email:    stringPtrToNullable(params.Email),
+	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("user_repo.GetByEmail: %w", err)
-	}
-	return mapUser(row), nil
-}
-
-func (r *UserRepo) GetByUID(ctx context.Context, uid string) (*domain.User, error) {
-	u, err := parseUUID(uid)
-	if err != nil {
-		return nil, fmt.Errorf("user_repo.GetByUID: invalid uid: %w", err)
-	}
-	row, err := r.store.GetUserByUID(ctx, u)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrNotFound
-		}
-		return nil, fmt.Errorf("user_repo.GetByUID: %w", err)
-	}
-	return mapUser(row), nil
-}
-
-func (r *UserRepo) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	exists, err := r.store.UserExistsByUsername(ctx, username)
-	if err != nil {
-		return false, fmt.Errorf("user_repo.ExistsByUsername: %w", err)
-	}
-	return exists, nil
-}
-
-func (r *UserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	exists, err := r.store.UserExistsByEmail(ctx, email)
-	if err != nil {
-		return false, fmt.Errorf("user_repo.ExistsByEmail: %w", err)
+		return false, fmt.Errorf("user_repo.UserExists: failed to check user: %w", err)
 	}
 	return exists, nil
 }
@@ -137,7 +110,7 @@ func (r *UserRepo) ExistsByEmail(ctx context.Context, email string) (bool, error
 // confirmed. The SQL statement is the single source of truth for "once only":
 // it updates, activates and consumes the flag atomically, and returns no rows
 // when the reset is no longer allowed.
-func (r *UserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEmailParams) (*domain.User, error) {
+func (r *UserRepo) ConfirmEmailReset(ctx context.Context, params *domain.ResetEmailParams) (*domain.User, error) {
 	row, err := r.store.ConfirmEmailReset(ctx, db.ConfirmEmailResetParams{
 		Username: params.Username,
 		NewEmail: params.NewEmail,
@@ -156,7 +129,7 @@ func (r *UserRepo) ConfirmEmailReset(ctx context.Context, params domain.ResetEma
 	return mapUser(row), nil
 }
 
-func (r *UserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (*domain.User, error) {
+func (r *UserRepo) Update(ctx context.Context, params *domain.UpdateUserParams) (*domain.User, error) {
 	row, err := r.store.UpdateUser(ctx, db.UpdateUserParams{
 		Username:  params.Username,
 		FullName:  params.FullName,
@@ -171,7 +144,7 @@ func (r *UserRepo) Update(ctx context.Context, params domain.UpdateUserParams) (
 	return mapUser(row), nil
 }
 
-func (r *UserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserPasswordParams) (*domain.User, error) {
+func (r *UserRepo) UpdatePassword(ctx context.Context, params *domain.UpdateUserPasswordParams) (*domain.User, error) {
 	row, err := r.store.UpdatePassword(ctx, db.UpdatePasswordParams{
 		Username:    params.Username,
 		NewPassword: params.NewPassword,
@@ -185,10 +158,10 @@ func (r *UserRepo) UpdatePassword(ctx context.Context, params domain.UpdateUserP
 	return mapUser(row), nil
 }
 
-func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAccount) (*domain.User, error) {
+func (r *UserRepo) VerifyEmail(ctx context.Context, params *domain.VerifyEmailAccount) (*domain.User, error) {
 	user, err := r.store.VerifyEmailAccount(ctx, db.VerifyEmailAccountParams{
-		Email:    usernamePtrToNullable(params.Email),
-		Username: usernamePtrToNullable(params.Username),
+		Email:    stringPtrToNullable(params.Email),
+		Username: stringPtrToNullable(params.Username),
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -199,7 +172,7 @@ func (r *UserRepo) VerifyEmail(ctx context.Context, params domain.VerifyEmailAcc
 	return mapUser(user), nil
 }
 
-func (r *UserRepo) OAuthLogin(ctx context.Context, params domain.OAuthLoginParams) (*domain.User, error) {
+func (r *UserRepo) OAuthLogin(ctx context.Context, params *domain.OAuthLoginParams) (*domain.User, error) {
 	user, err := r.store.OAuthLogin(ctx, db.OAuthLoginParams{
 		Username:     params.Username,
 		Email:        params.Email,
@@ -214,9 +187,9 @@ func (r *UserRepo) OAuthLogin(ctx context.Context, params domain.OAuthLoginParam
 // ── Mapping ──────────────────────────────────────────────────────────────────
 
 func mapUser(u db.User) *domain.User {
-	var emailResetAt *time.Time
+	var emailResetAt time.Time
 	if u.EmailResetAt.Valid { // can be nil-pointer
-		emailResetAt = new(u.EmailResetAt.Time)
+		emailResetAt = u.EmailResetAt.Time
 	}
 
 	return &domain.User{

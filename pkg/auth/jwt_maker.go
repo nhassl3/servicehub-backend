@@ -31,24 +31,24 @@ func NewJWTMaker(secret string, ttl time.Duration) (*JWTMaker, error) {
 	return &JWTMaker{secret: []byte(secret), ttl: ttl}, nil
 }
 
-func (m *JWTMaker) CreateToken(username, uid, role, email string, isActive bool) (string, error) {
-	return m.createToken(username, uid, role, email, uuid.New().String(), isActive, time.Now())
+func (m *JWTMaker) CreateToken(params *CreateTokenParams) (string, error) {
+	return m.createToken(params.Username, params.UID, params.Role, params.Email, uuid.New().String(), params.IsActive, time.Now())
 }
 
-func (m *JWTMaker) CreateRefreshToken(username, uid, role, email string, isActive bool) (string, *Payload, error) {
+func (m *JWTMaker) CreateRefreshToken(params *CreateTokenParams) (string, *Payload, error) {
 	begin := time.Now()
 	jti := uuid.New().String()
-	token, err := m.createToken(username, uid, role, email, jti, isActive, begin)
+	token, err := m.createToken(params.Username, params.UID, params.Role, params.Email, jti, params.IsActive, begin)
 	if err != nil {
 		return "", nil, err
 	}
 	return token, &Payload{
 		JTI:       jti,
-		Username:  username,
-		Email:     email,
-		UID:       uid,
-		Role:      role,
-		IsActive:  isActive,
+		Username:  params.Username,
+		Email:     params.Email,
+		UID:       params.UID,
+		Role:      params.Role,
+		IsActive:  params.IsActive,
 		IssuedAt:  begin,
 		ExpiredAt: begin.Add(m.ttl),
 	}, nil

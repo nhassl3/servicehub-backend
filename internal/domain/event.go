@@ -12,6 +12,7 @@ const (
 	TopicProductEvent     Topic = "product_events"
 	TopicTransactionEvent Topic = "transaction_events"
 	TopicAnalyticsEvent   Topic = "analytics_events"
+	TopicHistoryEvent     Topic = "history_events"
 )
 
 var (
@@ -36,6 +37,7 @@ const (
 	ModerationApproved        // moderation.approved
 	ModerationRejected        // moderation.rejected
 	OrderItemCreated          // order.item.created
+	CreateUserHistory
 )
 
 //go:generate mockgen -source=event.go -destination=../repository/mock/event_publisher_mock.go -package=mockrepo
@@ -52,6 +54,7 @@ type EventPublisher interface {
 	PublishModerationApproved(ctx context.Context, payload ModerationApprovedPayload) error
 	PublishModerationRejected(ctx context.Context, payload ModerationRejectedPayload) error
 	PublishOrderItemCreated(ctx context.Context, payload OrderItemCreatedPayload) error
+	PublishCreateUserHistory(ctx context.Context, payload CreateUserHistoryParams) error
 	Close() error
 }
 

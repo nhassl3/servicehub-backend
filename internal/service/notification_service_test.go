@@ -6,22 +6,24 @@ import (
 
 	"github.com/nhassl3/servicehub-backend/internal/domain"
 	"github.com/nhassl3/servicehub-backend/internal/service"
+	"github.com/nhassl3/servicehub-backend/internal/service/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestNotificationService_ApproveCode_OK(t *testing.T) {
 	var verified *domain.VerifiedState
 
-	redis := &mockUserRedis{
-		codeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
+	redis := &mock.MockUserRedis{
+		CodeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
 			return &domain.CodeState{Email: "new@example.com", Code: "123456", Username: "alice"}, nil
 		},
-		setVerifiedFunc: func(_ context.Context, _, _ string, state *domain.VerifiedState) error {
+		SetVerifiedFunc: func(_ context.Context, _, _ string, state *domain.VerifiedState) error {
 			verified = state
 			return nil
 		},
 	}
-	svc := service.NewNotificationService(redis, &mockUserRepo{}, nil)
+	svc := service.NewNotificationService(redis, &mock.MockUserRepo{}, nil, zap.NewNop())
 
 	token, err := svc.ApproveCode(context.Background(), "verify_email:", "operation-id", "123456")
 
@@ -34,12 +36,12 @@ func TestNotificationService_ApproveCode_OK(t *testing.T) {
 }
 
 func TestNotificationService_ApproveCode_WrongCode(t *testing.T) {
-	redis := &mockUserRedis{
-		codeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
+	redis := &mock.MockUserRedis{
+		CodeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
 			return &domain.CodeState{Email: "alice@example.com", Code: "123456"}, nil
 		},
 	}
-	svc := service.NewNotificationService(redis, &mockUserRepo{}, nil)
+	svc := service.NewNotificationService(redis, &mock.MockUserRepo{}, nil, zap.NewNop())
 
 	token, err := svc.ApproveCode(context.Background(), "verify_email:", "operation-id", "000000")
 
@@ -48,15 +50,15 @@ func TestNotificationService_ApproveCode_WrongCode(t *testing.T) {
 }
 
 func TestNotificationService_ApproveCode_TooManyAttempts(t *testing.T) {
-	redis := &mockUserRedis{
-		codeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
+	redis := &mock.MockUserRedis{
+		CodeFunc: func(_ context.Context, _, _ string) (*domain.CodeState, error) {
 			return &domain.CodeState{Email: "alice@example.com", Code: "123456"}, nil
 		},
-		incrCodeAttemptsFunc: func(_ context.Context, _, _ string) (int64, error) {
+		IncrCodeAttemptsFunc: func(_ context.Context, _, _ string) (int64, error) {
 			return 6, nil // maxCodeAttempts + 1
 		},
 	}
-	svc := service.NewNotificationService(redis, &mockUserRepo{}, nil)
+	svc := service.NewNotificationService(redis, &mock.MockUserRepo{}, nil, zap.NewNop())
 
 	token, err := svc.ApproveCode(context.Background(), "verify_email:", "operation-id", "123456")
 
@@ -65,7 +67,7 @@ func TestNotificationService_ApproveCode_TooManyAttempts(t *testing.T) {
 }
 
 func TestNotificationService_ApproveCode_CodeNotFound(t *testing.T) {
-	svc := service.NewNotificationService(&mockUserRedis{}, &mockUserRepo{}, nil)
+	svc := service.NewNotificationService(&mock.MockUserRedis{}, &mock.MockUserRepo{}, nil, zap.NewNop())
 
 	token, err := svc.ApproveCode(context.Background(), "verify_email:", "unknown", "123456")
 

@@ -4,65 +4,41 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/go-passwd/validator"
-	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
-	"github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
 	"github.com/nhassl3/servicehub-backend/pkg/hash"
-	"github.com/nhassl3/servicehub-backend/pkg/mailer"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/metadata"
 )
 
 type AuthService struct {
-	userRepo         domain.UserRepository
-	userRedis        domain.UserRedis
-	tokenManager     auth.TokenManager
-	refreshManager   auth.TokenManager
-	blacklist        auth.TokenBlacklist
-	smtpClient       mailer.Notifier
-	eventPublisher   domain.EventPublisher
-	emailResetWindow time.Duration
-	log              *zap.Logger
+	userRepo       domain.UserRepository
+	userRedis      domain.UserRedis
+	tokenManager   auth.TokenManager
+	refreshManager auth.TokenManager
+	blacklist      auth.TokenBlacklist
+	eventService   *PublishService
+	tokenService   *TokenService
+	log            *zap.Logger
 }
 
 func NewAuthService(
 	userRepo domain.UserRepository, userRedis domain.UserRedis,
-	tokenManager, refreshManager auth.TokenManager,
 	blacklist auth.TokenBlacklist,
-	smtpClient mailer.Notifier,
-	eventPublisher domain.EventPublisher,
-	emailResetWindow time.Duration,
+	eventService *PublishService, tokenService *TokenService,
 	log *zap.Logger,
 ) *AuthService {
 	return &AuthService{
-		userRepo:         userRepo,
-		userRedis:        userRedis,
-		tokenManager:     tokenManager,
-		refreshManager:   refreshManager,
-		blacklist:        blacklist,
-		smtpClient:       smtpClient,
-		eventPublisher:   eventPublisher,
-		emailResetWindow: emailResetWindow,
-		log:              log,
+		userRepo:       userRepo,
+		userRedis:      userRedis,
+		tokenManager:   tokenService.tokenManager,
+		refreshManager: tokenService.refreshManager,
+		blacklist:      blacklist,
+		eventService:   eventService,
+		tokenService:   tokenService,
+		log:            log,
 	}
-}
-
-type RegisterInput struct {
-	Username string
-	Email    string
-	Password string
-	FullName string
-}
-
-type OAuthLoginInput struct {
-	Username string
-	Email    string
-	Password string
 }
 
 type TokenPair struct {
@@ -71,126 +47,119 @@ type TokenPair struct {
 	RefreshTokenPayload *auth.Payload
 }
 
-func (s *AuthService) OAuthLogin(ctx context.Context, input OAuthLoginInput) (*domain.User, *TokenPair, error) {
-	clientIP, _ := getMetadataFromContext(ctx)
+func (s *AuthService) OAuthLogin(ctx context.Context, input domain.OAuthLoginInput) (*domain.User, *TokenPair, error) {
+	clientIP, userAgent := GetMetadataFromContext(ctx)
 
-	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
-		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	if err := s.checkBlockAuth(ctx, clientIP); err != nil {
+		return nil, nil, err
 	}
 
-	existsUsername, err := s.userRepo.ExistsByUsername(ctx, input.Username)
-	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.oAuthLogin: failed to check username %w", err)
-	}
+	var (
+		user *domain.User
+		err  error
+	)
 
-	var user *domain.User
-	existsEmail, err := s.userRepo.ExistsByEmail(ctx, input.Email)
-	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register check email: %w", err)
-	}
-	if !existsEmail && !existsUsername {
-		passwordHash, err := hash.CreateHashPassword(input.Password)
-		if err != nil {
-			return nil, nil, fmt.Errorf("auth_service.Register hash: %w", err)
-		}
-
-		user, err = s.userRepo.OAuthLogin(ctx, domain.OAuthLoginParams{
-			Username:     input.Username,
-			Email:        input.Email,
-			PasswordHash: passwordHash,
-		})
-		if err != nil {
-			return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
-		}
-
-		if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
-			UID:       user.UID,
-			Username:  user.Username,
-			CreatedAt: user.CreatedAt,
-		}); err != nil {
-			s.log.Warn("(Kafka) analytics: failed to publish user.registered", zap.Error(err))
-		}
-	} else {
-		user, err = s.userRepo.GetByEmail(ctx, input.Email)
+	if exists, err := s.userRepo.UserExists(ctx, new(domain.UserExistsParams{
+		Username: &input.Username,
+		Email:    &input.Email,
+	})); err != nil {
+		return nil, nil, fmt.Errorf("auth_service.OAuthLogin: failed to check user exists: %w", err)
+	} else if exists {
+		user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{
+			Email: &input.Email,
+		}))
 		if err != nil {
 			return nil, nil, fmt.Errorf("auth_service.oAuthLogin: failed to get user by email: %w", err)
 		}
+		s.eventService.PublishNewUserHistory(ctx,
+			user.Username, user.Username,
+			domain.Login, domain.Login.LastLoginChanges(user.LastLogin, time.Now()),
+			clientIP, userAgent,
+		)
+	} else {
+		user, err = createUser(ctx, input, func(in domain.OAuthLoginInput) string { return in.Password },
+			func(ctx context.Context, input domain.OAuthLoginInput, passwordHash string) (*domain.User, error) {
+				return s.userRepo.OAuthLogin(ctx, new(domain.OAuthLoginParams{
+					Username:     input.Username,
+					Email:        input.Email,
+					PasswordHash: passwordHash,
+				}))
+			}, "OAuthLogin")
+		if err != nil {
+			return nil, nil, fmt.Errorf("auth_service.oAuthLogin: failed to create new user: %w", err)
+		}
+
+		// Kafka events sending async
+		s.eventService.PublishUserRegistered(ctx, user, clientIP, userAgent)
 	}
 
-	tokens, err := s.createTokensAndSession(ctx, user, input.Username)
+	tokens, err := s.tokenService.CreateTokensAndSession(ctx, user, input.Username)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
+		s.log.Warn("auth_service.OAuthLogin: failed to set auth block",
+			zap.Error(err),
+		)
+	}
 
 	return user, tokens, nil
 }
 
-func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, *TokenPair, error) {
-	clientIP, _ := getMetadataFromContext(ctx)
+func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) (*domain.User, *TokenPair, error) {
+	clientIP, userAgent := GetMetadataFromContext(ctx)
 
-	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
-		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	if err := s.checkBlockAuth(ctx, clientIP); err != nil {
+		return nil, nil, err
 	}
 
-	existsUsername, err := s.userRepo.ExistsByUsername(ctx, input.Username)
-	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register check username: %w", err)
-	}
-	if existsUsername {
+	if exists, err := s.userRepo.UserExists(ctx, new(domain.UserExistsParams{
+		Username: &input.Username,
+		Email:    &input.Email,
+	})); err != nil {
+		return nil, nil, fmt.Errorf("auth_service.Register: failed to check user exists: %w", err)
+	} else if exists {
 		return nil, nil, domain.ErrAlreadyExists
 	}
 
-	existsEmail, err := s.userRepo.ExistsByEmail(ctx, input.Email)
+	user, err := createUser(ctx, input, func(in domain.RegisterInput) string { return in.Password },
+		func(ctx context.Context, in domain.RegisterInput, passwordHash string) (*domain.User, error) {
+			return s.userRepo.Create(ctx, new(domain.CreateUserParams{
+				Username:     in.Username,
+				Email:        in.Email,
+				PasswordHash: passwordHash,
+				FullName:     in.FullName,
+			}))
+		}, "Register")
 	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register check email: %w", err)
-	}
-	if existsEmail {
-		return nil, nil, domain.ErrAlreadyExists
+		return nil, nil, fmt.Errorf("auth_service.Register create user: %w", err)
 	}
 
-	passwordHash, err := hash.CreateHashPassword(input.Password)
-	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register hash: %w", err)
-	}
+	s.eventService.PublishUserRegistered(ctx, user, clientIP, userAgent)
 
-	user, err := s.userRepo.Create(ctx, domain.CreateUserParams{
-		Username:     input.Username,
-		Email:        input.Email,
-		PasswordHash: passwordHash,
-		FullName:     input.FullName,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register create: %w", err)
-	}
-
-	if err := s.eventPublisher.PublishUserRegistered(ctx, domain.UserRegisteredPayload{
-		UID:       user.UID,
-		Username:  user.Username,
-		CreatedAt: user.CreatedAt,
-	}); err != nil {
-		s.log.Warn("(Kafka) analytics: failed to publish user.registered", zap.Error(err))
-	}
-
-	tokens, err := s.createTokensAndSession(ctx, user, input.Username)
+	tokens, err := s.tokenService.CreateTokensAndSession(ctx, user, input.Username)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
+		s.log.Warn("auth_service.Register: failed to set auth block",
+			zap.Error(err),
+		)
+	}
 
 	return user, tokens, nil
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password string) (*domain.User, *TokenPair, error) {
-	clientIP, _ := getMetadataFromContext(ctx)
+	clientIP, userAgent := GetMetadataFromContext(ctx)
 
-	if block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP); block || err != nil {
-		return nil, nil, fmt.Errorf("%w: %.0f seconds remaining", domain.ErrAuthBlock, ttl)
+	if err := s.checkBlockAuth(ctx, clientIP); err != nil {
+		return nil, nil, err
 	}
 
-	user, err := s.userRepo.GetByUsername(ctx, username)
+	user, err := s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return nil, nil, domain.ErrInvalidCredentials
@@ -206,173 +175,24 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 		return nil, nil, domain.ErrInvalidCredentials
 	}
 
-	tokens, err := s.createTokensAndSession(ctx, user, username)
+	tokens, err := s.tokenService.CreateTokensAndSession(ctx, user, user.Username)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_ = s.userRedis.SetAuthBlock(ctx, clientIP)
+	s.eventService.PublishNewUserHistory(ctx,
+		user.Username, user.Username,
+		domain.Login, domain.Login.LastLoginChanges(user.LastLogin, time.Now()),
+		clientIP, userAgent,
+	)
+
+	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
+		s.log.Warn("auth_service.Login: failed to set auth block",
+			zap.Error(err),
+		)
+	}
 
 	return user, tokens, nil
-}
-
-func (s *AuthService) RequestResetPassword(ctx context.Context, params domain.RequestResetPasswordParams) (string, error) {
-	var email string
-	if params.Username != nil && *params.Username != "" {
-		user, err := s.userRedis.Profile(ctx, *params.Username)
-		if err != nil {
-			if errors.Is(err, domain.ErrRedisNotFound) {
-				user, err = s.userRepo.GetByUsername(ctx, *params.Username)
-				if err != nil {
-					return "", fmt.Errorf("auth_service.GetMe get from database: %w", err)
-				}
-				_ = s.userRedis.SetProfile(ctx, user)
-			} else {
-				return "", fmt.Errorf("auth_service:GetMe get from redis: %w", err)
-			}
-		}
-		email = user.Email
-	} else if params.Email != nil && *params.Email != "" && strings.Contains(*params.Email, "@") {
-		ok, err := s.userRepo.ExistsByEmail(ctx, *params.Email)
-		if err != nil {
-			return "", fmt.Errorf("auth_serivce.ResetPassword check email: %w", err)
-		}
-		if !ok {
-			return "", domain.ErrNotFound
-		}
-		email = *params.Email
-	} else {
-		return "", domain.ErrInvalidCredentials
-	}
-
-	return s.requestToEntryKey(ctx, redis.ResetPasswordEnterKey, &domain.CodeState{Email: email})
-}
-
-func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword string) (bool, error) {
-	state, err := s.userRedis.Verified(ctx, redis.ResetPasswordEnterKey, resetToken)
-	if err != nil {
-		if errors.Is(err, domain.ErrRedisNotFound) {
-			return false, domain.ErrNotFound
-		}
-		return false, fmt.Errorf("auth_service.ResetPassword verify reset token: %w", err)
-	}
-
-	user, err := s.userRepo.GetByEmail(ctx, state.Email)
-	if err != nil {
-		return false, err
-	}
-
-	ok, err := hash.VerifyPassword(newPassword, user.PasswordHash)
-	if err != nil {
-		return false, fmt.Errorf("user_service.UpdatePassword verify password: %w", err)
-	}
-	if ok {
-		return false, domain.ErrTooSimilarPasswords
-	}
-
-	// similarity by default is 0.7 - DO NOT CHANGE THIS THRESHOLD
-	passwordValidator := validator.New(
-		validator.Similarity([]string{user.PasswordHash}, nil, domain.ErrTooSimilarPasswords),
-	)
-	if err := passwordValidator.Validate(newPassword); err != nil {
-		return false, err
-	}
-
-	newPasswordHashed, err := hash.CreateHashPassword(newPassword)
-	if err != nil {
-		return false, fmt.Errorf("user_service.UpdatePassword.NewPassword: %w", err)
-	}
-
-	params := domain.UpdateUserPasswordParams{
-		Username:    user.Username,
-		NewPassword: newPasswordHashed,
-	}
-
-	if _, err = s.userRepo.UpdatePassword(ctx, params); err != nil {
-		return false, fmt.Errorf("auth_service.UpdatePassword: %w", err)
-	}
-
-	_ = s.userRedis.DelVerified(ctx, redis.ResetPasswordEnterKey, resetToken) // optional operation
-
-	return true, nil
-}
-
-func (s *AuthService) RequestVerifyEmail(ctx context.Context, email string) (string, error) {
-	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, &domain.CodeState{Email: email})
-}
-
-// requestToEntryKey issues a six-digit code for an email-related flow, stores
-// it in Redis together with the target email (and, for email resets, the
-// account username) and sends it to the target address. It returns the
-// operation id that is later used to confirm the code.
-func (s *AuthService) requestToEntryKey(ctx context.Context, entryKey string, state *domain.CodeState) (string, error) {
-	if ok := s.userRedis.CodeExists(ctx, entryKey, state.Email); ok {
-		return "", domain.ErrCodeAlreadyExists
-	}
-
-	code := GenerateResetPasswordCode()
-	if code == "" {
-		return "", fmt.Errorf("auth_service.requestToEntryKey reset code is empty")
-	}
-	state.Code = code
-
-	operationId := uuid.NewString()
-
-	if err := s.userRedis.SetCode(ctx, entryKey, operationId, state); err != nil {
-		return "", fmt.Errorf("auth_service.requestToEntryKey set code: %w", err)
-	}
-
-	var err error
-	switch entryKey {
-	case redis.VerifyEmailEnterKey:
-		err = s.smtpClient.NotifyEmailConfirmation(ctx, code, state.Email)
-	case redis.ResetPasswordEnterKey:
-		err = s.smtpClient.NotifyResetPassword(ctx, code, state.Email)
-	default:
-		return "", fmt.Errorf("auth_service.requestToEntryKey unknown entry key")
-	}
-	if err != nil {
-		return "", fmt.Errorf("auth_service.requestToEntryKey: failed to notify: %w", err)
-	}
-
-	return operationId, nil
-}
-
-func (s *AuthService) VerifyEmailAccount(ctx context.Context, verifyToken string) (*TokenPair, bool, error) {
-	state, err := s.userRedis.Verified(ctx, redis.VerifyEmailEnterKey, verifyToken)
-	if err != nil {
-		if errors.Is(err, domain.ErrRedisNotFound) {
-			return nil, false, domain.ErrInvalidToken
-		}
-		return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify token: %w", err)
-	}
-
-	var user *domain.User
-	if state.IsEmailReset() {
-		// The email is switched only now, after the user has proved access to the
-		// new address; ConfirmEmailReset also consumes the one-time reset flag.
-		user, err = s.userRepo.ConfirmEmailReset(ctx, domain.ResetEmailParams{
-			Username: state.Username,
-			NewEmail: state.Email,
-		})
-		if err != nil {
-			return nil, false, err
-		}
-	} else {
-		user, err = s.userRepo.VerifyEmail(ctx, domain.VerifyEmailAccount{Email: &state.Email})
-		if err != nil {
-			return nil, false, fmt.Errorf("auth_service.VerifyEmailAccount: failed to verify email account: %w", err)
-		}
-	}
-
-	tokens, err := s.createTokensAndSession(ctx, user, user.Username)
-	if err != nil {
-		return nil, false, err
-	}
-
-	_ = s.userRedis.DelVerified(ctx, redis.VerifyEmailEnterKey, verifyToken)
-
-	return tokens, true, nil
 }
 
 func (s *AuthService) Logout(ctx context.Context, accessPayload *auth.Payload) error {
@@ -418,7 +238,13 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		return nil, domain.ErrSessionIsBlocked
 	}
 
-	accessToken, err := s.tokenManager.CreateToken(session.Username, payload.UID, payload.Role, payload.Email, payload.IsActive)
+	accessToken, err := s.tokenService.CreateAccessToken(&auth.CreateTokenParams{
+		Username: payload.Username,
+		Email:    payload.Email,
+		UID:      payload.UID,
+		Role:     payload.Role,
+		IsActive: payload.IsActive,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}
@@ -429,42 +255,11 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 	}, nil
 }
 
-// ResetEmail starts the one-time email change for an unverified account.
-func (s *AuthService) ResetEmail(ctx context.Context, username, newEmail string) (string, error) {
-	user, err := s.userRepo.GetByUsername(ctx, username)
-	if err != nil {
-		return "", err
-	}
-
-	if user.IsActive {
-		return "", domain.ErrEmailResetNotAllowed
-	}
-	if user.EmailResetAt != nil {
-		return "", domain.ErrEmailAlreadyReset
-	}
-	if s.emailResetWindow > 0 && time.Since(user.CreatedAt) > s.emailResetWindow {
-		return "", domain.ErrEmailResetWindowExpired
-	}
-
-	exists, err := s.userRepo.ExistsByEmail(ctx, newEmail)
-	if err != nil {
-		return "", fmt.Errorf("auth_service.ResetEmail check email exists: %w", err)
-	}
-	if exists {
-		return "", domain.ErrAlreadyExists
-	}
-
-	return s.requestToEntryKey(ctx, redis.VerifyEmailEnterKey, &domain.CodeState{
-		Email:    newEmail,
-		Username: username,
-	})
-}
-
 func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User, error) {
 	user, err := s.userRedis.Profile(ctx, username)
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
-			user, err = s.userRepo.GetByUsername(ctx, username)
+			user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &username}))
 			if err != nil {
 				return nil, fmt.Errorf("auth_service.GetMe get from database: %w", err)
 			}
@@ -478,93 +273,37 @@ func (s *AuthService) GetMe(ctx context.Context, username string) (*domain.User,
 	return user, nil
 }
 
-func (s *AuthService) createTokenPair(username, uid, role, email string, isActive bool) (*TokenPair, error) {
-	accessToken, err := s.tokenManager.CreateToken(username, uid, role, email, isActive)
+// checkBlockAuth checks auth blocking in redis storage cache
+func (s *AuthService) checkBlockAuth(ctx context.Context, clientIP string) error {
+	block, ttl, err := s.userRedis.AuthBlock(ctx, clientIP)
 	if err != nil {
-		return nil, fmt.Errorf("auth_service: create access token: %w", err)
+		return fmt.Errorf("auth_service.OAuthLogin: check auth block: %w", err)
 	}
-
-	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(username, uid, role, email, isActive)
-	if err != nil {
-		return nil, fmt.Errorf("auth_service: create refresh token: %w", err)
+	if block {
+		return fmt.Errorf(
+			"%w: %.0f seconds remaining",
+			domain.ErrAuthBlock,
+			ttl,
+		)
 	}
-
-	return &TokenPair{AccessToken: accessToken, RefreshToken: refreshToken, RefreshTokenPayload: payload}, nil
-}
-
-func (s *AuthService) createSession(ctx context.Context, username, refreshToken string, expiredAt time.Time) error {
-	clientIp, userAgent := getMetadataFromContext(ctx)
-
-	// Select session by username because only username store old data for old refreshToken
-	// new refresh token while not store in database
-	// it's only will be created after check old session
-	session, err := s.userRedis.Session(ctx, username)
-	if err != nil {
-		if errors.Is(err, domain.ErrRedisNotFound) {
-			session, err = s.userRepo.GetSessionByUsername(ctx, username)
-			if err != nil && !errors.Is(err, domain.ErrNotFound) {
-				return fmt.Errorf("auth_service.createSession get old session: %w", err)
-			}
-		} else {
-			return fmt.Errorf("auth_service.createSession get old session (redis): %w", err)
-		}
-	}
-
-	// TODO: implement IPs and useragent checker
-	if session != nil && session.ClientIP != clientIp && session.UserAgent != userAgent {
-		return domain.ErrDeviceMistake
-	}
-
-	// Creating session record about user session in main database
-	newSession, err := s.userRepo.CreateSession(ctx, domain.CreateSessionParams{
-		Username:     username,
-		RefreshToken: refreshToken,
-		UserAgent:    userAgent,
-		ClientIp:     clientIp,
-		IsBlocked:    false,
-		ExpiresAt:    expiredAt,
-	})
-	if err != nil {
-		return fmt.Errorf("auth_service.createSession create session: %w", err)
-	}
-
-	// Creating session record about user session in Redis
-	if err := s.userRedis.SetSession(ctx, newSession); err != nil {
-		return fmt.Errorf("auth_service.createSession create session (redis): %w", err)
-	}
-
 	return nil
 }
 
-func (s *AuthService) createTokensAndSession(ctx context.Context, user *domain.User, sessionUsername string) (*TokenPair, error) {
-	tokens, err := s.createTokenPair(user.Username, user.UID, user.Role, user.Email, user.IsActive)
+// createUser creates user by any types
+func createUser[T any](
+	ctx context.Context,
+	input T,
+	getPassword func(T) string,
+	create func(context.Context, T, string) (*domain.User, error),
+	operation string,
+) (*domain.User, error) {
+	passwordHash, err := hash.CreateHashPassword(getPassword(input))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("auth_service.%s: failed to hash password: %w", operation, err)
 	}
-
-	if err := s.createSession(ctx, sessionUsername, tokens.RefreshToken, tokens.RefreshTokenPayload.ExpiredAt); err != nil {
-		return nil, err
+	user, err := create(ctx, input, passwordHash)
+	if err != nil {
+		return nil, fmt.Errorf("auth_service.%s: failed to create user: %w", operation, err)
 	}
-
-	_ = s.userRedis.SetProfile(ctx, user)
-
-	return tokens, nil
-}
-
-// getMetadataFromContext TODO: update function (wrong ip and user-agent on response)
-func getMetadataFromContext(ctx context.Context) (clientIp string, userAgent string) {
-	if headers, ok := metadata.FromIncomingContext(ctx); ok {
-		xForwardFor := headers.Get("x-forwarded-for")
-		if len(xForwardFor) > 0 && xForwardFor[0] != "" {
-			ips := strings.Split(xForwardFor[0], ",")
-			if len(ips) > 0 {
-				clientIp = ips[0]
-			}
-		}
-		usrAgent := headers.Get("user-agent")
-		if len(usrAgent) >= 1 && usrAgent[0] != "" {
-			userAgent = usrAgent[0]
-		}
-	}
-	return
+	return user, nil
 }

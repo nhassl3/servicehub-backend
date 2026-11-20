@@ -52,7 +52,7 @@ func (r *AdminRepo) GetAdmin(ctx context.Context, params domain.GetAdminProfileP
 		}
 	} else if params.Username != "" {
 		getAdminParams = db.GetAdminParams{
-			Username: usernamePtrToNullable(&params.Username),
+			Username: stringPtrToNullable(&params.Username),
 		}
 	}
 	row, err := r.store.GetAdmin(ctx, getAdminParams)
