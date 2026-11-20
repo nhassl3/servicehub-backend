@@ -14,7 +14,9 @@ func TestPasetoMaker_CreateAndVerify(t *testing.T) {
 	maker, err := auth.NewPasetoMaker(testPasetoKey, 15*time.Minute)
 	require.NoError(t, err)
 
-	token, err := maker.CreateToken("alice", "uid-123", "buyer", "alice@example.com", false)
+	token, err := maker.CreateToken(&auth.CreateTokenParams{
+		Username: "alice", UID: "uid-123", Role: "buyer", Email: "alice@example.com", IsActive: false,
+	})
 	require.NoError(t, err)
 	require.NotEmpty(t, token)
 
@@ -30,7 +32,9 @@ func TestPasetoMaker_CreateAndVerify(t *testing.T) {
 
 func TestPasetoMaker_ExpiredToken(t *testing.T) {
 	maker, _ := auth.NewPasetoMaker(testPasetoKey, -1*time.Second)
-	token, _ := maker.CreateToken("alice", "uid-123", "buyer", "alice@example.com", false)
+	token, _ := maker.CreateToken(&auth.CreateTokenParams{
+		Username: "alice", UID: "uid-123", Role: "buyer", Email: "alice@example.com", IsActive: false,
+	})
 
 	_, err := maker.VerifyToken(token)
 	require.ErrorIs(t, err, auth.ErrInvalidToken)
@@ -51,7 +55,9 @@ func TestJWTMaker_CreateAndVerify(t *testing.T) {
 	maker, err := auth.NewJWTMaker("supersecretkeythatisatleast32chars!!", 15*time.Minute)
 	require.NoError(t, err)
 
-	token, err := maker.CreateToken("bob", "uid-456", "seller", "bob@example.com", false)
+	token, err := maker.CreateToken(&auth.CreateTokenParams{
+		Username: "bob", UID: "uid-456", Role: "seller", Email: "bob@example.com", IsActive: false,
+	})
 	require.NoError(t, err)
 
 	payload, err := maker.VerifyToken(token)
@@ -63,7 +69,9 @@ func TestJWTMaker_CreateAndVerify(t *testing.T) {
 
 func TestJWTMaker_ExpiredToken(t *testing.T) {
 	maker, _ := auth.NewJWTMaker("supersecretkeythatisatleast32chars!!", -1*time.Second)
-	token, _ := maker.CreateToken("bob", "uid", "buyer", "bob@example.com", false)
+	token, _ := maker.CreateToken(&auth.CreateTokenParams{
+		Username: "bob", UID: "uid", Role: "buyer", Email: "bob@example.com", IsActive: false,
+	})
 	_, err := maker.VerifyToken(token)
 	require.ErrorIs(t, err, auth.ErrExpiredToken)
 }
