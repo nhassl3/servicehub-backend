@@ -127,7 +127,7 @@ func (s *UserService) RequestResetPassword(ctx context.Context, params domain.Re
 	} else if params.Email != nil && *params.Email != "" && strings.Contains(*params.Email, "@") {
 		ok, err := s.userRepo.UserExists(ctx, new(domain.UserExistsParams{Email: params.Email}))
 		if err != nil {
-			return "", fmt.Errorf("auth_serivce.RequestResetPassword check email: %w", err)
+			return "", fmt.Errorf("user_service.RequestResetPassword check email: %w", err)
 		}
 		if !ok {
 			return "", domain.ErrNotFound
@@ -151,7 +151,7 @@ func (s *UserService) ResetPassword(ctx context.Context, resetToken, newPassword
 
 	user, err := s.userRedis.Profile(ctx, state.Username)
 	if err != nil {
-		user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &state.Username}))
+		user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{Username: &state.Username, Email: &state.Email}))
 		if err != nil {
 			return false, fmt.Errorf("user_service.ResetPassword: failed to get user: %w", err)
 		}

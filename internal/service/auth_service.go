@@ -63,7 +63,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, input domain.OAuthLoginInp
 		Username: &input.Username,
 		Email:    &input.Email,
 	})); err != nil {
-		return nil, nil, fmt.Errorf("auth_service.Register: failed to check user exists: %w", err)
+		return nil, nil, fmt.Errorf("auth_service.OAuthLogin: failed to check user exists: %w", err)
 	} else if exists {
 		user, err = s.userRepo.GetUser(ctx, new(domain.GetUserParams{
 			Email: &input.Email,
@@ -144,7 +144,7 @@ func (s *AuthService) Register(ctx context.Context, input domain.RegisterInput) 
 	}
 
 	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
-		s.log.Warn("auth_service.OAuthLogin: failed to set auth block",
+		s.log.Warn("auth_service.Register: failed to set auth block",
 			zap.Error(err),
 		)
 	}
@@ -187,7 +187,7 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (*do
 	)
 
 	if err := s.userRedis.SetAuthBlock(ctx, clientIP); err != nil {
-		s.log.Warn("auth_service.OAuthLogin: failed to set auth block",
+		s.log.Warn("auth_service.Login: failed to set auth block",
 			zap.Error(err),
 		)
 	}
@@ -238,9 +238,13 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*T
 		return nil, domain.ErrSessionIsBlocked
 	}
 
-	accessToken, err := s.tokenService.CreateAccessToken(
-		session.Username, payload.UID, payload.Role, payload.Email, payload.IsActive,
-	)
+	accessToken, err := s.tokenService.CreateAccessToken(&auth.CreateTokenParams{
+		Username: payload.Username,
+		Email:    payload.Email,
+		UID:      payload.UID,
+		Role:     payload.Role,
+		IsActive: payload.IsActive,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("auth_service: create access token: %w", err)
 	}

@@ -33,30 +33,28 @@ func NewTokenService(tokenManager, refreshManager auth.TokenManager,
 }
 
 func (s *TokenService) CreateTokenPair(username, uid, role, email string, isActive bool) (*TokenPair, error) {
-	accessToken, err := s.CreateAccessToken(username, uid, role, email, isActive)
-
-	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(&auth.CreateTokenParams{
+	input := new(auth.CreateTokenParams{
 		Username: username,
 		UID:      uid,
 		Role:     role,
 		Email:    email,
 		IsActive: isActive,
 	})
+	accessToken, err := s.CreateAccessToken(input)
 	if err != nil {
-		return nil, fmt.Errorf("auth_service: create refresh token: %w", err)
+		return nil, err
+	}
+
+	refreshToken, payload, err := s.refreshManager.CreateRefreshToken(input)
+	if err != nil {
+		return nil, fmt.Errorf("token_service.CreateTokenPair: create refresh token: %w", err)
 	}
 
 	return &TokenPair{AccessToken: accessToken, RefreshToken: refreshToken, RefreshTokenPayload: payload}, nil
 }
 
-func (s *TokenService) CreateAccessToken(username, uid, role, email string, isActive bool) (string, error) {
-	accessToken, err := s.tokenManager.CreateToken(&auth.CreateTokenParams{
-		Username: username,
-		UID:      uid,
-		Role:     role,
-		Email:    email,
-		IsActive: isActive,
-	})
+func (s *TokenService) CreateAccessToken(params *auth.CreateTokenParams) (string, error) {
+	accessToken, err := s.tokenManager.CreateToken(params)
 	if err != nil {
 		return "", fmt.Errorf("token_service.createAccessToken: create access token: %w", err)
 	}
@@ -71,10 +69,10 @@ func (s *TokenService) CreateSession(ctx context.Context, username, refreshToken
 	// it's only will be created after check old session
 	session, err := s.userRedis.Session(ctx, username)
 	if err != nil {
-		s.log.Warn("(redis) failed to load session from cache", zap.Error(err))
+		s.log.Warn("(Redis) failed to load session from cache", zap.Error(err))
 		session, err = s.userRepo.GetSessionByUsername(ctx, username)
 		if err != nil && !errors.Is(err, domain.ErrNotFound) {
-			return fmt.Errorf("auth_service.createSession get old session: %w", err)
+			return fmt.Errorf("token_service.CreateSession get old session: %w", err)
 		}
 	}
 
@@ -93,12 +91,12 @@ func (s *TokenService) CreateSession(ctx context.Context, username, refreshToken
 		ExpiresAt:    expiredAt,
 	}))
 	if err != nil {
-		return fmt.Errorf("auth_service.createSession create session: %w", err)
+		return fmt.Errorf("token_service.CreateSession create session: %w", err)
 	}
 
 	// Creating session record about user session in Redis
 	if err = s.userRedis.SetSession(ctx, newSession); err != nil {
-		s.log.Warn("(Redis) auth_service.createSession create session (redis)", zap.Error(err))
+		s.log.Warn("(Redis) token_service.CreateSession create session (redis)", zap.Error(err))
 	}
 
 	return nil

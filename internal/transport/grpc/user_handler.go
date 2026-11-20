@@ -141,8 +141,12 @@ func (h *UserHandler) RequestResetEmail(ctx context.Context, req *userv1.Request
 		if !ok {
 			return nil, status.Error(codes.FailedPrecondition, "missing token")
 		}
+	} else {
+		if payload == nil {
+			return nil, status.Errorf(codes.FailedPrecondition, "empty payload")
+		}
+		username = payload.Username
 	}
-	username = payload.Username
 
 	operationId, err := h.svc.RequestResetEmail(ctx, username, req.GetNewEmail())
 	if err != nil {
