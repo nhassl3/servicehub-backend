@@ -15,6 +15,7 @@ go.work
 go.work.sumo
 
 AGENTS.md
+CODE_REVIEW.md
 .claude/
 pprof/
 CLAUDE.md
