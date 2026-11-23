@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nhassl3/servicehub-backend/pkg/auth"
+	userv1 "github.com/nhassl3/servicehub-contracts/pkg/pb/user/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -37,7 +38,8 @@ var publicMethods = []string{
 var guestMethods = []string{
 	"/auth.v1.AuthService/RequestVerifyEmail",
 	"/auth.v1.AuthService/VerifyEmail",
-	"/auth.v1.AuthService/ResetEmail",
+	userv1.UserService_RequestResetEmail_FullMethodName,
+	userv1.UserService_ResetEmail_FullMethodName,
 }
 
 // AuthInterceptor returns a gRPC unary interceptor for PASETO token verification.

@@ -112,10 +112,11 @@ func TestUserService_RequestResetEmail_AlreadyReset(t *testing.T) {
 		},
 	}
 
-	_, err := newUserServiceWithRedis(repo, &mock.MockUserRedis{}).
+	operationID, err := newUserServiceWithRedis(repo, &mock.MockUserRedis{}).
 		RequestResetEmail(context.Background(), "alice", "new@example.com")
 
 	require.ErrorIs(t, err, domain.EmailResetManyAttempts)
+	require.Empty(t, operationID)
 }
 
 func TestUserService_RequestResetEmail_EmailTaken(t *testing.T) {
@@ -337,26 +338,80 @@ func TestUserService_VerifyEmailAccount_InvalidToken(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrInvalidToken)
 }
 
-func TestUserService_ResetEmail_OK(t *testing.T) {
+func TestResetEmail_RequestApproveAndReset(t *testing.T) {
+	ctx := context.Background()
 	var got *domain.ResetEmailParams
+	type redisKey struct{ namespace, id string }
+	codes := make(map[redisKey]*domain.CodeState)
+	verified := map[redisKey]*domain.VerifiedState{
+		{repoRedis.VerifyEmailEnterKey, "verification-token"}: {Email: "old@example.com"},
+	}
+	var deliveredCode string
 
 	repo := &mock.MockUserRepo{
+		GetUserFunc: func(_ context.Context, params *domain.GetUserParams) (*domain.User, error) {
+			return &domain.User{Username: *params.Username}, nil
+		},
 		ConfirmEmailResetFunc: func(_ context.Context, params *domain.ResetEmailParams) (*domain.User, error) {
 			got = params
 			return &domain.User{Username: params.Username, Email: params.NewEmail}, nil
 		},
 	}
 	redis := &mock.MockUserRedis{
-		VerifiedFunc: func(_ context.Context, _, _ string) (*domain.VerifiedState, error) {
-			return &domain.VerifiedState{Email: "new@example.com", Username: "alice"}, nil
+		SetCodeFunc: func(_ context.Context, namespace, id string, state *domain.CodeState) error {
+			codes[redisKey{namespace, id}] = state
+			return nil
+		},
+		CodeFunc: func(_ context.Context, namespace, id string) (*domain.CodeState, error) {
+			if state := codes[redisKey{namespace, id}]; state != nil {
+				return state, nil
+			}
+			return nil, domain.ErrRedisNotFound
+		},
+		SetVerifiedFunc: func(_ context.Context, namespace, token string, state *domain.VerifiedState) error {
+			verified[redisKey{namespace, token}] = state
+			return nil
+		},
+		VerifiedFunc: func(_ context.Context, namespace, token string) (*domain.VerifiedState, error) {
+			if state := verified[redisKey{namespace, token}]; state != nil {
+				return state, nil
+			}
+			return nil, domain.ErrRedisNotFound
+		},
+		DelVerifiedFunc: func(_ context.Context, namespace, token string) error {
+			delete(verified, redisKey{namespace, token})
+			return nil
 		},
 	}
+	notifier := &mock.MockNotifier{
+		NotifyEmailConfirmationFunc: func(_ context.Context, code, email string) error {
+			require.Equal(t, "new@example.com", email)
+			deliveredCode = code
+			return nil
+		},
+	}
+	users := newUserService(repo, &mock.MockPhotoStorage{}, redis, notifier)
+	notifications := NewNotificationService(redis, repo, nil, zap.NewNop())
 
-	ok, err := newUserServiceWithRedis(repo, redis).ResetEmail(context.Background(), "verify-token")
+	ok, err := users.ResetEmail(ctx, "verification-token")
+	require.ErrorIs(t, err, domain.ErrInvalidToken)
+	require.False(t, ok)
+	require.Nil(t, got)
 
+	operationID, err := users.RequestResetEmail(ctx, "alice", "new@example.com")
+	require.NoError(t, err)
+	token, err := notifications.ApproveCode(ctx, repoRedis.VerifyEmailEnterKey, operationID, deliveredCode)
+	require.NoError(t, err)
+	require.NotEmpty(t, token)
+
+	ok, err = users.ResetEmail(ctx, token)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, &domain.ResetEmailParams{Username: "alice", NewEmail: "new@example.com"}, got)
+
+	ok, err = users.ResetEmail(ctx, token)
+	require.ErrorIs(t, err, domain.ErrInvalidToken)
+	require.False(t, ok)
 }
 
 func TestUserService_ResetEmail_InvalidToken(t *testing.T) {

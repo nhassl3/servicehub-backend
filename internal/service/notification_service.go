@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nhassl3/servicehub-backend/internal/domain"
+	"github.com/nhassl3/servicehub-backend/internal/repository/redis"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +36,11 @@ func NewNotificationService(userRedis domain.UserRedis, userRepo domain.UserRepo
 
 func (s *NotificationService) ApproveCode(ctx context.Context, enterKeyCode, operationId, code string) (string, error) {
 	storeCode, err := s.userRedis.Code(ctx, enterKeyCode, operationId)
+	// The notification contract uses VERIFY_EMAIL for both email flows.
+	if enterKeyCode == redis.VerifyEmailEnterKey && errors.Is(err, domain.ErrRedisNotFound) {
+		enterKeyCode = redis.ResetEmailEnterKey
+		storeCode, err = s.userRedis.Code(ctx, enterKeyCode, operationId)
+	}
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
 			return "", domain.ErrNotFound
