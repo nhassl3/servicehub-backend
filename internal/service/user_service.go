@@ -308,7 +308,7 @@ func (s *UserService) RequestResetEmail(ctx context.Context, username, newEmail 
 }
 
 func (s *UserService) ResetEmail(ctx context.Context, token string) (bool, error) {
-	state, err := s.userRedis.Verified(ctx, redis.VerifyEmailEnterKey, token)
+	state, err := s.userRedis.Verified(ctx, redis.ResetEmailEnterKey, token)
 	if err != nil {
 		if errors.Is(err, domain.ErrRedisNotFound) {
 			return false, domain.ErrInvalidToken
@@ -324,5 +324,11 @@ func (s *UserService) ResetEmail(ctx context.Context, token string) (bool, error
 		return false, fmt.Errorf("user_service.ResetEmail: failed to reset email: %w", err)
 	}
 
-	return user != nil && *user != domain.User{}, nil
+	if user == nil || *user == (domain.User{}) {
+		return false, nil
+	}
+	if err := s.userRedis.DelVerified(ctx, redis.ResetEmailEnterKey, token); err != nil {
+		s.log.Warn("user_service.ResetEmail: failed to delete verified token in redis cache")
+	}
+	return true, nil
 }
